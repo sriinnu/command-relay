@@ -46,6 +46,47 @@ Coverage baseline:
 
 Use this suite as the protocol gate before merging schema changes.
 
+## Batch Outcomes Snapshot (2026-02-24)
+
+This batch locked four outcomes used as tonight's validation scope:
+
+1. iOS transport layer contract is defined in `RelayTransportClient` and `RelayTransportState`.
+2. Android parity module boundary is documented (`core:protocol` + `core:transport` + `core:auth` + `data:repository`).
+3. tmux fixture harness is active in server e2e tests via `createFakeTmux()` in `src/server/bridge-server.e2e.test.ts`.
+4. Replay test strategy is split into:
+   - bridge replay/delta unit tests (`src/bridge/bridge-engine.test.ts`)
+   - websocket contract tests (`src/server/ws-contract-matrix.test.ts`)
+   - iOS mock replay tests (`apps/ios/M0ProtocolMockClient/Tests/M0ProtocolMockClientTests/M0ReplayTests.swift`)
+
+## Tonight on Mac (Exact Command Pack - 2026-02-24)
+
+Run in this exact order:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node -v
+npm -v
+tmux -V
+npm ci
+npm run check
+node --import tsx --test src/protocol.conformance.test.ts
+node --import tsx --test src/bridge/bridge-engine.test.ts
+node --import tsx --test src/server/bridge-server.e2e.test.ts
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+node --import tsx --test src/server/bridge-server.policy.test.ts
+node --import tsx --test src/server/startup-validation.test.ts
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/M0ProtocolMockClient
+swift test --filter M0ReplayTests
+swift test
+```
+
+Tonight pass criteria:
+
+1. Every Node test command ends with `# fail 0`.
+2. `src/server/bridge-server.e2e.test.ts` passes (verifies tmux fixture harness flow for hello/auth/list/attach/input).
+3. `swift test --filter M0ReplayTests` passes (verifies reconnect resume cursor and replay window behavior).
+4. Full `swift test` passes for package-wide regression coverage.
+
 ## Mac Nightly Validation Runbook (Exact Command Order)
 
 Run nightly from the repo root:

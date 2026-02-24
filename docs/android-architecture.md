@@ -29,6 +29,29 @@ Android is a first-class client over WebSocket JSON events.
 7. Persistence: Room (local cache) + DataStore (small settings).
 8. Crypto and secure storage: Android Keystore + EncryptedSharedPreferences.
 
+## Batch Outcomes (2026-02-24)
+
+### Android Parity Module Outcome
+
+Android parity is now defined as a first-class boundary contract, not a UI-only milestone.
+
+1. Parity module boundary is `data:repository` over `core:protocol`, `core:transport`, and `core:auth`.
+2. Required parity behaviors are locked for Android implementation:
+   - read-only default after auth/reconnect
+   - attach with `lastSeq`
+   - replay-safe stream ordering by `streamSeq`
+   - explicit input enable/disable controls
+3. The current repository state for `apps/android` remains architecture-first (`apps/android/README.md`), ready for module scaffold execution without changing parity semantics.
+
+Tonight parity verification commands on Mac (server-contract side):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node --import tsx --test src/protocol.conformance.test.ts
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+node --import tsx --test src/server/bridge-server.policy.test.ts
+```
+
 ## Proposed Module Layout
 
 ```text

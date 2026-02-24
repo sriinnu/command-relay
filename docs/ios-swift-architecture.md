@@ -31,6 +31,38 @@ The first implementation scaffold now exists at `apps/ios/CommandRelay` with:
 
 This baseline is intentionally stub-backed so transport, repositories, and rendering layers can be implemented incrementally without breaking top-level flow contracts.
 
+## Batch Outcomes (2026-02-24)
+
+### iOS Transport Layer Outcome
+
+The transport contract is now explicitly locked in `CommandRelayKit`:
+
+1. `RelayTransportState` defines `idle`, `connecting`, `connected`, `reconnecting`, and `disconnected`.
+2. `RelayTransportClient` defines async transport boundaries:
+   - `connect(to:)`
+   - `disconnect()`
+   - `send(_:)`
+   - `receive()`
+3. The interface lives at `apps/ios/CommandRelay/Packages/CommandRelayKit/Sources/TransportKit/Interfaces/RelayTransportClient.swift`.
+
+This gives repositories and domain layers a stable transport seam while concrete WebSocket implementation is developed.
+
+### Replay Strategy Outcome (iOS Mock Transport)
+
+Replay and reconnect semantics are now codified in the mock package:
+
+1. `M0MockClient.reconnect()` emits `resumeRequest` and `replayEvents`.
+2. `M0ReplayPlanner` guarantees replay filtering by `lastSeq`.
+3. `M0ReplayTests` validates reconnect cursor and replay window behavior.
+
+Exact validation commands for Mac:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/M0ProtocolMockClient
+swift test --filter M0ReplayTests
+swift test
+```
+
 ## Module Design
 
 Use one app target plus internal Swift package targets for boundaries.

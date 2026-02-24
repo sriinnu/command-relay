@@ -43,6 +43,21 @@ jobs:
             npm --prefix "$pkg" run check
           done
 
+      - name: Perf script CLI sanity (--help)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          scripts=(
+            "scripts/perf/connect-latency.ts"
+            "scripts/perf/list-sessions-roundtrip.ts"
+            "scripts/perf/input-ack-roundtrip.ts"
+          )
+
+          for script in "${scripts[@]}"; do
+            node --import tsx "$script" --help > /dev/null
+          done
+
       - name: Test gates with TAP logs
         shell: bash
         run: |
@@ -52,16 +67,23 @@ jobs:
 
           run_scope_tests() {
             local scope="$1"
-            local test_root="$2"
+            local test_glob="$2"
             local tap_file="$3"
             local -a tests=()
 
-            if [ ! -d "$test_root" ]; then
-              printf 'TAP version 13\n1..0 # SKIP no test directory for %s\n' "$scope" > "$tap_file"
-              return 0
+            if [ "$scope" = "root" ]; then
+              shopt -s globstar
+              mapfile -t tests < <(compgen -G "$test_glob" | sort)
+              shopt -u globstar
+            else
+              local test_root="$test_glob"
+              if [ ! -d "$test_root" ]; then
+                printf 'TAP version 13\n1..0 # SKIP no test directory for %s\n' "$scope" > "$tap_file"
+                return 0
+              fi
+              mapfile -t tests < <(find "$test_root" -type f -name '*.test.ts' | sort)
             fi
 
-            mapfile -t tests < <(find "$test_root" -type f -name '*.test.ts' | sort)
             if [ "${#tests[@]}" -eq 0 ]; then
               printf 'TAP version 13\n1..0 # SKIP no tests found for %s\n' "$scope" > "$tap_file"
               return 0
@@ -73,7 +95,7 @@ jobs:
               "${tests[@]}"
           }
 
-          run_scope_tests "root" "src" "artifacts/tap/root.tap" || status=1
+          run_scope_tests "root" "src/**/*.test.ts" "artifacts/tap/root.tap" || status=1
 
           for pkg in packages/*; do
             [ -f "$pkg/package.json" ] || continue
@@ -91,3 +113,52 @@ jobs:
           path: artifacts/tap/*.tap
           if-no-files-found: warn
           retention-days: 14
+
+  swift-tests-macos:
+    name: Swift Package Tests (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect Swift package/toolchain
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg_dir="apps/ios/M0ProtocolMockClient"
+
+          if [ ! -f "${pkg_dir}/Package.swift" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=Package.swift not found in ${pkg_dir}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if ! command -v swift > /dev/null 2>&1; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=swift toolchain unavailable on runner" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+          echo "reason=swift toolchain and package detected" >> "$GITHUB_OUTPUT"
+
+      - name: Run Swift package tests
+        if: steps.detect.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/ios/M0ProtocolMockClient
+          swift test --parallel
+
+      - name: Note skipped Swift tests
+        if: steps.detect.outputs.should_run != 'true'
+        shell: bash
+        run: |
+          {
+            echo "### Swift package tests skipped"
+            echo
+            echo "${{ steps.detect.outputs.reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"

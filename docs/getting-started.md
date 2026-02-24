@@ -68,6 +68,35 @@ The matrix validates required v1 event types:
 8. `heartbeat`
 9. `policy_update`
 
+## Tonight on Mac (Batch Validation Commands - 2026-02-24)
+
+Run this command set exactly as written:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node -v
+npm -v
+tmux -V
+npm ci
+npm run check
+node --import tsx --test src/protocol.conformance.test.ts
+node --import tsx --test src/bridge/bridge-engine.test.ts
+node --import tsx --test src/server/bridge-server.e2e.test.ts
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+node --import tsx --test src/server/bridge-server.policy.test.ts
+node --import tsx --test src/server/startup-validation.test.ts
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/M0ProtocolMockClient
+swift test --filter M0ReplayTests
+swift test
+```
+
+What this covers tonight:
+
+1. iOS transport replay path via `M0ReplayTests`.
+2. Android parity contract gate via strict protocol and websocket matrix tests.
+3. tmux fixture harness via `src/server/bridge-server.e2e.test.ts`.
+4. Replay delta/snapshot behavior via `src/bridge/bridge-engine.test.ts`.
+
 ## Mac Nightly Validation Checklist (Exact Order)
 
 Run these commands in order. Do not skip or reorder.
