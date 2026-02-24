@@ -13,6 +13,7 @@ Thumbs.db
 # Logs and temporary files
 *.log
 tmp/
+.ci-artifacts/
 
 # Local native scaffold (kept local until production module split is finalized)
 apps/ios/CommandRelay/

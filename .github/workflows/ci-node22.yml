@@ -1,0 +1,93 @@
+name: CI Node 22
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-node22-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-test:
+    name: Check and Test (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check gates (root + packages/*)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm run check
+
+          for pkg in packages/*; do
+            [ -f "$pkg/package.json" ] || continue
+            npm --prefix "$pkg" run check
+          done
+
+      - name: Test gates with TAP logs
+        shell: bash
+        run: |
+          set +e
+          mkdir -p artifacts/tap
+          status=0
+
+          run_scope_tests() {
+            local scope="$1"
+            local test_root="$2"
+            local tap_file="$3"
+            local -a tests=()
+
+            if [ ! -d "$test_root" ]; then
+              printf 'TAP version 13\n1..0 # SKIP no test directory for %s\n' "$scope" > "$tap_file"
+              return 0
+            fi
+
+            mapfile -t tests < <(find "$test_root" -type f -name '*.test.ts' | sort)
+            if [ "${#tests[@]}" -eq 0 ]; then
+              printf 'TAP version 13\n1..0 # SKIP no tests found for %s\n' "$scope" > "$tap_file"
+              return 0
+            fi
+
+            node --import tsx --test \
+              --test-reporter=tap \
+              --test-reporter-destination="$tap_file" \
+              "${tests[@]}"
+          }
+
+          run_scope_tests "root" "src" "artifacts/tap/root.tap" || status=1
+
+          for pkg in packages/*; do
+            [ -f "$pkg/package.json" ] || continue
+            pkg_name="$(basename "$pkg")"
+            run_scope_tests "$pkg_name" "$pkg/test" "artifacts/tap/${pkg_name}.tap" || status=1
+          done
+
+          exit "$status"
+
+      - name: Upload TAP artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tap-logs-node22-${{ github.run_id }}
+          path: artifacts/tap/*.tap
+          if-no-files-found: warn
+          retention-days: 14

@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "check": "tsc --noEmit",
-    "test": "tsx --test src/net/proxy-router.test.ts src/net/proxy-agent-factory.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "test:ci:all": "scripts/ci-test-all.sh"
   },
   "dependencies": {
     "http-proxy-agent": "^7.0.2",
