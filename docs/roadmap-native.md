@@ -1,0 +1,135 @@
+# CommandRelay Native-First Roadmap
+
+Last updated: 2026-02-24
+Execution order: iOS Swift app -> Android app -> web fallback.
+
+## Goal
+
+Ship reliable and safe remote terminal control on mobile first, with web as a contingency path rather than the primary product surface.
+
+## Milestones
+
+## M0 - Contract and Platform Baseline (2026-02-24 to 2026-03-13)
+
+Deliverables:
+1. Versioned protocol contract (`v1`) for all required events.
+2. Replay and ordering guarantees documented and testable.
+3. Security defaults locked: read-only by default, explicit input enable, global kill switch.
+
+Acceptance criteria:
+1. Contract tests pass for all required client and server events.
+2. No unversioned protocol changes merged after milestone close.
+3. Mobile clients can run against mocked gateway fixtures with zero schema errors.
+
+Dependencies:
+1. Gateway event schema ownership and review workflow.
+2. Tailscale connectivity available in dev and staging.
+
+## M1 - iOS Alpha (Read-Only Core) (2026-03-16 to 2026-04-03)
+
+Deliverables:
+1. Swift app with auth, session list, pane attach, output stream.
+2. Reconnect with replay from `lastSeq`.
+3. Accessibility baseline (labels, focus order, dynamic text).
+
+Acceptance criteria:
+1. 30 minutes continuous stream without manual reconnect.
+2. Reconnect recovery under packet loss resumes without output gaps.
+3. Crash-free sessions >= 99% in alpha cohort.
+
+Dependencies:
+1. Stable `v1` protocol from M0.
+2. iOS test devices and TestFlight distribution.
+
+## M2 - iOS Beta (Guarded Input) (2026-04-06 to 2026-04-24)
+
+Deliverables:
+1. Input enable/disable flow with explicit user intent.
+2. Command send/ack timeout handling and user feedback.
+3. Audit event visibility in client and backend logs.
+
+Acceptance criteria:
+1. Read-only remains default after reconnect/app restart.
+2. Every input action includes pane target and timestamp in audit logs.
+3. Kill switch immediately blocks new input attempts.
+
+Dependencies:
+1. Gateway audit pipeline.
+2. Policy update events and real-time enforcement.
+
+## M3 - iOS GA (2026-04-27 to 2026-05-15)
+
+Deliverables:
+1. Reliability hardening for background/foreground and token refresh.
+2. App Store readiness: compliance artifacts and support path.
+3. Incident runbook for mobile and gateway failures.
+
+Acceptance criteria:
+1. 14-day beta period without Sev-1 regression.
+2. Median input round-trip latency <= 250ms on private mesh.
+3. Support docs cover auth, reconnect, and input safety controls.
+
+Dependencies:
+1. Observability dashboards and alerting thresholds.
+2. Release automation for signed iOS builds.
+
+## M4 - Android Buildout (2026-05-18 to 2026-06-12)
+
+Deliverables:
+1. Kotlin app with parity for auth/list/attach/replay.
+2. Guarded input flow matching iOS policy and UX intent.
+3. Device matrix validation for background behavior and network handoff.
+
+Acceptance criteria:
+1. Functional parity with iOS core features.
+2. Same safety invariants enforced (read-only default, explicit input enable, kill switch).
+3. Crash-free sessions >= 99% in beta cohort.
+
+Dependencies:
+1. Shared protocol conformance suite.
+2. Google Play internal testing setup.
+
+## M5 - Web Fallback (2026-06-15 to 2026-07-03)
+
+Deliverables:
+1. Minimal responsive web console for emergency access.
+2. Read-only streaming primary, guarded input secondary.
+3. Browser compatibility baseline for modern mobile and desktop.
+
+Acceptance criteria:
+1. Core fallback flows work on Chrome/Safari current versions.
+2. Web remains explicitly non-primary in roadmap and release comms.
+
+Dependencies:
+1. Existing gateway + protocol stack from mobile milestones.
+2. Basic frontend hosting and auth integration.
+
+## Cross-Milestone Dependencies
+
+1. Protocol governance: single owner for event schema changes.
+2. Security controls: global input disable and per-session authorization.
+3. Test strategy: mocked event fixtures + end-to-end tmux integration tests.
+4. Observability: client crash reporting, gateway latency metrics, replay health.
+5. Release operations: signed builds, staged rollout, rollback paths.
+
+## Key Risks
+
+1. Protocol churn across milestones.
+Mitigation: strict versioning and backward-compatible deprecation windows.
+2. Unsafe command execution paths.
+Mitigation: read-only default, explicit enable, rate/size limits, kill switch.
+3. Mobile network instability causing stream gaps.
+Mitigation: replay buffer SLAs, reconnect backoff tuning, chaos network tests.
+4. Store approval and release timing slippage.
+Mitigation: early internal track submissions and pre-review checklists.
+5. Team focus drift to web too early.
+Mitigation: enforce milestone gates; block web work before M4 exit.
+
+## Immediate Next Actions (Next 10 Working Days)
+
+1. Freeze and publish protocol `v1` schema and examples.
+2. Implement gateway conformance tests for required events.
+3. Start iOS spike: auth + session list + attach + output stream.
+4. Define iOS UX copy for input safety and confirmation states.
+5. Set SLOs for connect time, replay catch-up time, and input ack latency.
+6. Finalize weekly milestone review cadence with owners and blockers.
