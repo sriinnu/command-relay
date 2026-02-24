@@ -1,0 +1,29 @@
+{
+  "name": "commandrelay-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CommandRelay tmux bridge core engine",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "check": "tsc --noEmit",
+    "test": "tsx --test src/net/proxy-router.test.ts src/net/proxy-agent-factory.test.ts"
+  },
+  "dependencies": {
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "pac-proxy-agent": "^7.2.0",
+    "socks-proxy-agent": "^8.0.5",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

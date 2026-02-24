@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Local agent/runtime state
+.claude/
+.mcp.json
+CLAUDE.md
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+tmp/
+
+# Local native scaffold (kept local until production module split is finalized)
+apps/ios/CommandRelay/
