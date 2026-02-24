@@ -85,7 +85,7 @@ test("strict v1 parser accepts all required event types", () => {
 });
 
 test("strict v1 parser rejects unsupported type", () => {
-  const parsed = parseMessage(buildStrictRaw("detach", "req-detach"), {
+  const parsed = parseMessage(buildStrictRaw("unknown_future_type", "req-unknown"), {
     strictV1: true
   });
   assert.deepEqual(parsed, { ok: false, error: "unsupported_type" });
@@ -185,7 +185,18 @@ test("strict v1 parser rejects invalid payload and requestId formats", () => {
 });
 
 test("strict v1 parser requires requestId for request-response correlated event types", () => {
-  const requiredRequestIdTypes = ["auth", "list_sessions", "attach", "input", "ack", "error"];
+  const requiredRequestIdTypes = [
+    "auth",
+    "list_sessions",
+    "attach",
+    "detach",
+    "enable_input",
+    "disable_input",
+    "disconnect",
+    "input",
+    "ack",
+    "error"
+  ];
 
   for (const type of requiredRequestIdTypes) {
     const parsed = parseMessage(buildStrictRaw(type), { strictV1: true });

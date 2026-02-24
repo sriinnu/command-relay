@@ -14,6 +14,16 @@ test("parses global input kill switch truthy and falsy values", () => {
   assert.equal(disabled.globalInputDisabled, false);
 });
 
+test("defaults strict protocol parsing on and supports legacy toggle alias", () => {
+  const defaults = loadConfig({});
+  const strictOffPrimary = loadConfig({ COMMANDRELAY_STRICT_PROTOCOL_PARSING: "false" });
+  const strictOffAlias = loadConfig({ COMMANDRELAY_STRICT_V1: "0" });
+
+  assert.equal(defaults.strictProtocolParsing, true);
+  assert.equal(strictOffPrimary.strictProtocolParsing, false);
+  assert.equal(strictOffAlias.strictProtocolParsing, false);
+});
+
 test("rejects invalid global input kill switch values", () => {
   assert.throws(
     () => loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "sometimes" }),

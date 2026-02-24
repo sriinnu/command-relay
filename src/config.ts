@@ -6,6 +6,7 @@
 export interface BridgeConfig {
   host: string;
   port: number;
+  strictProtocolParsing: boolean;
   pollIntervalMs: number;
   replayLines: number;
   maxHistoryEvents: number;
@@ -59,6 +60,29 @@ function parseBooleanEnv(raw: string | undefined, fallback: boolean, envName: st
 }
 
 /**
+ * Parses a boolean environment variable with optional legacy alias fallback.
+ *
+ * @param env Environment map.
+ * @param primaryName Primary environment variable name.
+ * @param aliasName Legacy alias environment variable name.
+ * @param fallback Fallback when neither variable is set.
+ * @returns Parsed boolean value.
+ */
+function parseBooleanEnvWithAlias(
+  env: NodeJS.ProcessEnv,
+  primaryName: string,
+  aliasName: string,
+  fallback: boolean
+): boolean {
+  const primary = env[primaryName];
+  if (primary !== undefined) {
+    return parseBooleanEnv(primary, fallback, primaryName);
+  }
+
+  return parseBooleanEnv(env[aliasName], fallback, aliasName);
+}
+
+/**
  * Parses an optional env string and normalizes whitespace-only values to null.
  *
  * @param raw Raw env value.
@@ -89,6 +113,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   return {
     host: env.COMMANDRELAY_HOST || "127.0.0.1",
     port: parseIntEnv(env.COMMANDRELAY_PORT, 8787, { min: 1, max: 65535 }),
+    strictProtocolParsing: parseBooleanEnvWithAlias(
+      env,
+      "COMMANDRELAY_STRICT_PROTOCOL_PARSING",
+      "COMMANDRELAY_STRICT_V1",
+      true
+    ),
     pollIntervalMs: parseIntEnv(env.COMMANDRELAY_POLL_MS, 350, { min: 100, max: 5000 }),
     replayLines: parseIntEnv(env.COMMANDRELAY_REPLAY_LINES, 200, { min: 20, max: 5000 }),
     maxHistoryEvents: parseIntEnv(env.COMMANDRELAY_HISTORY_EVENTS, 300, { min: 50, max: 5000 }),

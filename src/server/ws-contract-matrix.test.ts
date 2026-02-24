@@ -10,7 +10,7 @@ import {
   type ProtocolV1RequiredEventType,
   parseMessage
 } from "../protocol.js";
-import { handleClientMessage } from "./bridge-server.js";
+import { handleClientMessage, parseIncomingClientMessage } from "./bridge-server.js";
 import { AuditLogger } from "./audit-log.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 
@@ -176,8 +176,8 @@ test("strict parsing matrix rejects malformed envelopes", () => {
       name: "unsupported type",
       raw: JSON.stringify({
         v: PROTOCOL_V1,
-        type: "disconnect",
-        requestId: "req-disconnect",
+        type: "unknown_future_type",
+        requestId: "req-unknown",
         timestamp: STRICT_TS,
         payload: {}
       }),
@@ -248,6 +248,19 @@ test("strict parsing matrix rejects envelopes above 64KiB", () => {
 
   const parsed = parseMessage(raw, { strictV1: true });
   assert.deepEqual(parsed, { ok: false, error: "message_too_large" });
+});
+
+test("strict parsing matrix accepts runtime extension commands in live strict mode", () => {
+  const parsed = parseIncomingClientMessage(
+    buildStrictRaw("enable_input", "req-enable"),
+    true
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  assert.equal(parsed.message.type, "enable_input");
+  assert.equal(parsed.message.requestId, "req-enable");
 });
 
 test("policy transition matrix applies enable -> input -> disable flow", async () => {

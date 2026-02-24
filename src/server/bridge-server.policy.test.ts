@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { AuditLogger } from "./audit-log.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
-import { handleClientMessage } from "./bridge-server.js";
+import { handleClientMessage, parseIncomingClientMessage } from "./bridge-server.js";
 
 interface SentEnvelope {
   type: string;
@@ -140,4 +140,33 @@ test("keeps read-only policy and blocks input when global kill switch is on", as
   assert.equal(inputError.requestId, "input");
   assert.equal(inputError.payload.code, "input_disabled");
   assert.equal(sentInputs.length, 0);
+});
+
+test("parses and executes legacy policy command envelopes when strict parsing is disabled", async () => {
+  const parsed = parseIncomingClientMessage(
+    JSON.stringify({
+      type: "enable_input",
+      requestId: "legacy-enable",
+      payload: {}
+    }),
+    false
+  );
+
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+
+  const { ctx, sent } = createContext(false);
+  await handleClientMessage({
+    ...ctx,
+    type: parsed.message.type,
+    payload: parsed.message.payload,
+    requestId: parsed.message.requestId
+  } as Parameters<typeof handleClientMessage>[0]);
+
+  const policyUpdate = sent[sent.length - 1];
+  assert.equal(policyUpdate.type, "policy_update");
+  assert.equal(policyUpdate.requestId, "legacy-enable");
+  assert.equal(policyUpdate.payload.inputEnabled, true);
 });

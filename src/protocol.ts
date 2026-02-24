@@ -23,9 +23,33 @@ export const PROTOCOL_V1_REQUIRED_EVENT_TYPES = [
 ] as const;
 
 /**
+ * Additional event types allowed by the current bridge runtime.
+ */
+export const PROTOCOL_V1_RUNTIME_EVENT_TYPES = [
+  "detach",
+  "enable_input",
+  "disable_input",
+  "disconnect",
+  "hello",
+  "session_list",
+  "auth_ok",
+  "auth_error",
+  "heartbeat_ack"
+] as const;
+
+/**
+ * Strict parser allow-list for v1 envelopes.
+ */
+export const PROTOCOL_V1_ALLOWED_EVENT_TYPES = [
+  ...PROTOCOL_V1_REQUIRED_EVENT_TYPES,
+  ...PROTOCOL_V1_RUNTIME_EVENT_TYPES
+] as const;
+
+/**
  * v1 event type union.
  */
 export type ProtocolV1RequiredEventType = (typeof PROTOCOL_V1_REQUIRED_EVENT_TYPES)[number];
+export type ProtocolV1AllowedEventType = (typeof PROTOCOL_V1_ALLOWED_EVENT_TYPES)[number];
 
 /**
  * A websocket protocol envelope.
@@ -55,11 +79,15 @@ export type ParseMessageResult =
 const MAX_V1_ENVELOPE_BYTES = 64 * 1024;
 const REQUEST_ID_MAX_LENGTH = 128;
 
-const V1_REQUIRED_TYPES = new Set<string>(PROTOCOL_V1_REQUIRED_EVENT_TYPES);
+const V1_ALLOWED_TYPES = new Set<string>(PROTOCOL_V1_ALLOWED_EVENT_TYPES);
 const V1_REQUEST_ID_REQUIRED_TYPES = new Set<string>([
   "auth",
   "list_sessions",
   "attach",
+  "detach",
+  "enable_input",
+  "disable_input",
+  "disconnect",
   "input",
   "ack",
   "error"
@@ -137,7 +165,7 @@ function parseStrictV1(parsed: Record<string, unknown>): ParseMessageResult {
     return { ok: false, error: "invalid_version" };
   }
 
-  if (!V1_REQUIRED_TYPES.has(parsed.type as string)) {
+  if (!V1_ALLOWED_TYPES.has(parsed.type as string)) {
     return { ok: false, error: "unsupported_type" };
   }
 

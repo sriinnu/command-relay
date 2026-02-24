@@ -29,6 +29,7 @@ import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
  *   config: {
  *     host: string,
  *     port: number,
+ *     strictProtocolParsing: boolean,
  *     pollIntervalMs: number,
  *     replayLines: number,
  *     maxHistoryEvents: number,
@@ -163,7 +164,7 @@ export async function startBridgeServer(deps) {
         return;
       }
 
-      const parsed = parseMessage(raw.toString());
+      const parsed = parseIncomingClientMessage(raw.toString(), config.strictProtocolParsing);
       if (parsed.ok === false) {
         send(client.socket, envelope("error", { code: parsed.error }));
         return;
@@ -230,6 +231,17 @@ export async function startBridgeServer(deps) {
       });
     }
   };
+}
+
+/**
+ * Parses an incoming client websocket frame using configured protocol strictness.
+ *
+ * @param {string} raw UTF-8 JSON message text.
+ * @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled.
+ * @returns {import("../protocol.js").ParseMessageResult} Parse result.
+ */
+export function parseIncomingClientMessage(raw, strictProtocolParsing) {
+  return parseMessage(raw, strictProtocolParsing ? { strictV1: true } : undefined);
 }
 
 /**
