@@ -1,37 +1,48 @@
 # Security
 
-CommandRelay assumes remote access is sensitive and applies strict defaults.
+CommandRelay treats remote terminal control as high-risk and defaults to read-only behavior.
 
 ## Security Objectives
 
-1. Prevent unauthorized session access.
-2. Prevent silent remote command execution.
-3. Preserve auditability of all control actions.
-4. Limit blast radius of misconfiguration.
+1. Prevent unauthorized access to active terminal sessions.
+2. Prevent unauthorized or silent command injection.
+3. Preserve operator auditability for sensitive actions.
+4. Constrain blast radius when a client or network path is compromised.
 
-## Baseline Controls
+## Implementation-Aligned Control Baseline
 
-1. Read-only default for every new connection.
-2. Explicit input enable action required.
-3. Authenticated and authorized session access.
-4. Audit logs for auth, attach, input, and admin actions.
-5. Session-level and user-level rate limits.
-6. Maximum payload size checks.
+1. New WebSocket clients start with `inputEnabled=false`.
+2. `input` is accepted only when both client input is enabled and global kill switch is off.
+3. Non-authenticated clients are blocked from non-`auth` events when `COMMANDRELAY_AUTH_TOKEN` is configured.
+4. Startup validation requires `COMMANDRELAY_AUTH_TOKEN` for non-loopback bind addresses.
+5. Token validation uses timing-safe comparison (`timingSafeEqual`) with equal-length gate.
+6. Input path is guarded by per-client rate limit, max bytes, and attached-pane checks.
+7. Sensitive actions (`auth_ok`, `auth_fail`, `attach`, `enable_input`, `disable_input`, `input`) are audit logged.
 
-## Network Controls
+## Attack/Mitigation Matrix (Current Runtime)
 
-1. Prefer private mesh (Tailscale/WireGuard).
-2. Do not expose unauthenticated public endpoints.
-3. Bind gateway to private interface where possible.
+| Threat Area | Concrete Attack | Current Mitigation | Residual Risk / Operator Action |
+| --- | --- | --- | --- |
+| Auth gate | Send `attach`/`input` before auth completes | Server returns `error.code=auth_required` for non-`auth` events until authenticated | If running open mode (no token on loopback), rely on host/network isolation |
+| Auth token guessing and timing attacks | Brute-force `auth.token` or exploit compare timing | Static token is required on non-loopback host; compare uses timing-safe equality and rejects different lengths | Static bearer token has no built-in expiry/rotation; rotate operationally |
+| Token disclosure in logs | Leak token through audit/event logging | Auth failures log reason (`invalid_token`) but not the submitted token value | Keep process/stdout logs private; avoid reverse proxies that log frames |
+| Bi-directional input injection | Malicious client sends unsolicited `input` | Input requires: authenticated client, explicit `enable_input`, kill switch off, attached pane, rate limit pass, payload size <= `COMMANDRELAY_MAX_INPUT_BYTES` | Attached pane trust is session-scoped, not user-scoped ACL |
+| Replay on input channel | Re-send old `input` envelope with new transport session | No protocol nonce or anti-replay token for `input`; request correlation is best-effort via `requestId` | Use short-lived network paths and review audit hashes for suspicious duplicates |
+| Replay/output gap confusion | Client reconnects with stale `lastSeq` | Server replays bounded in-memory history (`maxHistoryEvents`), then falls back to snapshot if precise range unavailable | History is ephemeral and per-watcher; exact gap reconstruction is not guaranteed |
+| Kill switch bypass attempt | Client calls `enable_input` while global kill switch is on | `enable_input` cannot override global flag; policy remains `inputEnabled=false`, and `input` returns `input_disabled` | Kill switch is process config, not dynamic remote toggle |
 
-## Sensitive Operation Controls
+## Kill Switch Semantics (Exact)
 
-1. Global input kill switch.
-2. Per-session input freeze.
-3. Optional command policy filters.
+1. `COMMANDRELAY_INPUT_KILL_SWITCH` is parsed once at startup (`true/false` strict parser).
+2. When on, `enable_input` emits `policy_update` with `inputEnabled=false` and `globalInputDisabled=true`.
+3. `input` continues to be rejected with `error.code=input_disabled`.
+4. `disable_input` always forces client input state to false.
+5. `disconnect` clears attached panes and resets client input state.
 
-## Incident Readiness
+## Operator Hardening Checklist
 
-1. Keep logs with timestamp, actor, target pane, and action result.
-2. Add admin endpoint to revoke sessions quickly.
-3. Document key rotation and token revocation process.
+1. Bind to loopback or private mesh only; avoid direct public exposure.
+2. Set and rotate `COMMANDRELAY_AUTH_TOKEN`; do not reuse across environments.
+3. Enable `COMMANDRELAY_AUDIT_LOG` and protect log file access.
+4. Keep `COMMANDRELAY_MAX_INPUT_BYTES` and rate limits conservative.
+5. Treat kill switch as emergency brake and verify policy state from `policy_update`.
