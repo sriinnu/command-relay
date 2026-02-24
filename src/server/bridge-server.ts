@@ -81,7 +81,7 @@ export async function startBridgeServer(deps) {
     onOutput: (clientId, event) => {
       const client = clients.get(clientId);
       if (!client) return;
-      send(client.socket, envelope("output", event));
+      send(client.socket, envelope("output", event as unknown as Record<string, unknown>));
     },
     onError: (clientId, paneId, error) => {
       const client = clients.get(clientId);
@@ -164,7 +164,7 @@ export async function startBridgeServer(deps) {
       }
 
       const parsed = parseMessage(raw.toString());
-      if (!parsed.ok) {
+      if (parsed.ok === false) {
         send(client.socket, envelope("error", { code: parsed.error }));
         return;
       }
@@ -349,7 +349,7 @@ export async function handleClientMessage(ctx) {
           buildInputPolicyState({
             clientInputEnabled: client.inputEnabled,
             globalInputDisabled: config.globalInputDisabled
-          }),
+          }) as unknown as Record<string, unknown>,
           requestId
         )
       );
@@ -366,7 +366,7 @@ export async function handleClientMessage(ctx) {
           buildInputPolicyState({
             clientInputEnabled: client.inputEnabled,
             globalInputDisabled: config.globalInputDisabled
-          }),
+          }) as unknown as Record<string, unknown>,
           requestId
         )
       );

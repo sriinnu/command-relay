@@ -13,7 +13,7 @@ import { timingSafeEqual } from "node:crypto";
  */
 export function sendEnvelope(
   socket: { OPEN: number; readyState: number; send: (payload: string) => void },
-  message: Record<string, unknown>
+  message: unknown
 ): void {
   if (socket.readyState !== socket.OPEN) return;
   socket.send(JSON.stringify(message));

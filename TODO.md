@@ -22,8 +22,8 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Freeze mobile event contract (`auth`, `list_sessions`, `attach`, `output`, `input`, `ack`, `error`).
 - [ ] Define replay/ordering guarantees (`streamSeq`, reconnect with `lastSeq`).
 - [ ] Finalize read-only-by-default and explicit input-enable policy.
-- [ ] Add API conformance checks for protocol envelope and event types.
-- [ ] Publish v1 contract doc for native clients.
+- [x] Add API conformance checks for protocol envelope and event types.
+- [x] Publish v1 contract doc for native clients.
 - [ ] Exit criteria met:
 - [ ] iOS can consume mocked gateway events without schema drift for 7 days.
 - [ ] Command input path can be disabled globally and per-session.
@@ -95,9 +95,9 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## Immediate Next Actions (This Week)
 
-- [ ] Create `v1` protocol contract tests in gateway repo.
+- [x] Create `v1` protocol contract tests in gateway repo.
 - [ ] Build iOS spike for WebSocket connect/list/attach/output (no input yet).
 - [ ] Define iOS screen map and navigation for three core flows.
 - [ ] Decide telemetry schema (connect time, replay time, input ack latency).
 - [ ] Schedule weekly cross-platform checkpoint with single source of truth in `docs/roadmap-native.md`.
-- [ ] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
+- [x] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.

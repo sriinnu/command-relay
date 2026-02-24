@@ -2,26 +2,62 @@
  * @file Proxy-aware outbound HTTP JSON client.
  */
 
+import type { Agent } from "node:http";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 
 /**
- * @typedef {object} JsonRequestOptions
- * @property {string} method HTTP method.
- * @property {Record<string, string>} [headers] Optional request headers.
- * @property {unknown} [body] Optional JSON-serializable body.
- * @property {number} [timeoutMs=8000] Request timeout in milliseconds.
+ * Request options for JSON HTTP calls.
  */
+export interface JsonRequestOptions {
+  method: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+}
+
+/** JSON response envelope returned by {@link requestJson}. */
+export interface JsonResponse<TBody = unknown> {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: TBody | null;
+}
+
+/**
+ * Proxy resolution result for an outbound target.
+ *
+ * Implementations can include additional metadata fields such as `proxyUrl`
+ * and `viaProxy`; `requestJson` only requires the optional `agent`.
+ */
+export interface ProxyResolution {
+  agent: Agent | null;
+}
+
+/** Contract for proxy-aware target resolution. */
+export interface ProxyResolver {
+  resolve(target: string | URL): ProxyResolution;
+}
+
+/** Function signature for JSON request implementations. */
+export type JsonRequestFunction = <TBody = unknown>(
+  url: string | URL,
+  options: JsonRequestOptions,
+  proxyFactory?: ProxyResolver
+) => Promise<JsonResponse<TBody>>;
 
 /**
  * Performs a JSON HTTP request with optional proxy agent routing.
  *
  * @param {string | URL} url Request URL.
  * @param {JsonRequestOptions} options Request options.
- * @param {{ resolve: (target: string | URL) => { agent: import("node:http").Agent | null } }} [proxyFactory] Proxy factory.
- * @returns {Promise<{ status: number, headers: Record<string, string | string[]>, body: unknown }>} Response payload.
+ * @param {ProxyResolver} [proxyFactory] Proxy factory.
+ * @returns {Promise<JsonResponse<TBody>>} Response payload.
  */
-export async function requestJson(url, options, proxyFactory = undefined) {
+export const requestJson: JsonRequestFunction = async <TBody = unknown>(
+  url,
+  options,
+  proxyFactory = undefined
+) => {
   const target = url instanceof URL ? url : new URL(String(url));
   const method = options.method.toUpperCase();
   const timeoutMs = options.timeoutMs ?? 8000;
@@ -42,7 +78,7 @@ export async function requestJson(url, options, proxyFactory = undefined) {
   const proxy = proxyFactory ? proxyFactory.resolve(target) : { agent: null };
   const requester = target.protocol === "https:" ? httpsRequest : httpRequest;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<JsonResponse<TBody>>((resolve, reject) => {
     const req = requester(
       {
         protocol: target.protocol,
@@ -63,10 +99,10 @@ export async function requestJson(url, options, proxyFactory = undefined) {
         res.on("end", () => {
           try {
             const raw = Buffer.concat(chunks).toString("utf8");
-            const body = raw ? JSON.parse(raw) : null;
+            const body = raw ? (JSON.parse(raw) as TBody) : null;
             resolve({
               status: res.statusCode ?? 0,
-              headers: /** @type {Record<string, string | string[]>} */ (res.headers),
+              headers: res.headers,
               body
             });
           } catch (error) {
@@ -86,4 +122,4 @@ export async function requestJson(url, options, proxyFactory = undefined) {
     }
     req.end();
   });
-}
+};
