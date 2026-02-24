@@ -25,6 +25,14 @@ Dependencies:
 1. Gateway event schema ownership and review workflow.
 2. Tailscale connectivity available in dev and staging.
 
+Status snapshot (2026-02-24):
+- [x] Protocol `v1` contract published with required events (`docs/protocol-v1.md`).
+- [x] Replay and ordering rules documented (`streamSeq`, `attach(lastSeq)` replay behavior).
+- [x] Read-only default, explicit input enable, and global kill switch enforcement are implemented and tested.
+- [x] Gateway contract suites exist for protocol envelope and WebSocket event matrix.
+- [x] CI Node 22 workflow enforces typecheck/test gates and uploads TAP artifacts.
+- [ ] 7-day iOS mock-client schema drift burn-in still pending before M0 close.
+
 ## M1 - iOS Alpha (Read-Only Core) (2026-03-16 to 2026-04-03)
 
 Deliverables:
@@ -133,3 +141,15 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 4. Define iOS UX copy for input safety and confirmation states.
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
 6. Finalize weekly milestone review cadence with owners and blockers.
+
+## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
+
+- [ ] Node 22 is active on the Mac validation host (`node -v` reports `v22.x`).
+- [ ] Root typecheck gate passes (`npm run check`).
+- [ ] Protocol v1 conformance suite passes (`node --import tsx --test src/protocol.conformance.test.ts`).
+- [ ] Gateway policy/contract suites pass (`node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts`).
+- [ ] Proxy and outbound routing coverage passes (`node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`).
+- [ ] iOS M0 mock contract package passes on Mac (`cd apps/ios/M0ProtocolMockClient && swift test`).
+- [ ] CI parity run passes locally (`npm run test:ci:all`).
+- [ ] Manual smoke confirms attach/replay from `lastSeq` and kill-switch-enforced read-only behavior.
+- [ ] Validation artifacts are captured (TAP logs + `swift test` output) and linked in nightly notes.

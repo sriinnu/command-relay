@@ -46,6 +46,58 @@ Coverage baseline:
 
 Use this suite as the protocol gate before merging schema changes.
 
+## Mac Nightly Validation Runbook (Exact Command Order)
+
+Run nightly from the repo root:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node -v
+npm -v
+tmux -V
+npm ci
+npm run check
+node --import tsx --test src/protocol.conformance.test.ts
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+node --import tsx --test src/server/bridge-server.policy.test.ts
+node --import tsx --test src/server/startup-validation.test.ts
+node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
+```
+
+Expected output checks:
+
+1. Every `node --test ...` command ends with:
+
+```text
+# pass 1
+# fail 0
+```
+
+2. Strict protocol toggle command prints:
+
+```text
+STRICT_OFF {"ok":true,...}
+STRICT_ON {"ok":false,"error":"unsupported_type"}
+```
+
+3. If any test shows `# fail 1` (or more), treat nightly as failed and block protocol/runtime merges until fixed.
+
+Strict protocol toggle guidance:
+
+1. Live bridge strict mode is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default); legacy alias `COMMANDRELAY_STRICT_V1` is also supported.
+2. The parser flag (`strictV1: true`) remains useful for local deterministic checks like the toggle command above.
+3. Use strict-mode suites (`src/protocol.conformance.test.ts`, `src/server/ws-contract-matrix.test.ts`) as the authoritative nightly contract gate.
+
+Kill-switch toggle guidance (runtime config sanity):
+
+1. `COMMANDRELAY_INPUT_KILL_SWITCH=true` means global input is forcibly disabled.
+2. `COMMANDRELAY_INPUT_KILL_SWITCH=off` means input can be session-enabled.
+3. Invalid values fail startup with:
+
+```text
+COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
+```
+
 ## iOS Protocol Mock Package Usage
 
 The M0 iOS contract mock package lives at:

@@ -8,7 +8,7 @@ This document describes the implemented v1 event contract used by `src/server/br
 
 ## 1. Event Sets
 
-### 1.1 Core v1 Types (strict parser profile)
+### 1.1 Core v1 Types (required baseline)
 
 1. `auth`
 2. `list_sessions`
@@ -20,7 +20,7 @@ This document describes the implemented v1 event contract used by `src/server/br
 8. `heartbeat`
 9. `policy_update`
 
-These are the required event names in the strict envelope parser (`parseMessage(..., { strictV1: true })`).
+These are the required baseline event names for v1 interoperability.
 
 ### 1.2 Runtime Extension Types (accepted/emitted by bridge server)
 
@@ -54,17 +54,17 @@ Recommended wire shape:
 2. `type` MUST be a non-empty string.
 3. `payload` is normalized to `{}` when missing or non-object.
 4. `requestId` is accepted only when it is a string; otherwise treated as absent.
-5. Incoming `v` and `timestamp` are not enforced in runtime loose mode.
+5. Socket ingress strictness is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default, legacy alias `COMMANDRELAY_STRICT_V1`).
 6. Parse failures return `error` with `code` values such as `invalid_json`, `invalid_json_object`, `missing_type`.
 
 ### 2.2 Strict v1 Parse Rules (conformance profile)
 
 1. `v` MUST equal `1`.
-2. `type` MUST be one of the 9 core v1 types.
+2. `type` MUST be one of the strict allow-list types: the 9 core v1 types plus runtime extensions (`hello`, `auth_ok`, `auth_error`, `session_list`, `detach`, `enable_input`, `disable_input`, `disconnect`, `heartbeat_ack`).
 3. `timestamp` MUST be a safe integer `>= 0`.
 4. `payload` MUST be an object.
 5. `requestId` format: 1..128 ASCII printable chars, no leading/trailing spaces.
-6. `requestId` is required for: `auth`, `list_sessions`, `attach`, `input`, `ack`, `error`.
+6. `requestId` is required for: `auth`, `list_sessions`, `attach`, `detach`, `enable_input`, `disable_input`, `disconnect`, `input`, `ack`, `error`.
 7. Maximum encoded message size is 64 KiB.
 
 ## 3. Message Contracts

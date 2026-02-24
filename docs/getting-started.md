@@ -68,6 +68,141 @@ The matrix validates required v1 event types:
 8. `heartbeat`
 9. `policy_update`
 
+## Mac Nightly Validation Checklist (Exact Order)
+
+Run these commands in order. Do not skip or reorder.
+
+1. Move to repo root.
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+```
+
+Expected output: no error.
+
+2. Confirm toolchain versions.
+
+```bash
+node -v
+npm -v
+tmux -V
+```
+
+Expected output:
+
+```text
+v22.x.x
+10.x.x
+tmux 3.x
+```
+
+3. Install dependencies cleanly.
+
+```bash
+npm ci
+```
+
+Expected output contains `added` and no `npm ERR!`.
+
+4. Run type check gate.
+
+```bash
+npm run check
+```
+
+Expected output contains no TypeScript errors.
+
+5. Run strict protocol conformance matrix.
+
+```bash
+node --import tsx --test src/protocol.conformance.test.ts
+```
+
+Expected output footer:
+
+```text
+# pass 1
+# fail 0
+```
+
+6. Run strict websocket contract + policy transition matrix.
+
+```bash
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+```
+
+Expected output footer:
+
+```text
+# pass 1
+# fail 0
+```
+
+7. Validate policy behavior for input enable/disable flow.
+
+```bash
+node --import tsx --test src/server/bridge-server.policy.test.ts
+```
+
+Expected output footer:
+
+```text
+# pass 1
+# fail 0
+```
+
+8. Validate startup parsing for kill switch and auth safety checks.
+
+```bash
+node --import tsx --test src/server/startup-validation.test.ts
+```
+
+Expected output footer:
+
+```text
+# pass 1
+# fail 0
+```
+
+9. Validate strict parser behavior (`strictV1` off vs on).
+
+```bash
+node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
+```
+
+Expected output:
+
+```text
+STRICT_OFF {"ok":true,...}
+STRICT_ON {"ok":false,"error":"unsupported_type"}
+```
+
+Strict protocol toggle guidance:
+
+1. `STRICT_OFF` represents loose parsing (unknown message types pass through).
+2. `STRICT_ON` represents strict v1 parsing (`strictV1: true`), where unsupported types are rejected.
+3. Live socket strictness is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default).
+
+10. Optional kill-switch parse sanity.
+
+```bash
+node --import tsx -e 'import { loadConfig } from "./src/config.ts"; console.log("KILL_SWITCH_TRUE", loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "true" }).globalInputDisabled); console.log("KILL_SWITCH_OFF", loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "off" }).globalInputDisabled);'
+```
+
+Expected output:
+
+```text
+KILL_SWITCH_TRUE true
+KILL_SWITCH_OFF false
+```
+
+Nightly pass criteria:
+
+1. Step 4 exits cleanly.
+2. Steps 5-8 each show `# fail 0`.
+3. Step 9 shows `STRICT_OFF ok:true` and `STRICT_ON unsupported_type`.
+4. Optional step 10 shows the exact `true`/`false` toggle values.
+
 ## Setup Steps
 
 1. Create named tmux sessions for active work.

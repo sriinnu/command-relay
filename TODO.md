@@ -19,14 +19,15 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## M0 - Gateway and Mobile Contract Baseline (Target: 2026-03-13)
 
-- [ ] Freeze mobile event contract (`auth`, `list_sessions`, `attach`, `output`, `input`, `ack`, `error`).
-- [ ] Define replay/ordering guarantees (`streamSeq`, reconnect with `lastSeq`).
-- [ ] Finalize read-only-by-default and explicit input-enable policy.
+- [x] Freeze mobile event contract (`auth`, `list_sessions`, `attach`, `output`, `input`, `ack`, `error`).
+- [x] Define replay/ordering guarantees (`streamSeq`, reconnect with `lastSeq`).
+- [x] Finalize read-only-by-default and explicit input-enable policy.
 - [x] Add API conformance checks for protocol envelope and event types.
 - [x] Publish v1 contract doc for native clients.
+- [x] Add CI Node 22 gate for root/package typecheck + TAP test artifacts.
 - [ ] Exit criteria met:
 - [ ] iOS can consume mocked gateway events without schema drift for 7 days.
-- [ ] Command input path can be disabled globally and per-session.
+- [x] Command input path can be disabled globally and per-session.
 
 ## M1 - iOS Alpha (Read-Only Streaming) (Target: 2026-04-03)
 
@@ -76,7 +77,7 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## Dependencies
 
-- [ ] Stable gateway protocol and auth policy.
+- [x] Stable gateway protocol and auth policy.
 - [ ] Tailscale network path for low-friction private connectivity.
 - [ ] Test environments: tmux session fixtures + replay test data.
 - [ ] Apple/Google developer accounts and release pipelines.
@@ -101,3 +102,15 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Decide telemetry schema (connect time, replay time, input ack latency).
 - [ ] Schedule weekly cross-platform checkpoint with single source of truth in `docs/roadmap-native.md`.
 - [x] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
+
+## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
+
+- [ ] Node.js runtime is `v22.x` on Mac validation machine.
+- [ ] `npm run check` passes.
+- [ ] `node --import tsx --test src/protocol.conformance.test.ts` passes.
+- [ ] `node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts` passes.
+- [ ] `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts` passes.
+- [ ] `cd apps/ios/M0ProtocolMockClient && swift test` passes.
+- [ ] `npm run test:ci:all` passes on Mac.
+- [ ] Manual smoke passes: auth -> list_sessions -> attach -> replay from `lastSeq` works; kill switch blocks input enable.
+- [ ] Nightly evidence captured: TAP artifacts + swift test log + short smoke summary.

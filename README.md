@@ -231,7 +231,8 @@ Important env vars:
 3. `COMMANDRELAY_MAX_INPUT_BYTES` - input payload guardrail.
 4. `COMMANDRELAY_MAX_MSG_PER_MIN` - per-client message rate limit.
 5. `COMMANDRELAY_MAX_INPUT_PER_MIN` - per-client input rate limit.
-6. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - outbound proxy routing for gateway control-plane/telemetry calls.
+6. `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (or legacy `COMMANDRELAY_STRICT_V1`) - strict WebSocket envelope parsing toggle (`true` by default).
+7. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - outbound proxy routing for gateway control-plane/telemetry calls.
 
 ## Security Model
 
@@ -276,6 +277,37 @@ Public ingress should only be considered when private mesh is impossible.
 1. Electron desktop wrapper.
 2. Windows native adapter via ConPTY.
 3. Mobile-friendly read-only mode.
+
+## Mac Nightly Validation (Tonight)
+
+Run these commands in this exact order from Terminal on your Mac:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm ci
+npm run check
+node --import tsx --test src/protocol.conformance.test.ts
+node --import tsx --test src/server/ws-contract-matrix.test.ts
+node --import tsx --test src/server/bridge-server.policy.test.ts
+node --import tsx --test src/server/startup-validation.test.ts
+node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
+```
+
+Expected test footer for each `node --test` command:
+
+```text
+# pass 1
+# fail 0
+```
+
+Expected strict toggle output:
+
+```text
+STRICT_OFF {"ok":true,...}
+STRICT_ON {"ok":false,"error":"unsupported_type"}
+```
+
+Use [`docs/getting-started.md`](docs/getting-started.md) for the full nightly checklist with per-step validation notes.
 
 ## Documentation
 
