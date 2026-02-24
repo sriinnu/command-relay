@@ -9,7 +9,10 @@
     "dev": "tsx watch src/index.ts",
     "check": "tsc --noEmit",
     "test": "node --import tsx --test src/**/*.test.ts",
-    "test:ci:all": "scripts/ci-test-all.sh"
+    "test:ci:all": "scripts/ci-test-all.sh",
+    "bench:connect": "node --import tsx scripts/perf/connect-latency.ts",
+    "bench:list": "node --import tsx scripts/perf/list-sessions-roundtrip.ts",
+    "bench:input": "node --import tsx scripts/perf/input-ack-roundtrip.ts"
   },
   "dependencies": {
     "http-proxy-agent": "^7.0.2",

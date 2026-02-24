@@ -60,6 +60,23 @@ run_node_tap() {
 
 run_root() {
   local tap_file="$1"
+  local -a test_files=()
+  local log_file
+  log_file="$(mktemp)"
+
+  mapfile -t test_files < <(
+    cd "${REPO_ROOT}"
+    find src -type f -name '*.test.ts' | LC_ALL=C sort
+  )
+
+  if [[ "${#test_files[@]}" -eq 0 ]]; then
+    echo "No TypeScript tests found under ${REPO_ROOT}/src" >"${log_file}"
+    write_failure_tap "${tap_file}" "root tests" "No test files matched." "${log_file}"
+    rm -f "${log_file}"
+    return 1
+  fi
+
+  rm -f "${log_file}"
   run_node_tap \
     "${REPO_ROOT}" \
     "${tap_file}" \
@@ -67,8 +84,7 @@ run_root() {
     --import tsx \
     --test-reporter=tap \
     --test-concurrency=1 \
-    src/net/proxy-router.test.ts \
-    src/net/proxy-agent-factory.test.ts
+    "${test_files[@]}"
 }
 
 run_proxy_core() {

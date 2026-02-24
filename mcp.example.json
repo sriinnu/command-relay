@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "chitragupta": {
+      "command": "pnpm",
+      "args": [
+        "--dir",
+        "/absolute/path/to/chitragupta",
+        "exec",
+        "node",
+        "--import",
+        "tsx",
+        "packages/cli/src/mcp-entry.ts",
+        "--stdio",
+        "--project",
+        "/absolute/path/to/terminal",
+        "--agent"
+      ],
+      "env": {
+        "CHITRAGUPTA_MCP_AGENT": "true",
+        "CHITRAGUPTA_MCP_PROJECT": "/absolute/path/to/terminal"
+      }
+    }
+  }
+}
