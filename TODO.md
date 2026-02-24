@@ -114,3 +114,29 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] `npm run test:ci:all` passes on Mac.
 - [ ] Manual smoke passes: auth -> list_sessions -> attach -> replay from `lastSeq` works; kill switch blocks input enable.
 - [ ] Nightly evidence captured: TAP artifacts + swift test log + short smoke summary.
+
+## Home Pickup TODO (MacBook Session - 2026-02-24 Night)
+
+- [ ] Copy MCP template and set absolute paths: `cp mcp.example.json .mcp.json` then edit paths.
+- [ ] Verify Chitragupta MCP starts with the workaround command from `docs/operations.md`.
+- [ ] Run full gateway test pack: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Run replay-focused suites:
+  - `node --import tsx --test src/bridge/bridge-engine.replay.test.ts`
+  - `node --import tsx --test src/server/bridge-server.replay.e2e.test.ts`
+- [ ] Run iOS transport tests:
+  - `cd apps/ios/M0ProtocolMockClient && swift test --filter M0WebSocketTransportClientTests`
+  - `swift test`
+- [ ] Run Android parity module tests (requires Gradle wrapper or local Gradle):
+  - `cd apps/android/M0ProtocolMockClient && ./gradlew test` (or `gradle test`)
+- [ ] Run tmux fixture harness smoke:
+  - `scripts/tmux-fixtures/create-fixture.sh --session fixture_smoke --panes 2`
+  - `scripts/tmux-fixtures/emit-fixture-output.sh --session fixture_smoke --profile replay --cycles 5`
+  - `scripts/tmux-fixtures/teardown-fixture.sh --session fixture_smoke`
+- [ ] Run perf smoke benchmarks:
+  - `npm run bench:connect -- --iterations 20`
+  - `npm run bench:list -- --iterations 20`
+  - `npm run bench:input -- --iterations 20`
+- [ ] If all green, open/update PR notes with:
+  - replay coverage results
+  - iOS/Android local test results
+  - perf summary (`p50/p95/p99`)
