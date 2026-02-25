@@ -201,8 +201,10 @@ Current runtime and package baseline:
 1. Runtime: Node.js `>=22` with ESM (`"type": "module"`).
 2. TypeScript toolchain: `tsx` for run/dev and `typescript` for static checks.
 3. Transport: `ws` for gateway WebSocket connectivity.
-4. Outbound proxy stack: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
-5. Planned ecosystem split: iOS (Swift) first, Android (Kotlin) second, web fallback last.
+4. Outbound proxy package model: `@commandrelay/proxy-core`, `@commandrelay/proxy-agent`, `@commandrelay/proxy-http-client`.
+5. Proxy package internals use: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
+6. Startup currently parses proxy env and initializes a proxy factory for diagnostics; control-plane outbound wiring remains module-level (`src/control-plane/control-plane-client.ts`).
+7. Planned ecosystem split: iOS (Swift) first, Android (Kotlin) second, web fallback last.
 
 Run locally:
 
@@ -232,7 +234,7 @@ Important env vars:
 4. `COMMANDRELAY_MAX_MSG_PER_MIN` - per-client message rate limit.
 5. `COMMANDRELAY_MAX_INPUT_PER_MIN` - per-client input rate limit.
 6. `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (or legacy `COMMANDRELAY_STRICT_V1`) - strict WebSocket envelope parsing toggle (`true` by default).
-7. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - outbound proxy routing for gateway control-plane/telemetry calls.
+7. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - proxy settings consumed by proxy packages and control-plane client paths; startup currently parses/logs these settings.
 
 ## Security Model
 

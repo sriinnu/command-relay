@@ -64,12 +64,28 @@ Creating a GitHub release with a tag starting `proxy-` triggers publish mode aut
 
 Use this only when your release process already guarantees approval and version readiness.
 
+## Batch Follow-up (2026-02-25)
+
+- [x] Proxy package versions aligned for the current cut:
+  - `@commandrelay/proxy-core@0.1.0`
+  - `@commandrelay/proxy-agent@0.1.0`
+  - `@commandrelay/proxy-http-client@0.1.0`
+- [x] Batch validation evidence captured in current environment:
+  - root TAP `14/14`
+  - `proxy-core` TAP `1/1`
+  - `proxy-agent` TAP `2/2`
+  - `proxy-http-client` TAP `1/1`
+- [ ] Home-Mac rerun pending: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Dry-run pending: trigger `Publish Proxy Packages` with `mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`.
+- [ ] GitHub policy verification pending: `NPM_TOKEN`, `npm-publish` reviewers, default-branch protections.
+- [ ] Capture dry-run run URL + artifact summary in checkpoint/release notes before any publish-mode trigger.
+
 ## Internal v0.1 Gate Checklist (tag prep only)
 
 This checklist is for internal `v0.1` readiness planning. It does not create git tags.
 
-1. Confirm proxy package versions/changelog entries are final for this cut.
-2. Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
-3. Run publish workflow in `dry-run` mode for `@commandrelay/proxy-*` with target `dist_tag`.
-4. Verify `NPM_TOKEN`, `npm-publish` environment reviewers, and default-branch protections.
-5. Record dry-run artifacts and approval outcome in release notes before any publish-mode trigger.
+- [x] Confirm proxy package versions/changelog entries are final for this cut.
+- [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Run publish workflow in `dry-run` mode for `@commandrelay/proxy-*` with target `dist_tag`.
+- [ ] Verify `NPM_TOKEN`, `npm-publish` environment reviewers, and default-branch protections.
+- [ ] Record dry-run artifacts and approval outcome in release notes before any publish-mode trigger.

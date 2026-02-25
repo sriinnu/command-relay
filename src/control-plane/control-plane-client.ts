@@ -385,28 +385,36 @@ function normalizeTimeoutMs(timeoutMs: number | undefined): number {
 }
 
 /**
- * Ensures thrown outbound request values are represented as typed `Error` instances.
+ * Normalizes outbound request failures into stable transport contracts when applicable.
  *
  * @param url Request URL.
  * @param error Thrown value from request layer.
  * @returns Transport error to throw.
  */
 function normalizeTransportError(url: URL, error: unknown): Error {
-  if (error instanceof Error) {
+  if (error instanceof ControlPlaneTransportError) {
     return error;
   }
 
   const code = inferTransportErrorCode(error);
-  return new ControlPlaneTransportError(code, url.toString(), error);
+  if (code) {
+    return new ControlPlaneTransportError(code, url.toString(), error);
+  }
+
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new ControlPlaneTransportError("unknown_transport_error", url.toString(), error);
 }
 
 /**
- * Derives a transport error code from a thrown non-Error value.
+ * Derives a transport error code from known request-layer timeout/abort/proxy failures.
  *
  * @param error Thrown request-layer value.
- * @returns Transport error code.
+ * @returns Transport error code when recognized; otherwise null.
  */
-function inferTransportErrorCode(error: unknown): ControlPlaneTransportErrorCode {
+function inferTransportErrorCode(error: unknown): ControlPlaneTransportErrorCode | null {
   if (typeof error === "string") {
     if (error.startsWith("request_timeout:")) {
       return "request_timeout";
@@ -416,5 +424,24 @@ function inferTransportErrorCode(error: unknown): ControlPlaneTransportErrorCode
     }
     return "transport_error";
   }
+
+  if (error instanceof Error) {
+    if (error.message.startsWith("request_timeout:") || error.name === "RequestTimeoutError") {
+      return "request_timeout";
+    }
+    if (
+      error.message === "request_aborted" ||
+      error.name === "RequestAbortedError" ||
+      error.name === "AbortError" ||
+      (error as { code?: unknown }).code === "ABORT_ERR"
+    ) {
+      return "request_aborted";
+    }
+    if (error.message === "proxy_resolution_error" || error.name === "ProxyResolutionError") {
+      return "transport_error";
+    }
+    return null;
+  }
+
   return "unknown_transport_error";
 }

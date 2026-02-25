@@ -15,6 +15,10 @@ import {
   type ControlPlaneRequestOptions,
   type DeviceAuthRequest
 } from "./control-plane-client.js";
+import {
+  RequestAbortedError,
+  RequestTimeoutError
+} from "../../packages/proxy-http-client/src/index.js";
 
 interface CapturedRequest {
   url: string;
@@ -226,6 +230,88 @@ test("wraps non-Error transport failures in ControlPlaneTransportError", async (
       assert.equal(error.code, "request_timeout");
       assert.equal(error.url, "https://control-plane.local/telemetry/events");
       assert.equal(error.cause, "request_timeout:2500");
+      return true;
+    }
+  );
+});
+
+test("maps RequestTimeoutError instances to ControlPlaneTransportError", async () => {
+  const timeoutCause = new RequestTimeoutError(1800, "https://control-plane.local/telemetry/events");
+  const client = new ControlPlaneClient({
+    baseUrl: "https://control-plane.local",
+    requestFn: async () => {
+      throw timeoutCause;
+    }
+  });
+
+  await assert.rejects(
+    () => client.sendTelemetry({ events: [] }),
+    (error: unknown) => {
+      assert.equal(error instanceof ControlPlaneTransportError, true);
+      if (!(error instanceof ControlPlaneTransportError)) {
+        return false;
+      }
+      assert.equal(error.code, "request_timeout");
+      assert.equal(error.url, "https://control-plane.local/telemetry/events");
+      assert.equal(error.cause, timeoutCause);
+      return true;
+    }
+  );
+});
+
+test("maps RequestAbortedError instances to ControlPlaneTransportError", async () => {
+  const abortedCause = new RequestAbortedError(
+    "https://control-plane.local/auth/device",
+    "caller_cancelled"
+  );
+  const client = new ControlPlaneClient({
+    baseUrl: "https://control-plane.local",
+    requestFn: async () => {
+      throw abortedCause;
+    }
+  });
+
+  await assert.rejects(
+    () => client.authenticate(buildAuthInput()),
+    (error: unknown) => {
+      assert.equal(error instanceof ControlPlaneTransportError, true);
+      if (!(error instanceof ControlPlaneTransportError)) {
+        return false;
+      }
+      assert.equal(error.code, "request_aborted");
+      assert.equal(error.url, "https://control-plane.local/auth/device");
+      assert.equal(error.cause, abortedCause);
+      return true;
+    }
+  );
+});
+
+test("maps proxy resolver failures to ControlPlaneTransportError", async () => {
+  const resolverCause = new Error("resolver_failed");
+  const client = new ControlPlaneClient({
+    baseUrl: "https://control-plane.local",
+    proxyFactory: {
+      resolve() {
+        throw resolverCause;
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => client.authenticate(buildAuthInput()),
+    (error: unknown) => {
+      assert.equal(error instanceof ControlPlaneTransportError, true);
+      if (!(error instanceof ControlPlaneTransportError)) {
+        return false;
+      }
+      assert.equal(error.code, "transport_error");
+      assert.equal(error.url, "https://control-plane.local/auth/device");
+      assert.equal(error.cause instanceof Error, true);
+      if (!(error.cause instanceof Error)) {
+        return false;
+      }
+      assert.equal(error.cause.message, "proxy_resolution_error");
+      assert.equal((error.cause as { cause?: unknown }).cause, resolverCause);
       return true;
     }
   );

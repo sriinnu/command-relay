@@ -15,6 +15,10 @@ Thumbs.db
 tmp/
 .ci-artifacts/
 
+# Generated package artifacts
+packages/*/dist/
+packages/*/.test-dist/
+
 # iOS generated artifacts
 apps/ios/CommandRelay/**/*.xcodeproj/
 apps/ios/CommandRelay/**/xcuserdata/

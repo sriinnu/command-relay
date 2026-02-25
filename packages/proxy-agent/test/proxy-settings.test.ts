@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   loadProxySettings,
   parseNoProxy,
-  resolveProxyForUrl
+  resolveProxyForUrl,
+  shouldBypassProxy
 } from "../src/proxy-settings.js";
 
 test("resolves protocol-specific proxy settings with fallback", () => {
@@ -114,4 +115,28 @@ test("parses no_proxy entries safely", () => {
   assert.equal(rules[1]?.port, 8443);
   assert.equal(rules[2]?.host, "*");
   assert.equal(rules[3]?.port, null);
+});
+
+test("throws invalid_target_url for malformed target strings", () => {
+  const settings = loadProxySettings({
+    HTTP_PROXY: "http://proxy.local:8080"
+  });
+
+  assert.throws(
+    () => resolveProxyForUrl("::not-a-url::", settings),
+    (error: unknown) => error instanceof TypeError && error.message === "invalid_target_url"
+  );
+});
+
+test("preserves wildcardSubdomains compatibility in shouldBypassProxy", () => {
+  const rules = [
+    {
+      host: "internal.local",
+      port: null,
+      wildcardSubdomains: true
+    }
+  ];
+
+  assert.equal(shouldBypassProxy(new URL("https://api.internal.local"), rules), true);
+  assert.equal(shouldBypassProxy(new URL("https://external.local"), rules), false);
 });

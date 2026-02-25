@@ -9,6 +9,8 @@ import test from "node:test";
 import {
   HttpStatusError,
   JsonParseError,
+  ProxyResolutionError,
+  RequestAbortedError,
   RequestTimeoutError,
   requestJson,
   type JsonRequestTransport,
@@ -205,6 +207,122 @@ test("requestJson rejects unsupported websocket protocols before proxy resolutio
   assert.equal(resolveCalls, 0);
 });
 
+test("requestJson rejects immediately when signal is already aborted", async () => {
+  const controller = new AbortController();
+  controller.abort("manual_cancel");
+
+  let resolveCalls = 0;
+  let transportCalls = 0;
+  const resolver: ProxyAgentResolver = {
+    resolve() {
+      resolveCalls += 1;
+      return { agent: null };
+    }
+  };
+  const transport: JsonRequestTransport = {
+    httpRequest: () => {
+      transportCalls += 1;
+      throw new Error("unexpected_http_request");
+    },
+    httpsRequest: () => {
+      transportCalls += 1;
+      throw new Error("unexpected_https_request");
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      requestJson("http://service.local/aborted", {
+        signal: controller.signal,
+        proxyResolver: resolver,
+        transport
+      }),
+    (error: unknown) => {
+      assert.equal(error instanceof RequestAbortedError, true);
+      if (!(error instanceof RequestAbortedError)) {
+        return false;
+      }
+      assert.equal(error.target, "http://service.local/aborted");
+      assert.equal(error.reason, "manual_cancel");
+      return true;
+    }
+  );
+
+  assert.equal(resolveCalls, 0);
+  assert.equal(transportCalls, 0);
+});
+
+test("requestJson rejects with RequestAbortedError when aborted during async proxy resolution", async () => {
+  const controller = new AbortController();
+  const deferred = createDeferred<{ agent: nodeHttp.Agent | null }>();
+
+  let transportCalls = 0;
+  const resolver: ProxyAgentResolver = {
+    async resolve() {
+      return deferred.promise;
+    }
+  };
+  const transport: JsonRequestTransport = {
+    httpRequest: () => {
+      transportCalls += 1;
+      throw new Error("unexpected_http_request");
+    },
+    httpsRequest: () => {
+      transportCalls += 1;
+      throw new Error("unexpected_https_request");
+    }
+  };
+
+  const requestPromise = requestJson("https://service.local/secure", {
+    signal: controller.signal,
+    proxyResolver: resolver,
+    transport
+  });
+
+  controller.abort("abort_during_proxy_resolution");
+  deferred.resolve({ agent: null });
+
+  await assert.rejects(
+    () => requestPromise,
+    (error: unknown) => {
+      assert.equal(error instanceof RequestAbortedError, true);
+      if (!(error instanceof RequestAbortedError)) {
+        return false;
+      }
+      assert.equal(error.target, "https://service.local/secure");
+      assert.equal(error.reason, "abort_during_proxy_resolution");
+      return true;
+    }
+  );
+
+  assert.equal(transportCalls, 0);
+});
+
+test("requestJson wraps proxy resolver failures with ProxyResolutionError", async () => {
+  const resolverCause = new Error("resolver_failed");
+  const resolver: ProxyAgentResolver = {
+    resolve() {
+      throw resolverCause;
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      requestJson("http://service.local/proxy-fail", {
+        proxyResolver: resolver
+      }),
+    (error: unknown) => {
+      assert.equal(error instanceof ProxyResolutionError, true);
+      if (!(error instanceof ProxyResolutionError)) {
+        return false;
+      }
+      assert.equal(error.target, "http://service.local/proxy-fail");
+      assert.equal((error as { cause?: unknown }).cause, resolverCause);
+      return true;
+    }
+  );
+});
+
 test("requestJson rejects with RequestTimeoutError on timeout", async () => {
   const harness = createTransportHarness((_request) => {
     // Intentionally no response: requestJson should timeout and destroy the request.
@@ -312,4 +430,18 @@ function createTransportHarness(
       return lastRequest;
     }
   };
+}
+
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }

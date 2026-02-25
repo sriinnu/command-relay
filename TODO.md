@@ -194,11 +194,15 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## Proxy Package Release Gates (for internal v0.1 prep)
 
-- [ ] Gate 1: version readiness confirmed for each `@commandrelay/proxy-*` package.
+- [x] Gate 1: version readiness confirmed for each `@commandrelay/proxy-*` package (`@commandrelay/proxy-core@0.1.0`, `@commandrelay/proxy-agent@0.1.0`, `@commandrelay/proxy-http-client@0.1.0`).
 - [ ] Gate 2: root/package `check`, `build`, `test` all green on Mac run.
+  - Batch evidence (2026-02-25): TAP green in current environment (`root 14/14`, `proxy-core 1/1`, `proxy-agent 2/2`, `proxy-http-client 1/1`).
 - [ ] Gate 3: publish workflow dry-run green with expected package selector and `dist_tag`.
+  - Home Mac action: run `Publish Proxy Packages` with `mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`.
 - [ ] Gate 4: `NPM_TOKEN` + `npm-publish` environment policy verified.
+  - Home Mac action: verify `NPM_TOKEN` secret, `npm-publish` reviewers, and default-branch restrictions.
 - [ ] Gate 5: release notes/changelog draft reviewed before any publish-mode trigger.
+  - Home Mac action: append dry-run URL + artifact summary + go/no-go note.
 
 ## Proposed Internal v0.1 Tag Plan (proposal only; do not create tags yet)
 

@@ -5,7 +5,7 @@
 import type { Agent } from "node:http";
 import {
   ProxyAgentFactory as PrimitiveProxyAgentFactory
-} from "../../packages/proxy-agent/src/proxy-agent-factory.js";
+} from "../../packages/proxy-agent/src/index.js";
 import {
   loadProxySettings,
   type ProxySettings

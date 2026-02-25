@@ -32,6 +32,18 @@ run_npm_script() {
   return 1
 }
 
+has_npm_script() {
+  local package_json="$1"
+  local script_name="$2"
+
+  node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const scripts = pkg.scripts ?? {};
+process.exit(Object.prototype.hasOwnProperty.call(scripts, process.argv[2]) ? 0 : 1);
+' "${package_json}" "${script_name}"
+}
+
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   usage
   exit 0
@@ -83,16 +95,29 @@ if [[ "${INCLUDE_ROOT}" -eq 1 ]]; then
 fi
 
 mapfile -t package_dirs < <(find "${PACKAGES_DIR}" -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort)
+matched_packages=0
 
 for package_dir in "${package_dirs[@]}"; do
-  if [[ ! -f "${package_dir}/package.json" ]]; then
+  package_json="${package_dir}/package.json"
+  if [[ ! -f "${package_json}" ]]; then
     continue
   fi
 
   package_name="$(basename "${package_dir}")"
+  if ! has_npm_script "${package_json}" "${PHASE}"; then
+    echo "==> [${package_name}] SKIP (no '${PHASE}' script)"
+    continue
+  fi
+
+  matched_packages=$((matched_packages + 1))
   if ! run_npm_script "${package_dir}" "${package_name}" "${PHASE}"; then
     status=1
   fi
 done
+
+if [[ "${matched_packages}" -eq 0 ]]; then
+  echo "No package under ${PACKAGES_DIR} defines script '${PHASE}'" >&2
+  status=1
+fi
 
 exit "${status}"

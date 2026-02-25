@@ -10,7 +10,7 @@ import {
   type NoProxyRule as PrimitiveNoProxyRule,
   type ProxyEnvironment,
   type ProxySettings as PrimitiveProxySettings
-} from "../../packages/proxy-agent/src/proxy-settings.js";
+} from "../../packages/proxy-agent/src/index.js";
 
 /** Parsed `NO_PROXY` matcher rule used by runtime net code. */
 export type NoProxyRule = PrimitiveNoProxyRule;
