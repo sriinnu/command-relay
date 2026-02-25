@@ -33,6 +33,18 @@ test("loadProxySettings ignores uppercase HTTP_PROXY in CGI-like environments", 
   assert.equal(settings.httpsProxy, "https://secure.local/");
 });
 
+test("loadProxySettings drops unsupported proxy protocols", () => {
+  const settings = loadProxySettings({
+    http_proxy: "ftp://unsupported.local:2121",
+    https_proxy: "gopher://legacy.local:70",
+    all_proxy: "ssh://bastion.local:22"
+  });
+
+  assert.equal(settings.httpProxy, null);
+  assert.equal(settings.httpsProxy, null);
+  assert.equal(settings.allProxy, null);
+});
+
 test("parseNoProxy supports wildcard, domain, port, localhost, URL tokens, and IPv6", () => {
   const rules = parseNoProxy(
     "*.example.com,.svc.local:8443,localhost,http://service.internal:8080,[::1]:9090"
@@ -175,4 +187,14 @@ test("resolveProxyForUrlFromEnv loads env and resolves in one step", () => {
   });
 
   assert.equal(proxy, "http://proxy.local:3128/");
+});
+
+test("exports stable proxy-core root APIs", async () => {
+  const module = await import("../src/index.js");
+
+  assert.equal(module.loadProxySettings, loadProxySettings);
+  assert.equal(module.parseNoProxy, parseNoProxy);
+  assert.equal(module.resolveProxyForUrl, resolveProxyForUrl);
+  assert.equal(module.resolveProxyForUrlFromEnv, resolveProxyForUrlFromEnv);
+  assert.equal(module.shouldBypassProxy, shouldBypassProxy);
 });

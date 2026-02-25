@@ -2,6 +2,9 @@
   "name": "commandrelay-bridge",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "type": "module",
   "description": "CommandRelay tmux bridge core engine",
   "scripts": {
@@ -18,9 +21,11 @@
     "test:root": "node --import tsx --test src/**/*.test.ts",
     "test:packages": "scripts/packages/run-phase.sh test",
     "test:all": "scripts/packages/run-phase.sh test --include-root --root-script test:root",
+    "verify:consumer-smoke": "scripts/packages/verify-consumer-smoke.sh",
+    "ci:packages": "npm run check:packages && npm run build:packages && npm run test:packages && npm run verify:consumer-smoke",
     "ci:check": "npm run check:all",
     "ci:build": "npm run build:all",
-    "ci:test": "npm run test:all",
+    "ci:test": "npm run test:all && npm run verify:consumer-smoke",
     "ci:all": "npm run ci:check && npm run ci:build && npm run ci:test",
     "test:ci:all": "scripts/ci-test-all.sh",
     "bench:connect": "node --import tsx scripts/perf/connect-latency.ts",

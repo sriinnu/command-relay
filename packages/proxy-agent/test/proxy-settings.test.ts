@@ -5,7 +5,7 @@ import {
   parseNoProxy,
   resolveProxyForUrl,
   shouldBypassProxy
-} from "../src/proxy-settings.js";
+} from "../src/index.js";
 
 test("resolves protocol-specific proxy settings with fallback", () => {
   const settings = loadProxySettings({
@@ -36,6 +36,20 @@ test("falls back to all_proxy when protocol proxy is absent", () => {
     resolveProxyForUrl("ws://example.com", settings),
     "socks5://127.0.0.1:1080"
   );
+});
+
+test("sanitizes unsupported proxy protocols to preserve package boundaries", () => {
+  const settings = loadProxySettings({
+    HTTP_PROXY: "ftp://unsupported.local:2121",
+    HTTPS_PROXY: "gopher://legacy.local:70",
+    ALL_PROXY: "ssh://bastion.local:22"
+  });
+
+  assert.equal(settings.httpProxy, null);
+  assert.equal(settings.httpsProxy, null);
+  assert.equal(settings.allProxy, null);
+  assert.equal(resolveProxyForUrl("http://example.com", settings), null);
+  assert.equal(resolveProxyForUrl("https://example.com", settings), null);
 });
 
 test("honors no_proxy exact and wildcard-subdomain matching", () => {
@@ -139,4 +153,13 @@ test("preserves wildcardSubdomains compatibility in shouldBypassProxy", () => {
 
   assert.equal(shouldBypassProxy(new URL("https://api.internal.local"), rules), true);
   assert.equal(shouldBypassProxy(new URL("https://external.local"), rules), false);
+});
+
+test("exports stable proxy settings APIs from package root", async () => {
+  const module = await import("../src/index.js");
+
+  assert.equal(module.loadProxySettings, loadProxySettings);
+  assert.equal(module.parseNoProxy, parseNoProxy);
+  assert.equal(module.resolveProxyForUrl, resolveProxyForUrl);
+  assert.equal(module.shouldBypassProxy, shouldBypassProxy);
 });

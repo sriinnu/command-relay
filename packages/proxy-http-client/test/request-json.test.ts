@@ -1,7 +1,3 @@
-/**
- * Tests for the proxy-aware JSON HTTP client.
- */
-
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import * as nodeHttp from "node:http";
@@ -12,6 +8,7 @@ import {
   ProxyResolutionError,
   RequestAbortedError,
   RequestTimeoutError,
+  UnsupportedProtocolError,
   requestJson,
   type JsonRequestTransport,
   type ProxyAgentResolver
@@ -189,20 +186,15 @@ test("requestJson rejects unsupported websocket protocols before proxy resolutio
     }
   };
 
-  await assert.rejects(
-    () =>
-      requestJson("ws://service.local/socket", {
-        proxyResolver: resolver
-      }),
-    /unsupported_protocol:ws:/
-  );
-  await assert.rejects(
-    () =>
-      requestJson("wss://service.local/socket", {
-        proxyResolver: resolver
-      }),
-    /unsupported_protocol:wss:/
-  );
+  for (const protocol of ["ws:", "wss:"] as const) {
+    await assert.rejects(
+      () => requestJson(`${protocol}//service.local/socket`, { proxyResolver: resolver }),
+      (error: unknown) =>
+        error instanceof UnsupportedProtocolError &&
+        error.name === "UnsupportedProtocolError" &&
+        error.protocol === protocol
+    );
+  }
 
   assert.equal(resolveCalls, 0);
 });
@@ -242,6 +234,7 @@ test("requestJson rejects immediately when signal is already aborted", async () 
       if (!(error instanceof RequestAbortedError)) {
         return false;
       }
+      assert.equal(error.name, "RequestAbortedError");
       assert.equal(error.target, "http://service.local/aborted");
       assert.equal(error.reason, "manual_cancel");
       return true;
@@ -289,6 +282,7 @@ test("requestJson rejects with RequestAbortedError when aborted during async pro
       if (!(error instanceof RequestAbortedError)) {
         return false;
       }
+      assert.equal(error.name, "RequestAbortedError");
       assert.equal(error.target, "https://service.local/secure");
       assert.equal(error.reason, "abort_during_proxy_resolution");
       return true;
@@ -316,6 +310,7 @@ test("requestJson wraps proxy resolver failures with ProxyResolutionError", asyn
       if (!(error instanceof ProxyResolutionError)) {
         return false;
       }
+      assert.equal(error.name, "ProxyResolutionError");
       assert.equal(error.target, "http://service.local/proxy-fail");
       assert.equal((error as { cause?: unknown }).cause, resolverCause);
       return true;
@@ -337,6 +332,7 @@ test("requestJson rejects with RequestTimeoutError on timeout", async () => {
     (error: unknown) => {
       assert.equal(error instanceof RequestTimeoutError, true);
       assert.equal((error as RequestTimeoutError).timeoutMs, 20);
+      assert.equal((error as RequestTimeoutError).name, "RequestTimeoutError");
       return true;
     }
   );
@@ -361,6 +357,8 @@ test("requestJson rejects with JsonParseError when response is invalid JSON", as
       }),
     (error: unknown) => {
       assert.equal(error instanceof JsonParseError, true);
+      assert.equal((error as JsonParseError).name, "JsonParseError");
+      assert.equal((error as JsonParseError).status, 200);
       return true;
     }
   );
@@ -379,6 +377,7 @@ test("requestJson throws HttpStatusError for HTTP failures by default", async ()
     (error: unknown) => {
       assert.equal(error instanceof HttpStatusError, true);
       assert.equal((error as HttpStatusError<{ message: string }>).status, 503);
+      assert.equal((error as HttpStatusError<{ message: string }>).name, "HttpStatusError");
       assert.deepEqual((error as HttpStatusError<{ message: string }>).body, {
         message: "unavailable"
       });
@@ -399,6 +398,10 @@ test("requestJson can return non-2xx responses when throwOnHttpError is false", 
 
   assert.equal(result.status, 404);
   assert.deepEqual(result.body, { code: "missing" });
+});
+test("exports stable typed errors from package root", async () => {
+  const module = await import("../src/index.js");
+  assert.equal(module.UnsupportedProtocolError, UnsupportedProtocolError); assert.equal(module.ProxyResolutionError, ProxyResolutionError);
 });
 
 function createTransportHarness(

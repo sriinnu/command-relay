@@ -15,7 +15,7 @@ Thumbs.db
 tmp/
 .ci-artifacts/
 
-# Generated package artifacts
+# Generated package artifacts (build output; never commit)
 packages/*/dist/
 packages/*/.test-dist/
 

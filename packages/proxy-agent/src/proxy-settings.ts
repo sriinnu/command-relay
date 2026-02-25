@@ -6,7 +6,7 @@ import {
   type NoProxyRule as CoreNoProxyRule,
   type ProxyEnvironment as CoreProxyEnvironment,
   type ProxySettings as CoreProxySettings
-} from "../../proxy-core/src/index.js";
+} from "@commandrelay/proxy-core";
 
 /**
  * Parsed no_proxy matcher rule.

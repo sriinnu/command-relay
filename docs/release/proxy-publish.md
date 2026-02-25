@@ -14,6 +14,21 @@ The publish workflow is `.github/workflows/publish-proxy-packages.yml`.
 - Production publish job uses the `npm-publish` environment and npm provenance (`--provenance`).
 - Existing versions are detected and skipped to avoid republish failures.
 
+## Dist artifact policy
+
+- `packages/proxy-core/dist/`, `packages/proxy-agent/dist/`, and `packages/proxy-http-client/dist/` are generated build outputs and must remain untracked in git.
+- The publish workflow builds package outputs in CI (`npm --prefix <package> run build`) before `npm pack`, so tracked `dist/` files are not required for release.
+- Package tarballs still include `dist/` because each package `package.json` keeps `"files": ["dist"]`.
+
+If a `dist/` path is accidentally staged or tracked, clean the index with:
+
+```bash
+git rm -r --cached --ignore-unmatch \
+  packages/proxy-core/dist \
+  packages/proxy-agent/dist \
+  packages/proxy-http-client/dist
+```
+
 ## Required GitHub configuration
 
 1. Add repository secret `NPM_TOKEN` with publish rights for `@commandrelay`.
