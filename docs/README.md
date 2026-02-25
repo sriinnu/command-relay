@@ -42,3 +42,4 @@ Local MCP note:
 10. [macos-menu-bar-control-lane-spec.md](macos-menu-bar-control-lane-spec.md)
 11. [control-lane-parity-checklist.md](control-lane-parity-checklist.md)
 12. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
+13. [research-next-opportunities.md](research-next-opportunities.md)

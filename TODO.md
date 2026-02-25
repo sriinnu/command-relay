@@ -263,3 +263,32 @@ Reference roadmap: `docs/proxy-ecosystem-roadmap.md`.
   - `proxy-agent`
   - `proxy`
   - `socks-proxy-agent`
+
+## Research-Backed Next Wave (Home Pickup)
+
+Reference notes: `docs/research-next-opportunities.md`.
+
+- [ ] Cross-platform command safety contract:
+  - shared `input` timeout/retry semantics for iOS, Android, macOS, and web fallback
+  - shared telemetry keys for `enable_input` -> `input` -> `ack/error`
+  - deterministic kill-switch and lane-conflict behavior across clients
+- [ ] Multi-session UX + handoff model:
+  - session switch rules while preserving read-only default
+  - explicit takeover UX with owner visibility and confirmation
+  - per-pane activity/audit indicators in native clients
+- [ ] Reliability + SLO matrix:
+  - reconnect success target, command RTT target, replay catch-up target
+  - failover behavior when current writer disconnects mid-command
+  - weekly checkpoint artifact includes SLO trend deltas
+- [ ] Proxy family hardening gates (pre external publish):
+  - mandatory benchmark budgets (latency, throughput, memory/socket growth)
+  - dependency/license/SBOM/vulnerability gate in release flow
+  - interoperability matrix for `fetch`, `undici`, `axios`, `got`, and CLI adapters
+- [ ] Advanced transport exploration (feature-flagged):
+  - evaluate QUIC/WebTransport lane for degraded-network resilience
+  - compare against current WebSocket lane with controlled benchmark harness
+  - adopt only if reliability and operability improve without security regression
+- [ ] Remote-control trust model upgrades:
+  - short-lived pairing via QR + signed challenge response
+  - step-up confirmation for risky command classes
+  - immutable command audit stream export for incident review
