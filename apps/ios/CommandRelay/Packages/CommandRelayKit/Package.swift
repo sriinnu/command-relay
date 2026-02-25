@@ -31,7 +31,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CoreKitTests",
-            dependencies: ["CoreKit"]
+            dependencies: ["CoreKit", "SessionDomainKit"]
         )
     ]
 )

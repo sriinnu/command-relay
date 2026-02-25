@@ -15,7 +15,10 @@ struct AppRootView: View {
                     Label("Sessions", systemImage: "list.bullet.rectangle")
                 }
 
-            ReadOnlyStreamView(streamService: dependencies.streamService)
+            ReadOnlyStreamView(
+                streamService: dependencies.streamService,
+                inputService: dependencies.inputService
+            )
                 .tabItem {
                     Label("Stream", systemImage: "terminal")
                 }

@@ -93,14 +93,14 @@ Use this suite as the protocol gate before merging schema changes.
 
 ## Batch Outcomes Snapshot (2026-02-25)
 
-Tonight's validation scope for the iOS read-only spike is:
+Tonight's validation scope for the iOS controlled-input baseline is:
 
 1. App shell artifact set in `apps/ios/CommandRelay` (`AppRootView`, `AuthGateView`, `SessionListView`, `ReadOnlyStreamView`).
-2. Domain/transport contracts in `CommandRelayKit` (`AuthSessionServicing`, `SessionListServicing`, `ReadOnlyStreamServicing`, `RelayTransportClient`).
+2. Domain/transport contracts in `CommandRelayKit` (`AuthSessionServicing`, `SessionListServicing`, `ReadOnlyStreamServicing`, `ControlledInputServicing`, `RelayTransportClient`).
 3. Replay behavior in `M0ProtocolMockClient` (`M0ReplayPlanner`, `M0MockClient.reconnect()`, `M0ReplayTests`).
 4. Gateway protocol compatibility gates (`src/protocol.conformance.test.ts`, `src/server/ws-contract-matrix.test.ts`).
 
-## iOS Read-Only Live Mode (M1 Spike)
+## iOS Live Mode (M1/M2 Baseline)
 
 Enable live websocket services in iOS by exporting:
 
@@ -112,9 +112,9 @@ export COMMANDRELAY_WS_TIMEOUT_MS="8000"
 
 Behavior:
 
-1. `COMMANDRELAY_WS_URL` present -> app uses websocket-backed `SessionListServicing` and `ReadOnlyStreamServicing`.
+1. `COMMANDRELAY_WS_URL` present -> app uses websocket-backed `SessionListServicing`, `ReadOnlyStreamServicing`, and `ControlledInputServicing`.
 2. `COMMANDRELAY_WS_URL` absent -> app remains on stub services.
-3. Input remains disabled in UI; only `auth`, `list_sessions`, `attach`, `detach`, and `output` are used.
+3. Input remains opt-in in UI: `enable_input` is explicit, `disable_input` is available, and `input` is guarded by policy state.
 
 ## Tonight on Mac (Exact iOS Spike Command Pack - 2026-02-25)
 
@@ -159,7 +159,7 @@ Pass/fail gate:
 1. All command exits are `0`.
 2. No Swift test failures in `CommandRelayKit` and `M0ProtocolMockClient`.
 3. Both Node protocol suites end with `# fail 0`.
-4. Any failure blocks nightly acceptance of the iOS read-only spike artifacts.
+4. Any failure blocks nightly acceptance of the iOS controlled-input baseline artifacts.
 
 Strict protocol toggle guidance:
 
@@ -176,6 +176,69 @@ Kill-switch toggle guidance (runtime config sanity):
 ```text
 COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
 ```
+
+## Controlled-Input Operator Runbook (Tonight - 2026-02-25)
+
+This runbook verifies:
+
+1. `enable_input` can transition policy to input-enabled when kill switch is off.
+2. `input` is accepted only while input-enabled.
+3. `disable_input` returns policy to read-only and blocks later `input`.
+4. Kill switch blocks `enable_input` and all `input`.
+
+### A) Contract and policy gate (fast verification)
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/startup-validation.test.ts
+```
+
+Pass signal:
+
+1. Test run ends with `# fail 0`.
+2. `ws-contract-matrix` includes `enable -> input -> disable` and kill-switch policy assertions.
+
+### B) Live smoke with kill switch off (input should work)
+
+Terminal 1:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start
+```
+
+Terminal 2:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run bench:input -- --iterations 5
+```
+
+Pass signal:
+
+1. Benchmark exits `0`.
+2. Output includes input ack latency summary.
+
+### C) Live smoke with kill switch on (input must be blocked)
+
+Terminal 1 (restart bridge):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start
+```
+
+Terminal 2:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run bench:input -- --iterations 3
+```
+
+Pass signal:
+
+1. Benchmark exits non-zero.
+2. Failure message reports that input remained disabled after `enable_input` (kill switch effective).
 
 ## iOS Protocol Mock Package Usage
 

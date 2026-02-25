@@ -16,6 +16,9 @@ actor BridgeWebSocketReadOnlyStreamService: ReadOnlyStreamServicing {
     private var activeContinuation: AsyncThrowingStream<OutputChunk, Error>.Continuation?
     private var isTerminating = false
 
+    private let reconnectInitialDelayNs: UInt64 = 300_000_000
+    private let reconnectMaxDelayNs: UInt64 = 8_000_000_000
+
     /// Creates a gateway-backed read-only stream service.
     /// - Parameters:
     ///   - configuration: Gateway URL/token configuration.
@@ -31,20 +34,29 @@ actor BridgeWebSocketReadOnlyStreamService: ReadOnlyStreamServicing {
     func attach(request: StreamAttachRequest) async throws -> AsyncThrowingStream<OutputChunk, Error> {
         await terminateActiveConnection(closeCode: .normalClosure)
 
-        let socket = urlSession.webSocketTask(with: configuration.webSocketURL)
-        socket.resume()
-        activeSocket = socket
-        activePaneID = request.sessionID
-
-        try await authenticate(socket)
-        let bufferedOutput = try await attachAndBufferInitialOutput(socket: socket, request: request)
-
         let paneID = request.sessionID
+        let initialConnection = try await connectAndAttachSocket(
+            paneID: paneID,
+            resumeSequence: request.cursor?.lastSequence
+        )
+        activeSocket = initialConnection.socket
+        activePaneID = paneID
+
+        let initialState = prepareBufferedOutput(
+            initialConnection.bufferedOutput,
+            baselineSequence: request.cursor?.lastSequence
+        )
+
         return AsyncThrowingStream<OutputChunk, Error> { continuation in
-            bufferedOutput.forEach { continuation.yield($0) }
+            initialState.chunks.forEach { continuation.yield($0) }
 
             let receiverTask = Task { [weak self] in
-                await self?.consumeOutputLoop(socket: socket, paneID: paneID, continuation: continuation)
+                await self?.consumeOutputLoop(
+                    socket: initialConnection.socket,
+                    paneID: paneID,
+                    continuation: continuation,
+                    lastSequence: initialState.lastSequence
+                )
             }
 
             Task { [weak self] in
@@ -94,14 +106,36 @@ actor BridgeWebSocketReadOnlyStreamService: ReadOnlyStreamServicing {
         throw BridgeGatewayError.authRejected(code: code)
     }
 
+    private func connectAndAttachSocket(
+        paneID: String,
+        resumeSequence: Int64?
+    ) async throws -> (socket: URLSessionWebSocketTask, bufferedOutput: [OutputChunk]) {
+        let socket = urlSession.webSocketTask(with: configuration.webSocketURL)
+        socket.resume()
+
+        do {
+            try await authenticate(socket)
+            let bufferedOutput = try await attachAndBufferInitialOutput(
+                socket: socket,
+                paneID: paneID,
+                resumeSequence: resumeSequence
+            )
+            return (socket: socket, bufferedOutput: bufferedOutput)
+        } catch {
+            socket.cancel(with: .abnormalClosure, reason: nil)
+            throw error
+        }
+    }
+
     private func attachAndBufferInitialOutput(
         socket: URLSessionWebSocketTask,
-        request: StreamAttachRequest
+        paneID: String,
+        resumeSequence: Int64?
     ) async throws -> [OutputChunk] {
         let requestId = nextRequestID(prefix: "attach")
-        var payload: [String: Any] = ["paneId": request.sessionID]
-        if let cursor = request.cursor {
-            payload["lastSeq"] = cursor.lastSequence
+        var payload: [String: Any] = ["paneId": paneID]
+        if let resumeSequence {
+            payload["lastSeq"] = resumeSequence
         }
 
         let attachRequest = try BridgeGatewayProtocol.encodeClientRequest(
@@ -115,7 +149,7 @@ actor BridgeWebSocketReadOnlyStreamService: ReadOnlyStreamServicing {
         let deadline = Date().addingTimeInterval(TimeInterval(configuration.requestTimeoutMs) / 1000)
         while Date() < deadline {
             let envelope = try BridgeGatewayProtocol.decode(try await socket.receive())
-            if envelope.type == "output", let chunk = parseOutputChunk(from: envelope, paneID: request.sessionID) {
+            if envelope.type == "output", let chunk = parseOutputChunk(from: envelope, paneID: paneID) {
                 buffered.append(chunk)
                 continue
             }
@@ -139,27 +173,143 @@ actor BridgeWebSocketReadOnlyStreamService: ReadOnlyStreamServicing {
     private func consumeOutputLoop(
         socket: URLSessionWebSocketTask,
         paneID: String,
-        continuation: AsyncThrowingStream<OutputChunk, Error>.Continuation
+        continuation: AsyncThrowingStream<OutputChunk, Error>.Continuation,
+        lastSequence: Int64?
     ) async {
-        do {
-            while !Task.isCancelled {
-                let envelope = try BridgeGatewayProtocol.decode(try await socket.receive())
-                if envelope.type == "output", let chunk = parseOutputChunk(from: envelope, paneID: paneID) {
-                    continuation.yield(chunk)
-                    continue
+        var currentSocket = socket
+        var resumeSequence = lastSequence
+
+        while !Task.isCancelled {
+            do {
+                while !Task.isCancelled {
+                    let envelope = try BridgeGatewayProtocol.decode(try await currentSocket.receive())
+                    if envelope.type == "output", let chunk = parseOutputChunk(from: envelope, paneID: paneID) {
+                        if shouldEmit(chunk, after: resumeSequence) {
+                            if chunk.sequence > 0 {
+                                resumeSequence = chunk.sequence
+                            }
+                            continuation.yield(chunk)
+                        }
+                        continue
+                    }
+
+                    if envelope.type == "error" {
+                        let code = BridgeGatewayProtocol.payloadString("code", in: envelope) ?? "stream_failed"
+                        continuation.finish(throwing: BridgeGatewayError.requestRejected(code: code))
+                        await terminateActiveConnection(closeCode: .abnormalClosure)
+                        return
+                    }
+                }
+            } catch is CancellationError {
+                break
+            } catch {
+                if Task.isCancelled || activePaneID != paneID {
+                    break
                 }
 
-                if envelope.type == "error" {
-                    let code = BridgeGatewayProtocol.payloadString("code", in: envelope) ?? "stream_failed"
-                    continuation.finish(throwing: BridgeGatewayError.requestRejected(code: code))
+                currentSocket.cancel(with: .abnormalClosure, reason: nil)
+                do {
+                    let reconnected = try await reconnectWithBackoff(
+                        paneID: paneID,
+                        resumeSequence: resumeSequence
+                    )
+                    if Task.isCancelled || activePaneID != paneID {
+                        reconnected.socket.cancel(with: .goingAway, reason: nil)
+                        break
+                    }
+
+                    currentSocket = reconnected.socket
+                    activeSocket = reconnected.socket
+
+                    for chunk in reconnected.bufferedOutput where shouldEmit(chunk, after: resumeSequence) {
+                        if chunk.sequence > 0 {
+                            resumeSequence = chunk.sequence
+                        }
+                        continuation.yield(chunk)
+                    }
+                } catch is CancellationError {
+                    break
+                } catch {
+                    continuation.finish(throwing: error)
                     await terminateActiveConnection(closeCode: .abnormalClosure)
                     return
                 }
             }
-        } catch {
-            continuation.finish(throwing: error)
-            await terminateActiveConnection(closeCode: .abnormalClosure)
         }
+    }
+
+    private func reconnectWithBackoff(
+        paneID: String,
+        resumeSequence: Int64?
+    ) async throws -> (socket: URLSessionWebSocketTask, bufferedOutput: [OutputChunk]) {
+        var delayNs = reconnectInitialDelayNs
+
+        while !Task.isCancelled {
+            try Task.checkCancellation()
+            do {
+                let connected = try await connectAndAttachSocket(
+                    paneID: paneID,
+                    resumeSequence: resumeSequence
+                )
+                if activePaneID != paneID {
+                    connected.socket.cancel(with: .goingAway, reason: nil)
+                    throw CancellationError()
+                }
+                return connected
+            } catch {
+                if !isRetryableReconnectError(error) {
+                    throw error
+                }
+
+                // Deterministic exponential backoff without jitter keeps retry timing predictable.
+                try await Task.sleep(nanoseconds: delayNs)
+                delayNs = min(delayNs * 2, reconnectMaxDelayNs)
+            }
+        }
+
+        throw CancellationError()
+    }
+
+    private func isRetryableReconnectError(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return false
+        }
+
+        guard let bridgeError = error as? BridgeGatewayError else {
+            return true
+        }
+
+        switch bridgeError {
+        case .requestTimedOut:
+            return true
+        case .invalidEnvelope, .unsupportedMessageFrame, .missingField,
+             .authRejected, .requestRejected, .streamNotAttached:
+            return false
+        }
+    }
+
+    private func prepareBufferedOutput(
+        _ chunks: [OutputChunk],
+        baselineSequence: Int64?
+    ) -> (chunks: [OutputChunk], lastSequence: Int64?) {
+        var filtered: [OutputChunk] = []
+        filtered.reserveCapacity(chunks.count)
+
+        var latestSequence = baselineSequence
+        for chunk in chunks where shouldEmit(chunk, after: latestSequence) {
+            if chunk.sequence > 0 {
+                latestSequence = chunk.sequence
+            }
+            filtered.append(chunk)
+        }
+        return (chunks: filtered, lastSequence: latestSequence)
+    }
+
+    private func shouldEmit(_ chunk: OutputChunk, after lastSequence: Int64?) -> Bool {
+        guard chunk.sequence > 0, let lastSequence else {
+            return true
+        }
+        return chunk.sequence > lastSequence
     }
 
     private func waitForReply(

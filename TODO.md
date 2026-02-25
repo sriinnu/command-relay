@@ -17,6 +17,11 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## Current Milestones
 
+## Controlled-Input Status Snapshot (2026-02-25)
+
+- [x] Gateway controlled-input runtime is implemented and test-covered (`enable_input`, `input`, `disable_input`, kill switch enforcement).
+- [x] iOS controlled-input baseline is implemented (`enable_input`, `input`, `disable_input` wiring + UX safety gate); Mac runtime validation is pending.
+
 ## M0 - Gateway and Mobile Contract Baseline (Target: 2026-03-13)
 
 - [x] Freeze mobile event contract (`auth`, `list_sessions`, `attach`, `output`, `input`, `ack`, `error`).
@@ -31,9 +36,9 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## M1 - iOS Alpha (Read-Only Streaming) (Target: 2026-04-03)
 
-- [ ] Create Swift app shell (auth, session list, pane viewer).
-- [ ] Implement WebSocket connection + reconnect with backoff.
-- [ ] Implement pane attach, output render, replay resume.
+- [x] Create Swift app shell (auth, session list, pane viewer).
+- [x] Implement WebSocket connection + reconnect with backoff.
+- [x] Implement pane attach, output render, replay resume.
 - [ ] Add accessibility baseline (VoiceOver labels, dynamic type, focus order).
 - [ ] Add telemetry for connect latency, reconnect count, stream lag.
 - [ ] Exit criteria met:
@@ -42,8 +47,8 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## M2 - iOS Beta (Controlled Input) (Target: 2026-04-24)
 
-- [ ] Implement explicit `enable_input` UX with clear risk gate.
-- [ ] Implement input send/ack path with timeout/error handling.
+- [x] Implement explicit `enable_input` UX with clear risk gate.
+- [x] Implement input send/ack path with timeout/error handling.
 - [ ] Add safeguards: per-command length limits, rate limit feedback, kill switch handling.
 - [ ] Add audit event surfacing for sent commands.
 - [ ] Exit criteria met:
@@ -97,7 +102,7 @@ Owner scope: iOS first, Android second, web fallback last.
 ## Immediate Next Actions (This Week)
 
 - [x] Create `v1` protocol contract tests in gateway repo.
-- [x] Build iOS spike for WebSocket connect/list/attach/output (no input yet).
+- [x] Build iOS spike for WebSocket connect/list/attach/output, then extend with controlled-input baseline.
 - [x] Define iOS screen map and navigation for three core flows.
 - [x] Decide telemetry schema (connect time, replay time, input ack latency).
 - [x] Implement weekly checkpoint workflow artifacts (`scripts/checkpoints/generate-weekly-checkpoint.sh` + template) and document tracking in `docs/roadmap-native.md`.
@@ -114,16 +119,18 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Post-sync tracking rule:
   checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `TODO.md`.
 
-## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
+## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-25)
 
 - [ ] Node.js runtime is `v22.x` on Mac validation machine.
 - [ ] `npm run check` passes.
 - [ ] `node --import tsx --test src/protocol.conformance.test.ts` passes.
 - [ ] `node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts` passes.
+- [ ] `node --import tsx --test src/server/startup-validation.test.ts` passes.
 - [ ] `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts` passes.
 - [ ] `cd apps/ios/M0ProtocolMockClient && swift test` passes.
 - [ ] `npm run test:ci:all` passes on Mac.
-- [ ] Manual smoke passes: auth -> list_sessions -> attach -> replay from `lastSeq` works; kill switch blocks input enable.
+- [ ] Live smoke (kill switch off) passes: `COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start` + `npm run bench:input -- --iterations 5`.
+- [ ] Live smoke (kill switch on) blocks input: `COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start` + `npm run bench:input -- --iterations 3` fails with input-disabled behavior.
 - [ ] Nightly evidence captured: TAP artifacts + swift test log + short smoke summary.
 
 ## Home Pickup TODO (MacBook Session - 2026-02-24 Night)

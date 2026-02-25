@@ -65,6 +65,10 @@ Dependencies:
 1. Gateway audit pipeline.
 2. Policy update events and real-time enforcement.
 
+Status snapshot (2026-02-25):
+- [x] Gateway controlled-input policy path is implemented and covered by contract/policy tests.
+- [x] iOS controlled-input UX + transport baseline is implemented; Mac runtime validation is pending.
+
 ## M3 - iOS GA (2026-04-27 to 2026-05-15)
 
 Deliverables:
@@ -152,14 +156,16 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 5. Commit the checkpoint note in the same change that updates roadmap/TODO decisions for that week.
 6. Use checkpoint ID format `YYYY-Www-YYYY-MM-DD` as the source-of-truth reference in review notes.
 
-## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
+## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-25)
 
 - [ ] Node 22 is active on the Mac validation host (`node -v` reports `v22.x`).
 - [ ] Root typecheck gate passes (`npm run check`).
 - [ ] Protocol v1 conformance suite passes (`node --import tsx --test src/protocol.conformance.test.ts`).
 - [ ] Gateway policy/contract suites pass (`node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts`).
+- [ ] Startup validation suite passes (`node --import tsx --test src/server/startup-validation.test.ts`).
 - [ ] Proxy and outbound routing coverage passes (`node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`).
 - [ ] iOS M0 mock contract package passes on Mac (`cd apps/ios/M0ProtocolMockClient && swift test`).
 - [ ] CI parity run passes locally (`npm run test:ci:all`).
-- [ ] Manual smoke confirms attach/replay from `lastSeq` and kill-switch-enforced read-only behavior.
+- [ ] Live smoke with kill switch off passes (`COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start` + `npm run bench:input -- --iterations 5`).
+- [ ] Live smoke with kill switch on blocks input (`COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start` + `npm run bench:input -- --iterations 3` exits non-zero).
 - [ ] Validation artifacts are captured (TAP logs + `swift test` output) and linked in nightly notes.

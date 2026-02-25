@@ -127,4 +127,19 @@ enum BridgeGatewayProtocol {
         }
         return nil
     }
+
+    /// Reads a boolean payload field from an envelope.
+    /// - Parameters:
+    ///   - field: Payload key.
+    ///   - envelope: Source envelope.
+    /// - Returns: Parsed boolean when present.
+    static func payloadBool(_ field: String, in envelope: BridgeGatewayEnvelope) -> Bool? {
+        if let value = envelope.payload[field] as? Bool {
+            return value
+        }
+        if let value = envelope.payload[field] as? NSNumber {
+            return value.boolValue
+        }
+        return nil
+    }
 }

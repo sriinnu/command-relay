@@ -23,6 +23,11 @@ If you previously used `pnpm ... exec tsx .../mcp-entry.ts`, switch to the comma
 
 Run Codex/Claude inside `tmux` so CommandRelay can discover and control sessions reliably.
 
+## Remote-Control Capability Status (2026-02-25)
+
+1. Gateway controlled-input path is ready: `enable_input`, `input`, `disable_input`, and kill-switch enforcement are implemented and test-covered.
+2. iOS controlled-input baseline is implemented (explicit enable/disable + send path); full Mac runtime validation is pending.
+
 ## iOS Protocol Mock Package (M0)
 
 Use `apps/ios/M0ProtocolMockClient` to validate stream envelope encoding, replay, and reconnect behavior before wiring full gateway transport.
@@ -114,7 +119,50 @@ Pass criteria for tonight:
 4. Full `swift test` in both `CommandRelayKit` and `M0ProtocolMockClient` exits `0`.
 5. Both Node protocol gates end with `# fail 0`.
 
-## iOS Live Spike Environment (Read-Only)
+## Tonight on Mac (Controlled-Input Verification - 2026-02-25)
+
+Run policy gates from repo root:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/startup-validation.test.ts
+```
+
+Live smoke for input enabled path (gateway started with kill switch off):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start
+```
+
+In a second terminal:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run bench:input -- --iterations 5
+```
+
+Kill-switch smoke (expect blocked input):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start
+```
+
+In a second terminal:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run bench:input -- --iterations 3
+```
+
+Expected behavior:
+
+1. `ws-contract-matrix` covers `enable_input -> input -> disable_input` and blocked post-disable input.
+2. With kill switch `off`, input benchmark exits `0`.
+3. With kill switch `on`, benchmark exits non-zero after `enable_input` with input-disabled behavior.
+
+## iOS Live Environment
 
 Set these environment variables before launching the iOS app from Xcode:
 
@@ -136,7 +184,7 @@ Runtime behavior:
 2. Start CommandRelay bridge daemon on the home machine.
 3. Confirm daemon is reachable over Tailscale.
 4. Open client UI and authenticate.
-5. Attach to a pane and verify read-only output streaming.
+5. Attach to a pane and verify output streaming; enable controlled input only when needed.
 
 ## Minimal tmux Commands
 

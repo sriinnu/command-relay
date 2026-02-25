@@ -15,6 +15,12 @@ This document defines the native iOS architecture for CommandRelay in Swift/Swif
 2. Full offline terminal history sync.
 3. Multi-account support.
 
+## Remote-Control Capability Status (2026-02-25)
+
+1. Gateway controlled-input path is ready (`enable_input`, `input`, `disable_input`, policy updates, global kill switch).
+2. iOS controlled-input baseline is implemented in app code (explicit enable/disable + command send).
+3. Mac/Xcode runtime validation for the new controlled-input path is still pending.
+
 ## M1 Kickoff Baseline (Scaffolded on February 24, 2026)
 
 The first implementation scaffold now exists at `apps/ios/CommandRelay` with:
@@ -90,7 +96,7 @@ Navigation rules:
 
 ## Live WebSocket Spike Implementation (2026-02-25)
 
-The iOS spike now includes a real bridge WebSocket path (read-only only, no input).
+The iOS spike now includes a real bridge WebSocket path for both read-only streaming and controlled input.
 
 ### Implemented components
 
@@ -105,14 +111,36 @@ The iOS spike now includes a real bridge WebSocket path (read-only only, no inpu
 4. Read-only stream attach/output:
    - `CommandRelayApp/Gateway/BridgeWebSocketReadOnlyStreamService.swift`
    - flow: `auth` -> `attach` -> receive `output` envelopes (`snapshot`/`delta`) as `OutputChunk`
-5. Dependency switch:
+5. Controlled input:
+   - `CommandRelayApp/Gateway/BridgeWebSocketControlledInputService.swift`
+   - flow: `auth` -> `attach` -> `enable_input`/`disable_input` -> `input` with ack/error handling
+6. Dependency switch:
    - `AppDependencies.makeDefault()` chooses live services when `COMMANDRELAY_WS_URL` is set, else stubs.
 
 ### Current constraints
 
 1. `sessionID` in domain currently maps to gateway `paneId` for M1 read-only.
-2. Attach path is read-only; `enable_input` and `input` remain disabled in iOS UI.
+2. Controlled input remains explicit opt-in and defaults back to read-only on detach/reconnect.
 3. Transport tests for this app target still require Mac/Xcode execution.
+
+## M2 Controlled-Input Milestone Plan (In Progress)
+
+1. Transport layer:
+   - Add request/response support for `enable_input`, `disable_input`, and `input`.
+   - Parse and publish `policy_update` as authoritative input state.
+2. Domain layer:
+   - Add an input-control service interface with explicit enable/disable and send-input methods.
+   - Map gateway error codes (`input_disabled`, `input_rate_limited`, `input_too_large`) to typed domain failures.
+3. UI layer:
+   - Keep read-only default after auth/reconnect.
+   - Add explicit enable affordance and clear active-input indicator.
+   - Add explicit disable control in the stream screen.
+4. Safety and lifecycle:
+   - Block send while kill switch is active or policy is read-only.
+   - Force local input state back to read-only on detach/background/reconnect until re-enabled.
+5. Test plan:
+   - Add iOS service tests for `enable -> input -> disable` success path.
+   - Add iOS service tests for kill-switch-blocked path (`enable_input` does not make input effective).
 
 ## Batch Outcomes (2026-02-24)
 

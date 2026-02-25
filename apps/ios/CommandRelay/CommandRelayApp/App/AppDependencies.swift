@@ -5,6 +5,7 @@ struct AppDependencies {
     let authService: any AuthSessionServicing
     let sessionsService: any SessionListServicing
     let streamService: any ReadOnlyStreamServicing
+    let inputService: any ControlledInputServicing
 
     static func makeDefault(
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -16,7 +17,8 @@ struct AppDependencies {
         return AppDependencies(
             authService: GatewayAuthService(configuration: configuration),
             sessionsService: BridgeWebSocketSessionListService(configuration: configuration),
-            streamService: BridgeWebSocketReadOnlyStreamService(configuration: configuration)
+            streamService: BridgeWebSocketReadOnlyStreamService(configuration: configuration),
+            inputService: BridgeWebSocketControlledInputService(configuration: configuration)
         )
     }
 
@@ -24,7 +26,8 @@ struct AppDependencies {
         AppDependencies(
             authService: StubAuthService(),
             sessionsService: StubSessionListService(),
-            streamService: StubReadOnlyStreamService()
+            streamService: StubReadOnlyStreamService(),
+            inputService: StubControlledInputService()
         )
     }
 }
@@ -82,6 +85,62 @@ actor StubReadOnlyStreamService: ReadOnlyStreamServicing {
     }
 }
 
+actor StubControlledInputService: ControlledInputServicing {
+    private var isInputEnabled = false
+
+    func enableInput(request: EnableInputRequest) async throws -> InputControlState {
+        isInputEnabled = true
+        let now = Date()
+        return InputControlState(
+            sessionID: request.sessionID,
+            mode: .enabled,
+            globalInputDisabled: false,
+            updatedAt: now,
+            auditRecord: InputAuditRecord(
+                id: UUID().uuidString,
+                sessionID: request.sessionID,
+                action: .enableInput,
+                actor: request.actor,
+                occurredAt: now,
+                reason: request.reason
+            )
+        )
+    }
+
+    func disableInput(request: DisableInputRequest) async throws -> InputControlState {
+        isInputEnabled = false
+        let now = Date()
+        return InputControlState(
+            sessionID: request.sessionID,
+            mode: .readOnly,
+            globalInputDisabled: false,
+            updatedAt: now,
+            auditRecord: InputAuditRecord(
+                id: UUID().uuidString,
+                sessionID: request.sessionID,
+                action: .disableInput,
+                actor: request.actor,
+                occurredAt: now,
+                reason: request.reason
+            )
+        )
+    }
+
+    func sendInput(request: SendInputRequest) async throws -> InputAuditRecord {
+        guard isInputEnabled else {
+            throw BridgeGatewayError.requestRejected(code: "input_disabled")
+        }
+        return InputAuditRecord(
+            id: UUID().uuidString,
+            sessionID: request.sessionID,
+            action: .sendInput,
+            actor: request.actor,
+            occurredAt: Date(),
+            reason: "bytes=\(request.payload.utf8ByteCount)"
+        )
+    }
+}
+
 actor GatewayAuthService: AuthSessionServicing {
     private let configuration: BridgeGatewayConfiguration
 
@@ -99,6 +158,6 @@ actor GatewayAuthService: AuthSessionServicing {
     }
 
     func fetchCapabilities() async throws -> SessionCapabilities {
-        SessionCapabilities(readOnly: true, canEnableInput: false)
+        SessionCapabilities(readOnly: true, canEnableInput: true)
     }
 }
