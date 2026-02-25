@@ -100,6 +100,22 @@ Tonight's validation scope for the iOS read-only spike is:
 3. Replay behavior in `M0ProtocolMockClient` (`M0ReplayPlanner`, `M0MockClient.reconnect()`, `M0ReplayTests`).
 4. Gateway protocol compatibility gates (`src/protocol.conformance.test.ts`, `src/server/ws-contract-matrix.test.ts`).
 
+## iOS Read-Only Live Mode (M1 Spike)
+
+Enable live websocket services in iOS by exporting:
+
+```bash
+export COMMANDRELAY_WS_URL="ws://<tailscale-or-lan-ip>:8787/ws"
+export COMMANDRELAY_AUTH_TOKEN="<token-if-enabled>"
+export COMMANDRELAY_WS_TIMEOUT_MS="8000"
+```
+
+Behavior:
+
+1. `COMMANDRELAY_WS_URL` present -> app uses websocket-backed `SessionListServicing` and `ReadOnlyStreamServicing`.
+2. `COMMANDRELAY_WS_URL` absent -> app remains on stub services.
+3. Input remains disabled in UI; only `auth`, `list_sessions`, `attach`, `detach`, and `output` are used.
+
 ## Tonight on Mac (Exact iOS Spike Command Pack - 2026-02-25)
 
 Run in this exact order:

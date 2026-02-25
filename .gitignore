@@ -15,5 +15,7 @@ Thumbs.db
 tmp/
 .ci-artifacts/
 
-# Local native scaffold (kept local until production module split is finalized)
-apps/ios/CommandRelay/
+# iOS generated artifacts
+apps/ios/CommandRelay/**/*.xcodeproj/
+apps/ios/CommandRelay/**/xcuserdata/
+apps/ios/CommandRelay/**/DerivedData/

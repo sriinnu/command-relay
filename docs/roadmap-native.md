@@ -137,7 +137,7 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 
 1. Freeze and publish protocol `v1` schema and examples.
 2. Implement gateway conformance tests for required events.
-3. Start iOS spike: auth + session list + attach + output stream.
+3. Start iOS spike: auth + session list + attach + output stream. (Completed 2026-02-25)
 4. Define iOS UX copy for input safety and confirmation states.
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
 6. Run and commit the first scripted weekly cross-platform checkpoint artifact.

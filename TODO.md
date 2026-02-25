@@ -97,7 +97,7 @@ Owner scope: iOS first, Android second, web fallback last.
 ## Immediate Next Actions (This Week)
 
 - [x] Create `v1` protocol contract tests in gateway repo.
-- [ ] Build iOS spike for WebSocket connect/list/attach/output (no input yet).
+- [x] Build iOS spike for WebSocket connect/list/attach/output (no input yet).
 - [x] Define iOS screen map and navigation for three core flows.
 - [x] Decide telemetry schema (connect time, replay time, input ack latency).
 - [x] Implement weekly checkpoint workflow artifacts (`scripts/checkpoints/generate-weekly-checkpoint.sh` + template) and document tracking in `docs/roadmap-native.md`.

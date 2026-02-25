@@ -88,6 +88,32 @@ Navigation rules:
 3. Push `ReadOnlyStreamView` from `SessionListView` using selected session/pane IDs.
 4. Keep pane viewer read-only; input enable remains out of scope for this spike.
 
+## Live WebSocket Spike Implementation (2026-02-25)
+
+The iOS spike now includes a real bridge WebSocket path (read-only only, no input).
+
+### Implemented components
+
+1. Gateway runtime config:
+   - `CommandRelayApp/Gateway/BridgeGatewayConfiguration.swift`
+   - env vars: `COMMANDRELAY_WS_URL`, `COMMANDRELAY_AUTH_TOKEN`, `COMMANDRELAY_WS_TIMEOUT_MS`
+2. Protocol encode/decode:
+   - `CommandRelayApp/Gateway/BridgeGatewayProtocol.swift`
+3. Session listing over websocket:
+   - `CommandRelayApp/Gateway/BridgeWebSocketSessionListService.swift`
+   - flow: `auth` -> `list_sessions` -> map `session_list.panes[]` to `RelaySessionSummary`
+4. Read-only stream attach/output:
+   - `CommandRelayApp/Gateway/BridgeWebSocketReadOnlyStreamService.swift`
+   - flow: `auth` -> `attach` -> receive `output` envelopes (`snapshot`/`delta`) as `OutputChunk`
+5. Dependency switch:
+   - `AppDependencies.makeDefault()` chooses live services when `COMMANDRELAY_WS_URL` is set, else stubs.
+
+### Current constraints
+
+1. `sessionID` in domain currently maps to gateway `paneId` for M1 read-only.
+2. Attach path is read-only; `enable_input` and `input` remain disabled in iOS UI.
+3. Transport tests for this app target still require Mac/Xcode execution.
+
 ## Batch Outcomes (2026-02-24)
 
 ### iOS Transport Layer Outcome

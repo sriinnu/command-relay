@@ -114,6 +114,22 @@ Pass criteria for tonight:
 4. Full `swift test` in both `CommandRelayKit` and `M0ProtocolMockClient` exits `0`.
 5. Both Node protocol gates end with `# fail 0`.
 
+## iOS Live Spike Environment (Read-Only)
+
+Set these environment variables before launching the iOS app from Xcode:
+
+```bash
+export COMMANDRELAY_WS_URL="ws://<tailscale-or-lan-ip>:8787/ws"
+export COMMANDRELAY_AUTH_TOKEN="<token-if-enabled>"
+export COMMANDRELAY_WS_TIMEOUT_MS="8000"
+```
+
+Runtime behavior:
+
+1. If `COMMANDRELAY_WS_URL` is set, `AppDependencies` uses live websocket services.
+2. If `COMMANDRELAY_WS_URL` is missing, the app falls back to local stubs.
+3. Session rows now expose pane IDs; selected pane ID is reused by the stream tab via `@AppStorage`.
+
 ## Setup Steps
 
 1. Create named tmux sessions for active work.
