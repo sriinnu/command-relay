@@ -132,6 +132,79 @@ test("requestJson uses injected proxy agent resolver", async () => {
   assert.equal(harness.getLastRequest().options.agent, agent);
 });
 
+test("requestJson uses https transport and async proxy resolver for https targets", async () => {
+  let httpCalls = 0;
+  let httpsCalls = 0;
+  const capturedRequests: FakeClientRequest[] = [];
+
+  const transport: JsonRequestTransport = {
+    httpRequest: () => {
+      httpCalls += 1;
+      throw new Error("unexpected_http_request");
+    },
+    httpsRequest: (
+      options: nodeHttp.RequestOptions,
+      callback: (response: nodeHttp.IncomingMessage) => void
+    ): nodeHttp.ClientRequest => {
+      httpsCalls += 1;
+      const request = new FakeClientRequest(options, callback, (capturedRequest) => {
+        capturedRequest.emitJsonResponse(200, { ok: true });
+      });
+      capturedRequests.push(request);
+      return request as unknown as nodeHttp.ClientRequest;
+    }
+  };
+
+  const agent = new nodeHttp.Agent();
+  const resolvedTargets: string[] = [];
+  const resolver: ProxyAgentResolver = {
+    async resolve(target) {
+      resolvedTargets.push(target.toString());
+      return { agent };
+    }
+  };
+
+  const result = await requestJson<{ ok: boolean }>("https://service.local/secure", {
+    proxyResolver: resolver,
+    transport
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, { ok: true });
+  assert.equal(httpCalls, 0);
+  assert.equal(httpsCalls, 1);
+  assert.deepEqual(resolvedTargets, ["https://service.local/secure"]);
+  assert.equal(capturedRequests.length, 1);
+  assert.equal(capturedRequests[0]?.options.agent, agent);
+});
+
+test("requestJson rejects unsupported websocket protocols before proxy resolution", async () => {
+  let resolveCalls = 0;
+  const resolver: ProxyAgentResolver = {
+    resolve() {
+      resolveCalls += 1;
+      return { agent: null };
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      requestJson("ws://service.local/socket", {
+        proxyResolver: resolver
+      }),
+    /unsupported_protocol:ws:/
+  );
+  await assert.rejects(
+    () =>
+      requestJson("wss://service.local/socket", {
+        proxyResolver: resolver
+      }),
+    /unsupported_protocol:wss:/
+  );
+
+  assert.equal(resolveCalls, 0);
+});
+
 test("requestJson rejects with RequestTimeoutError on timeout", async () => {
   const harness = createTransportHarness((_request) => {
     // Intentionally no response: requestJson should timeout and destroy the request.

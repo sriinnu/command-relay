@@ -1,3 +1,19 @@
+import { isIP } from "node:net";
+
+const SUPPORTED_PROXY_PROTOCOLS = new Set([
+  "http:",
+  "https:",
+  "socks:",
+  "socks4:",
+  "socks4a:",
+  "socks5:",
+  "socks5h:",
+  "pac+http:",
+  "pac+https:",
+  "pac+file:",
+  "pac+data:"
+]);
+
 /**
  * Parsed no_proxy matcher rule.
  */
@@ -20,25 +36,43 @@ export interface ProxySettings {
 /**
  * Process-like environment map used for proxy parsing.
  */
-export type ProxyEnvironment = Record<string, string | undefined>;
+export type ProxyEnvironment = Readonly<Record<string, string | undefined>>;
 
 /**
  * Loads and normalizes proxy settings from environment variables.
+ *
+ * Behavior notes:
+ * - lowercase variables win over uppercase (`http_proxy` over `HTTP_PROXY`)
+ * - in CGI-like environments (`REQUEST_METHOD`), uppercase `HTTP_PROXY` is ignored
  *
  * @param env Environment source object, defaults to `process.env`.
  * @returns Normalized proxy settings.
  */
 export function loadProxySettings(env: ProxyEnvironment = process.env): ProxySettings {
-  const httpProxy = env.HTTP_PROXY ?? env.http_proxy ?? null;
-  const httpsProxy = env.HTTPS_PROXY ?? env.https_proxy ?? null;
-  const allProxy = env.ALL_PROXY ?? env.all_proxy ?? null;
-  const noProxyRaw = env.NO_PROXY ?? env.no_proxy ?? "";
-
+  const isCgi = Boolean(readRawEnv(env, "REQUEST_METHOD", "request_method"));
   return {
-    httpProxy: sanitizeProxyUrl(httpProxy),
-    httpsProxy: sanitizeProxyUrl(httpsProxy),
-    allProxy: sanitizeProxyUrl(allProxy),
-    noProxy: parseNoProxy(noProxyRaw)
+    httpProxy: sanitizeProxyUrl(
+      readProxyEnv(env, {
+        uppercase: "HTTP_PROXY",
+        lowercase: "http_proxy",
+        ignoreUppercase: isCgi
+      })
+    ),
+    httpsProxy: sanitizeProxyUrl(
+      readProxyEnv(env, {
+        uppercase: "HTTPS_PROXY",
+        lowercase: "https_proxy",
+        ignoreUppercase: false
+      })
+    ),
+    allProxy: sanitizeProxyUrl(
+      readProxyEnv(env, {
+        uppercase: "ALL_PROXY",
+        lowercase: "all_proxy",
+        ignoreUppercase: false
+      })
+    ),
+    noProxy: parseNoProxy(readRawEnv(env, "NO_PROXY", "no_proxy") ?? "")
   };
 }
 
@@ -48,13 +82,13 @@ export function loadProxySettings(env: ProxyEnvironment = process.env): ProxySet
  * @param target Target URL.
  * @param settings Proxy settings.
  * @returns Proxy URL string or `null` for direct mode.
+ * @throws {TypeError} When `target` is not a valid URL.
  */
 export function resolveProxyForUrl(
   target: string | URL,
   settings: ProxySettings
 ): string | null {
-  const targetUrl = target instanceof URL ? target : new URL(String(target));
-
+  const targetUrl = parseTargetUrl(target);
   if (shouldBypassProxy(targetUrl, settings.noProxy)) {
     return null;
   }
@@ -83,29 +117,23 @@ export function shouldBypassProxy(target: URL, rules: NoProxyRule[]): boolean {
     return false;
   }
 
-  const hostname = target.hostname.toLowerCase();
-  const port =
-    target.port ||
-    (target.protocol === "https:" || target.protocol === "wss:" ? "443" : "80");
+  const host = normalizeHost(target.hostname);
+  if (host === null) {
+    return false;
+  }
+  const port = getTargetPort(target);
 
   for (const rule of rules) {
     if (rule.host === "*") {
       return true;
     }
-
-    const exactHostMatch = hostname === rule.host;
-    const subdomainMatch =
-      rule.wildcardSubdomains && hostname.endsWith(`.${rule.host}`);
-
-    if (!exactHostMatch && !subdomainMatch) {
+    if (!matchesRuleHost(host, rule)) {
       continue;
     }
-
-    if (rule.port === null || String(rule.port) === String(port)) {
+    if (rule.port === null || rule.port === port) {
       return true;
     }
   }
-
   return false;
 }
 
@@ -116,77 +144,254 @@ export function shouldBypassProxy(target: URL, rules: NoProxyRule[]): boolean {
  * @returns Parsed matcher rules.
  */
 export function parseNoProxy(raw: string): NoProxyRule[] {
-  return raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry): NoProxyRule | null => {
-      if (entry === "*") {
-        return {
-          host: "*",
-          port: null,
-          wildcardSubdomains: false
-        };
-      }
+  if (!raw.trim()) {
+    return [];
+  }
 
-      const stripped = entry.startsWith(".") ? entry.slice(1) : entry;
-      const [hostPartRaw, portPart] = stripped.split(":");
-      const hostPart = hostPartRaw.toLowerCase();
-
-      if (!hostPart) {
-        return null;
-      }
-
-      return {
-        host: hostPart,
-        port: parsePort(portPart),
-        wildcardSubdomains: entry.startsWith(".") || !hostPart.includes(".")
-      };
-    })
-    .filter((rule): rule is NoProxyRule => rule !== null);
+  const rules: NoProxyRule[] = [];
+  for (const token of raw.split(",")) {
+    const parsed = parseNoProxyToken(token.trim());
+    if (parsed !== null) {
+      rules.push(parsed);
+    }
+  }
+  return rules;
 }
 
-/**
- * Parses an optional port token.
- *
- * @param token Port token.
- * @returns Parsed port or `null` when invalid.
- */
-function parsePort(token: string | undefined): number | null {
+interface ReadProxyEnvOptions {
+  uppercase: string;
+  lowercase: string;
+  ignoreUppercase: boolean;
+}
+
+function parseTargetUrl(target: string | URL): URL {
+  if (target instanceof URL) {
+    return target;
+  }
+  try {
+    return new URL(String(target));
+  } catch {
+    throw new TypeError("invalid_target_url");
+  }
+}
+
+function readProxyEnv(
+  env: ProxyEnvironment,
+  options: ReadProxyEnvOptions
+): string | undefined {
+  const lowercase = readRawEnv(env, options.lowercase, options.lowercase);
+  if (lowercase !== undefined) {
+    return lowercase;
+  }
+  if (options.ignoreUppercase) {
+    return undefined;
+  }
+  return readRawEnv(env, options.uppercase, options.uppercase);
+}
+
+function readRawEnv(
+  env: ProxyEnvironment,
+  primary: string,
+  secondary: string
+): string | undefined {
+  return env[primary] ?? env[secondary];
+}
+
+function parseNoProxyToken(token: string): NoProxyRule | null {
   if (!token) {
     return null;
   }
+  if (token === "*") {
+    return {
+      host: "*",
+      port: null,
+      wildcardSubdomains: false
+    };
+  }
 
-  const parsed = Number.parseInt(token, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) {
+  const urlEntry = parseNoProxyUrlToken(token);
+  if (urlEntry !== null) {
+    const host = normalizeHost(urlEntry.host);
+    if (host === null) {
+      return null;
+    }
+    return {
+      host,
+      port: urlEntry.port,
+      wildcardSubdomains: shouldMatchSubdomains(host, false)
+    };
+  }
+
+  const wildcardPrefix = token.startsWith("*.") || token.startsWith(".");
+  const tokenWithoutWildcard = wildcardPrefix ? token.replace(/^\*?\./, "") : token;
+  const hostAndPort = splitHostAndPort(tokenWithoutWildcard);
+  if (hostAndPort === null) {
     return null;
   }
 
-  return parsed;
+  const host = normalizeHost(hostAndPort.host);
+  if (host === null) {
+    return null;
+  }
+  return {
+    host,
+    port: hostAndPort.port,
+    wildcardSubdomains: shouldMatchSubdomains(host, wildcardPrefix)
+  };
 }
 
-/**
- * Sanitizes a candidate proxy URL string.
- *
- * @param value Candidate proxy URL.
- * @returns Normalized proxy URL or `null` when invalid.
- */
-function sanitizeProxyUrl(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
+function parseNoProxyUrlToken(
+  token: string
+): { host: string; port: number | null } | null {
+  if (!token.includes("://")) {
     return null;
   }
 
   try {
-    const parsed = new URL(trimmed);
-    if (!parsed.protocol) {
+    const parsed = new URL(token);
+    return {
+      host: parsed.hostname,
+      port: parsePort(parsed.port)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function splitHostAndPort(token: string): { host: string; port: number | null } | null {
+  if (!token) {
+    return null;
+  }
+
+  if (token.startsWith("[")) {
+    const closingIndex = token.indexOf("]");
+    if (closingIndex <= 0) {
+      return null;
+    }
+    const host = token.slice(1, closingIndex);
+    const rest = token.slice(closingIndex + 1);
+    if (!rest) {
+      return { host, port: null };
+    }
+    if (!rest.startsWith(":")) {
+      return null;
+    }
+    return {
+      host,
+      port: parsePort(rest.slice(1))
+    };
+  }
+
+  const colonCount = token.match(/:/g)?.length ?? 0;
+  if (colonCount === 1) {
+    const separator = token.lastIndexOf(":");
+    return {
+      host: token.slice(0, separator),
+      port: parsePort(token.slice(separator + 1))
+    };
+  }
+
+  return {
+    host: token,
+    port: null
+  };
+}
+
+function shouldMatchSubdomains(host: string, hasWildcardPrefix: boolean): boolean {
+  if (host === "*") {
+    return false;
+  }
+  if (hasWildcardPrefix) {
+    return true;
+  }
+  if (isIP(host) !== 0 || host === "localhost") {
+    return false;
+  }
+  return host.includes(".");
+}
+
+function matchesRuleHost(targetHost: string, rule: NoProxyRule): boolean {
+  if (targetHost === rule.host) {
+    return true;
+  }
+  if (!rule.wildcardSubdomains) {
+    return false;
+  }
+  return isSubdomainOf(targetHost, rule.host);
+}
+
+function isSubdomainOf(host: string, candidateParent: string): boolean {
+  if (!host.endsWith(candidateParent)) {
+    return false;
+  }
+  const boundaryIndex = host.length - candidateParent.length - 1;
+  return boundaryIndex >= 0 && host[boundaryIndex] === ".";
+}
+
+function getTargetPort(target: URL): number {
+  if (target.port) {
+    const explicitPort = parsePort(target.port);
+    if (explicitPort !== null) {
+      return explicitPort;
+    }
+  }
+  return target.protocol === "https:" || target.protocol === "wss:" ? 443 : 80;
+}
+
+function parsePort(token: string | undefined): number | null {
+  if (!token || !/^\d+$/.test(token)) {
+    return null;
+  }
+  const parsed = Number.parseInt(token, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0 || parsed > 65_535) {
+    return null;
+  }
+  return parsed;
+}
+
+function normalizeHost(host: string): string | null {
+  const trimmed = host.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  const unbracketed =
+    trimmed.startsWith("[") && trimmed.endsWith("]")
+      ? trimmed.slice(1, -1)
+      : trimmed;
+  const normalized = unbracketed.endsWith(".")
+    ? unbracketed.slice(0, -1)
+    : unbracketed;
+  if (!normalized || normalized.includes("/") || normalized.includes(" ")) {
+    return null;
+  }
+  return normalized;
+}
+
+function sanitizeProxyUrl(rawValue: string | undefined): string | null {
+  if (rawValue === undefined) {
+    return null;
+  }
+  const value = rawValue.trim();
+  if (!value) {
+    return null;
+  }
+
+  const candidate = /^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(value)
+    ? value
+    : `http://${value}`;
+
+  try {
+    const parsed = new URL(candidate);
+    const protocol = parsed.protocol.toLowerCase();
+    if (!SUPPORTED_PROXY_PROTOCOLS.has(protocol)) {
       return null;
     }
 
+    const hostOptional = protocol === "pac+file:" || protocol === "pac+data:";
+    if (!hostOptional && !parsed.hostname) {
+      return null;
+    }
     return parsed.toString();
   } catch {
     return null;

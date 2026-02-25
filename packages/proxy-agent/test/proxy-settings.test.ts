@@ -31,6 +31,10 @@ test("falls back to all_proxy when protocol proxy is absent", () => {
     resolveProxyForUrl("ftp://example.com", settings),
     "socks5://127.0.0.1:1080"
   );
+  assert.equal(
+    resolveProxyForUrl("ws://example.com", settings),
+    "socks5://127.0.0.1:1080"
+  );
 });
 
 test("honors no_proxy exact and wildcard-subdomain matching", () => {
@@ -54,6 +58,50 @@ test("honors no_proxy exact and wildcard-subdomain matching", () => {
   assert.equal(
     resolveProxyForUrl("http://external.local", wildcard),
     "http://proxy.local:8080/"
+  );
+});
+
+test("resolves websocket proxies with wss fallback to http_proxy", () => {
+  const settings = loadProxySettings({
+    HTTP_PROXY: "http://proxy.local:8080",
+    ALL_PROXY: "socks5://127.0.0.1:1080"
+  });
+
+  assert.equal(
+    resolveProxyForUrl("ws://example.com", settings),
+    "http://proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://example.com", settings),
+    "http://proxy.local:8080/"
+  );
+});
+
+test("honors no_proxy wildcard and default websocket ports", () => {
+  const wildcard = loadProxySettings({
+    HTTP_PROXY: "http://proxy.local:8080",
+    HTTPS_PROXY: "http://proxy.local:8443",
+    NO_PROXY: "*"
+  });
+
+  assert.equal(resolveProxyForUrl("ws://any.local", wildcard), null);
+  assert.equal(resolveProxyForUrl("wss://any.local", wildcard), null);
+
+  const portScoped = loadProxySettings({
+    HTTP_PROXY: "http://proxy.local:8080",
+    HTTPS_PROXY: "http://proxy.local:8443",
+    NO_PROXY: "socket.local:80,secure.local:443"
+  });
+
+  assert.equal(resolveProxyForUrl("ws://socket.local", portScoped), null);
+  assert.equal(resolveProxyForUrl("wss://secure.local", portScoped), null);
+  assert.equal(
+    resolveProxyForUrl("ws://socket.local:81", portScoped),
+    "http://proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://secure.local:444", portScoped),
+    "http://proxy.local:8443/"
   );
 });
 

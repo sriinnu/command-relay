@@ -20,6 +20,14 @@ test("resolves https and http proxies with fallback", () => {
     resolveProxyForUrl("http://example.com", settings),
     "http://http-proxy.local:8080/"
   );
+  assert.equal(
+    resolveProxyForUrl("ws://stream.example.com", settings),
+    "http://http-proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://stream.example.com", settings),
+    "http://https-proxy.local:8443/"
+  );
 });
 
 test("falls back to all_proxy for unknown schemes", () => {
@@ -62,6 +70,25 @@ test("honors NO_PROXY wildcard and subdomain rules", () => {
   assert.equal(
     resolveProxyForUrl("http://external.local", specific),
     "http://proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://api.internal.local", {
+      ...specific,
+      httpsProxy: "http://proxy.local:8443"
+    }),
+    null
+  );
+});
+
+test("uses lowercase proxy env when uppercase variant is empty", () => {
+  const settings = loadProxySettings({
+    HTTP_PROXY: "",
+    http_proxy: "http://lowercase-proxy.local:8080"
+  });
+
+  assert.equal(
+    resolveProxyForUrl("http://example.com", settings),
+    "http://lowercase-proxy.local:8080/"
   );
 });
 

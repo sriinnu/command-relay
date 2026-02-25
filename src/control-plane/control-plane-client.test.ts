@@ -5,15 +5,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ControlPlaneClient,
+  ControlPlaneHttpError,
+  ControlPlaneTransportError,
   createControlPlaneClientFromEnv,
+  type ControlPlaneProxyResolution,
+  type ControlPlaneProxyResolver,
+  type ControlPlaneRequestFunction,
+  type ControlPlaneRequestOptions,
   type DeviceAuthRequest
 } from "./control-plane-client.js";
-import type {
-  JsonRequestFunction,
-  JsonRequestOptions,
-  ProxyResolution,
-  ProxyResolver
-} from "../net/outbound-http.js";
 
 interface CapturedRequest {
   url: string;
@@ -25,7 +26,7 @@ interface CapturedRequest {
   body: unknown;
 }
 
-function createCaptureRequest(captured: CapturedRequest[]): JsonRequestFunction {
+function createCaptureRequest(captured: CapturedRequest[]): ControlPlaneRequestFunction {
   return async <TBody = unknown>(url, options, proxyFactory = undefined) => {
     const target = url instanceof URL ? url : new URL(String(url));
     const resolution = resolveProxy(proxyFactory, target);
@@ -49,11 +50,13 @@ function createCaptureRequest(captured: CapturedRequest[]): JsonRequestFunction 
 }
 
 function resolveProxy(
-  proxyFactory: ProxyResolver | undefined,
+  proxyFactory: ControlPlaneProxyResolver | undefined,
   target: URL
-): ProxyResolution & { proxyUrl: string | null; viaProxy: boolean } {
-  const resolved = proxyFactory ? proxyFactory.resolve(target) : { agent: null };
-  const withMetadata = resolved as ProxyResolution & {
+): ControlPlaneProxyResolution & { proxyUrl: string | null; viaProxy: boolean } {
+  const resolved: ControlPlaneProxyResolution = proxyFactory
+    ? proxyFactory.resolve(target)
+    : { agent: null };
+  const withMetadata = resolved as ControlPlaneProxyResolution & {
     proxyUrl?: string | null;
     viaProxy?: boolean;
   };
@@ -61,6 +64,15 @@ function resolveProxy(
     ...resolved,
     proxyUrl: withMetadata.proxyUrl ?? null,
     viaProxy: withMetadata.viaProxy ?? Boolean(resolved.agent)
+  };
+}
+
+function createHeadersCaptureRequest(
+  capturedOptions: ControlPlaneRequestOptions[]
+): ControlPlaneRequestFunction {
+  return async <TBody = unknown>(_url, options) => {
+    capturedOptions.push(options);
+    return { status: 200, headers: {}, body: { ok: true } as TBody };
   };
 }
 
@@ -156,11 +168,8 @@ test("honors NO_PROXY bypass for matching hosts", async () => {
 });
 
 test("includes bearer auth header when apiToken is configured", async () => {
-  const headersSeen: JsonRequestOptions[] = [];
-  const requestFn: JsonRequestFunction = async <TBody = unknown>(_url, options) => {
-    headersSeen.push(options);
-    return { status: 200, headers: {}, body: { ok: true } as TBody };
-  };
+  const headersSeen: ControlPlaneRequestOptions[] = [];
+  const requestFn = createHeadersCaptureRequest(headersSeen);
 
   const client = createControlPlaneClientFromEnv({
     baseUrl: "https://control-plane.local",
@@ -172,4 +181,52 @@ test("includes bearer auth header when apiToken is configured", async () => {
   await client.authenticate(buildAuthInput());
   assert.equal(headersSeen.length, 1);
   assert.equal(headersSeen[0].headers?.authorization, "Bearer secret-token");
+});
+
+test("throws ControlPlaneHttpError for non-2xx responses", async () => {
+  const client = new ControlPlaneClient({
+    baseUrl: "https://control-plane.local",
+    requestFn: async <TBody = unknown>() => ({
+      status: 503,
+      headers: {},
+      body: { code: "unavailable" } as TBody
+    })
+  });
+
+  await assert.rejects(
+    () => client.authenticate(buildAuthInput()),
+    (error: unknown) => {
+      assert.equal(error instanceof ControlPlaneHttpError, true);
+      if (!(error instanceof ControlPlaneHttpError)) {
+        return false;
+      }
+      assert.equal(error.status, 503);
+      assert.equal(error.url, "https://control-plane.local/auth/device");
+      assert.deepEqual(error.responseBody, { code: "unavailable" });
+      return true;
+    }
+  );
+});
+
+test("wraps non-Error transport failures in ControlPlaneTransportError", async () => {
+  const client = new ControlPlaneClient({
+    baseUrl: "https://control-plane.local",
+    requestFn: async () => {
+      throw "request_timeout:2500";
+    }
+  });
+
+  await assert.rejects(
+    () => client.sendTelemetry({ events: [] }),
+    (error: unknown) => {
+      assert.equal(error instanceof ControlPlaneTransportError, true);
+      if (!(error instanceof ControlPlaneTransportError)) {
+        return false;
+      }
+      assert.equal(error.code, "request_timeout");
+      assert.equal(error.url, "https://control-plane.local/telemetry/events");
+      assert.equal(error.cause, "request_timeout:2500");
+      return true;
+    }
+  );
 });

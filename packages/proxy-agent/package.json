@@ -17,7 +17,7 @@
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsx --test test/**/*.test.ts"
+    "test": "node --import tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "http-proxy-agent": "^7.0.2",

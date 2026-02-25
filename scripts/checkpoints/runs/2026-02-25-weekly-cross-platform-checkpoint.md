@@ -13,53 +13,53 @@ Facilitator: Sriinnu
 
 ### iOS
 
-- Milestone target:
-- Completed this week:
-- In progress:
-- Blockers:
-- Evidence links:
+- Milestone target: M2 controlled-input hardening.
+- Completed this week: controlled-input baseline (`enable_input`, `input`, `disable_input`) integrated.
+- In progress: Mac runtime validation + kill-switch on/off behavior verification.
+- Blockers: none hard-blocking; waiting on home-Mac verification run.
+- Evidence links: TODO acceptance + home continuation checklist entries.
 
 ### Android
 
-- Milestone target:
-- Completed this week:
-- In progress:
-- Blockers:
-- Evidence links:
+- Milestone target: M4 parity readiness planning.
+- Completed this week: baseline parity test command path defined.
+- In progress: follow-up local test execution on home Mac environment.
+- Blockers: validation bandwidth while iOS/tmux tracks close out.
+- Evidence links: TODO Home-Mac continuation Android step.
 
 ### Web Fallback
 
-- Milestone target:
-- Completed this week:
-- In progress:
-- Blockers:
-- Evidence links:
+- Milestone target: M5 scope remains deferred.
+- Completed this week: no new scope added by design.
+- In progress: none.
+- Blockers: intentionally blocked on iOS/Android completion.
+- Evidence links: roadmap priority order in TODO.
 
 ## Shared Gateway and Protocol Health
 
-- Contract/conformance status:
-- Replay + ordering status:
-- Input-safety policy status:
-- Infra/CI notes:
+- Contract/conformance status: green in CI; no contract drift reported this week.
+- Replay + ordering status: additional tmux replay and bridge replay checks queued for home-Mac run.
+- Input-safety policy status: explicit enable/disable implemented with kill-switch policy tests present.
+- Infra/CI notes: Node 22 gate active; full Mac `test:ci:all` rerun pending.
 
 ## Quality and Validation Snapshot
 
-- Automated test results:
-- Device/manual smoke summary:
-- Reliability/perf notes:
+- Automated test results: baseline suites green in shared environment; full Mac rerun pending.
+- Device/manual smoke summary: iOS functional baseline complete; controlled-input smoke pending Mac validation.
+- Reliability/perf notes: bench rerun planned (`connect/list/input`, 20 iterations) with `p50/p95/p99` capture.
 
 ## Risks and Decisions
 
-- New risks:
-- Decisions made:
-- Escalations needed:
+- New risks: replay regressions may hide until tmux fixture harness is rerun on Mac.
+- Decisions made: execute tmux engine and iOS validation as parallel tracks before internal v0.1 tag prep.
+- Escalations needed: escalate only if proxy publish dry-run fails or kill-switch behavior diverges from policy.
 
 ## Next-Week Commitments
 
-- [ ] iOS:
-- [ ] Android:
-- [ ] Web fallback:
-- [ ] Gateway/shared:
+- [ ] iOS: run `swift test` (including `M0WebSocketTransportClientTests`) and capture kill-switch validation evidence.
+- [ ] Android: run parity module tests and log pass/fail with retry notes.
+- [ ] Web fallback: keep deferred; confirm no scope pull-in during v0.1 prep.
+- [ ] Gateway/shared: complete replay + tmux fixture + perf runs, then update proxy release gates for dry-run readiness.
 
 ## Attendance
 

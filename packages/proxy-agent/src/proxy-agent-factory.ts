@@ -26,6 +26,7 @@ const PAC_PROTOCOLS = new Set([
   "pac+file:",
   "pac+data:"
 ]);
+const TARGET_PROTOCOLS = new Set(["http:", "https:", "ws:", "wss:"]);
 
 /**
  * Result of resolving an agent for a target URL.
@@ -44,6 +45,74 @@ export interface ProxyAgentFactoryOptions {
   settings?: ProxySettings;
   env?: ProxyEnvironment;
   maxCacheEntries?: number;
+}
+
+/**
+ * Error thrown when a target URL cannot be parsed.
+ */
+export class InvalidTargetUrlError extends TypeError {
+  readonly input: string;
+
+  /**
+   * @param input Original target input.
+   * @param cause Parsing cause.
+   */
+  constructor(input: string, cause?: unknown) {
+    super("invalid_target_url");
+    this.name = "InvalidTargetUrlError";
+    this.input = input;
+    this.cause = cause;
+  }
+}
+
+/**
+ * Error thrown when a proxy URL cannot be parsed.
+ */
+export class InvalidProxyUrlError extends TypeError {
+  readonly proxyUrl: string;
+
+  /**
+   * @param proxyUrl Candidate proxy URL.
+   * @param cause Parsing cause.
+   */
+  constructor(proxyUrl: string, cause?: unknown) {
+    super("invalid_proxy_url");
+    this.name = "InvalidProxyUrlError";
+    this.proxyUrl = proxyUrl;
+    this.cause = cause;
+  }
+}
+
+/**
+ * Error thrown when proxy protocol is unsupported.
+ */
+export class UnsupportedProxyProtocolError extends Error {
+  readonly protocol: string;
+
+  /**
+   * @param protocol Parsed proxy protocol token.
+   */
+  constructor(protocol: string) {
+    super(`unsupported_proxy_protocol:${protocol}`);
+    this.name = "UnsupportedProxyProtocolError";
+    this.protocol = protocol;
+  }
+}
+
+/**
+ * Error thrown when target protocol is unsupported.
+ */
+export class UnsupportedTargetProtocolError extends Error {
+  readonly protocol: string;
+
+  /**
+   * @param protocol Normalized target protocol token.
+   */
+  constructor(protocol: string) {
+    super(`unsupported_target_protocol:${protocol}`);
+    this.name = "UnsupportedTargetProtocolError";
+    this.protocol = protocol;
+  }
 }
 
 /**
@@ -72,7 +141,7 @@ export class ProxyAgentFactory {
    * @returns Resolution containing agent metadata.
    */
   resolve(target: string | URL): ProxyAgentResolution {
-    const targetUrl = target instanceof URL ? target : new URL(String(target));
+    const targetUrl = parseTargetUrl(target);
     const proxyUrl = resolveProxyForUrl(targetUrl, this.settings);
 
     if (!proxyUrl) {
@@ -129,6 +198,7 @@ export class ProxyAgentFactory {
  * @returns Agent instance.
  */
 export function createProxyAgent(proxyUrl: string, targetProtocol: string): Agent {
+  const normalizedTargetProtocol = normalizeTargetProtocol(targetProtocol);
   const protocol = parseProtocol(proxyUrl);
 
   if (SOCKS_PROTOCOLS.has(protocol)) {
@@ -140,14 +210,14 @@ export function createProxyAgent(proxyUrl: string, targetProtocol: string): Agen
   }
 
   if (protocol === "http:" || protocol === "https:") {
-    if (targetProtocol === "http:" || targetProtocol === "ws:") {
+    if (normalizedTargetProtocol === "http:" || normalizedTargetProtocol === "ws:") {
       return new HttpProxyAgent(proxyUrl) as unknown as Agent;
     }
 
     return new HttpsProxyAgent(proxyUrl) as unknown as Agent;
   }
 
-  throw new Error(`unsupported_proxy_protocol:${protocol}`);
+  throw new UnsupportedProxyProtocolError(protocol);
 }
 
 /**
@@ -157,11 +227,37 @@ export function createProxyAgent(proxyUrl: string, targetProtocol: string): Agen
  * @returns Lower-cased protocol token ending with `:`.
  */
 function parseProtocol(proxyUrl: string): string {
-  try {
-    return new URL(proxyUrl).protocol.toLowerCase();
-  } catch {
-    throw new Error("invalid_proxy_url");
+  const trimmed = proxyUrl.trim();
+  if (!trimmed) {
+    throw new InvalidProxyUrlError(proxyUrl);
   }
+  try {
+    return new URL(trimmed).protocol.toLowerCase();
+  } catch (error) {
+    throw new InvalidProxyUrlError(proxyUrl, error);
+  }
+}
+
+function parseTargetUrl(target: string | URL): URL {
+  if (target instanceof URL) {
+    return target;
+  }
+
+  const input = String(target);
+  try {
+    return new URL(input);
+  } catch (error) {
+    throw new InvalidTargetUrlError(input, error);
+  }
+}
+
+function normalizeTargetProtocol(targetProtocol: string): string {
+  const normalized = targetProtocol.trim().toLowerCase();
+  const protocol = normalized.endsWith(":") ? normalized : `${normalized}:`;
+  if (!TARGET_PROTOCOLS.has(protocol)) {
+    throw new UnsupportedTargetProtocolError(protocol);
+  }
+  return protocol;
 }
 
 /**
@@ -179,7 +275,11 @@ function normalizeCacheEntries(value: number | undefined): number {
     return DEFAULT_CACHE_ENTRIES;
   }
 
-  return Math.floor(value);
+  const normalized = Math.floor(value);
+  if (!Number.isSafeInteger(normalized)) {
+    return DEFAULT_CACHE_ENTRIES;
+  }
+  return normalized;
 }
 
 /**
@@ -217,8 +317,8 @@ class BoundedAgentCache<K, V> {
    * @returns Cached value or `null`.
    */
   get(key: K): V | null {
-    const value = this.store.get(key) ?? null;
-    if (!value) {
+    const value = this.store.get(key);
+    if (value === undefined) {
       return null;
     }
 

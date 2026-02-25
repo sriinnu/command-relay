@@ -100,6 +100,75 @@ test("resolveProxyForUrl uses protocol-specific precedence and NO_PROXY bypass",
   assert.equal(resolveProxyForUrl("https://api.internal.local", settings), null);
 });
 
+test("resolveProxyForUrl handles ws/wss protocol precedence and fallback", () => {
+  const explicit = loadProxySettings({
+    http_proxy: "http://http-proxy.local:8080",
+    https_proxy: "http://https-proxy.local:8443",
+    all_proxy: "socks5://fallback.local:1080"
+  });
+
+  assert.equal(
+    resolveProxyForUrl("ws://socket.public.local", explicit),
+    "http://http-proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://socket.public.local", explicit),
+    "http://https-proxy.local:8443/"
+  );
+
+  const fallback = loadProxySettings({
+    http_proxy: "http://http-proxy.local:8080",
+    all_proxy: "socks5://fallback.local:1080"
+  });
+
+  assert.equal(
+    resolveProxyForUrl("wss://socket.public.local", fallback),
+    "http://http-proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("ws://socket.public.local", loadProxySettings({
+      all_proxy: "socks5://fallback.local:1080"
+    })),
+    "socks5://fallback.local:1080"
+  );
+});
+
+test("resolveProxyForUrl honors NO_PROXY defaults for ws/wss ports", () => {
+  const settings = loadProxySettings({
+    http_proxy: "http://proxy.local:8080",
+    https_proxy: "http://proxy.local:8443",
+    no_proxy: "socket.local:80,secure-socket.local:443"
+  });
+
+  assert.equal(resolveProxyForUrl("ws://socket.local", settings), null);
+  assert.equal(resolveProxyForUrl("wss://secure-socket.local", settings), null);
+  assert.equal(
+    resolveProxyForUrl("ws://socket.local:81", settings),
+    "http://proxy.local:8080/"
+  );
+  assert.equal(
+    resolveProxyForUrl("wss://secure-socket.local:444", settings),
+    "http://proxy.local:8443/"
+  );
+});
+
+test("parseNoProxy supports ws/wss URL tokens and trailing-dot hosts", () => {
+  const rules = parseNoProxy("ws://stream.local:8080,wss://secure.local,.corp.local.");
+
+  assert.deepEqual(rules, [
+    { host: "stream.local", port: 8080, matchSubdomains: true },
+    { host: "secure.local", port: null, matchSubdomains: true },
+    { host: "corp.local", port: null, matchSubdomains: true }
+  ]);
+});
+
+test("shouldBypassProxy short-circuits for wildcard NO_PROXY", () => {
+  const rules = parseNoProxy("*");
+
+  assert.equal(shouldBypassProxy(new URL("ws://anything.local"), rules), true);
+  assert.equal(shouldBypassProxy(new URL("wss://secure.anything.local"), rules), true);
+});
+
 test("resolveProxyForUrlFromEnv loads env and resolves in one step", () => {
   const proxy = resolveProxyForUrlFromEnv("http://example.com", {
     http_proxy: "proxy.local:3128"

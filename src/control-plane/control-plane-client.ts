@@ -2,14 +2,18 @@
  * @file Concrete outbound control-plane client for auth/pairing/telemetry APIs.
  */
 
-import { ProxyAgentFactory } from "../net/proxy-agent-factory.js";
-import { loadProxySettings } from "../net/proxy-router.js";
 import {
-  requestJson,
-  type JsonRequestFunction,
-  type JsonResponse,
-  type ProxyResolver
-} from "../net/outbound-http.js";
+  requestJson as requestJsonViaPackage,
+  type JsonRequestOptions as ProxyHttpRequestOptions,
+  type JsonResponse as ProxyHttpJsonResponse,
+  type ProxyAgentResolver
+} from "../../packages/proxy-http-client/src/index.js";
+import {
+  ProxyAgentFactory,
+  loadProxySettings,
+  type ProxyEnvironment
+} from "../../packages/proxy-agent/src/index.js";
+import type { Agent } from "node:http";
 
 /** Request payload for device auth exchange. */
 export interface DeviceAuthRequest {
@@ -58,19 +62,89 @@ export interface TelemetryResponse {
   [key: string]: unknown;
 }
 
+/** Outbound JSON request options used by control-plane client request adapters. */
+export interface ControlPlaneRequestOptions {
+  method: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+}
+
+/** Outbound JSON response envelope used by control-plane client request adapters. */
+export interface ControlPlaneResponse<TBody = unknown> {
+  status: number;
+  headers: Record<string, string | string[] | undefined>;
+  body: TBody | null;
+}
+
+/** Proxy resolution contract used by control-plane request adapters. */
+export interface ControlPlaneProxyResolution {
+  agent: Agent | null;
+}
+
+/**
+ * Proxy resolver contract used by control-plane request adapters.
+ *
+ * Implementations can include optional metadata fields such as `proxyUrl`
+ * and `viaProxy`; control-plane request dispatch only requires `agent`.
+ */
+export interface ControlPlaneProxyResolver {
+  resolve(target: string | URL): ControlPlaneProxyResolution;
+}
+
+/** Function signature for control-plane JSON request implementations. */
+export type ControlPlaneRequestFunction = <TBody = unknown>(
+  url: string | URL,
+  options: ControlPlaneRequestOptions,
+  proxyFactory?: ControlPlaneProxyResolver
+) => Promise<ControlPlaneResponse<TBody>>;
+
+/** Categorized transport-layer error codes for outbound control-plane requests. */
+export type ControlPlaneTransportErrorCode =
+  | "request_timeout"
+  | "request_aborted"
+  | "transport_error"
+  | "unknown_transport_error";
+
+/**
+ * Error raised when an outbound request fails before a valid HTTP response is returned.
+ */
+export class ControlPlaneTransportError extends Error {
+  readonly code: ControlPlaneTransportErrorCode;
+  readonly url: string;
+  readonly cause: unknown;
+
+  /**
+   * @param code Categorized transport code.
+   * @param url Request URL.
+   * @param cause Original thrown error or value.
+   */
+  constructor(
+    code: ControlPlaneTransportErrorCode,
+    url: string,
+    cause: unknown
+  ) {
+    super(`control_plane_transport_error:${code}:${url}`);
+    this.name = "ControlPlaneTransportError";
+    this.code = code;
+    this.url = url;
+    this.cause = cause;
+  }
+}
+
 /** Constructor options for {@link ControlPlaneClient}. */
 export interface ControlPlaneClientOptions {
   baseUrl: string | URL;
   apiToken?: string | null;
   timeoutMs?: number;
-  proxyFactory?: ProxyResolver;
-  requestFn?: JsonRequestFunction;
+  proxyFactory?: ControlPlaneProxyResolver;
+  requestFn?: ControlPlaneRequestFunction;
 }
 
 /** Factory options for env-driven client creation. */
 export interface CreateControlPlaneClientFromEnvOptions
   extends Omit<ControlPlaneClientOptions, "proxyFactory"> {
-  env?: Record<string, string | undefined>;
+  env?: ProxyEnvironment;
   maxProxyCacheEntries?: number;
 }
 
@@ -103,7 +177,7 @@ export class ControlPlaneHttpError extends Error {
  * @returns Configured proxy agent factory.
  */
 export function createControlPlaneProxyFactory(options: {
-  env?: Record<string, string | undefined>;
+  env?: ProxyEnvironment;
   maxProxyCacheEntries?: number;
 } = {}): ProxyAgentFactory {
   const settings = loadProxySettings(options.env ?? process.env);
@@ -141,8 +215,8 @@ export class ControlPlaneClient {
   private readonly baseUrl: URL;
   private readonly apiToken: string | null;
   private readonly timeoutMs: number;
-  private readonly proxyFactory?: ProxyResolver;
-  private readonly requestFn: JsonRequestFunction;
+  private readonly proxyFactory?: ControlPlaneProxyResolver;
+  private readonly requestFn: ControlPlaneRequestFunction;
 
   /**
    * @param options Client configuration.
@@ -150,9 +224,9 @@ export class ControlPlaneClient {
   constructor(options: ControlPlaneClientOptions) {
     this.baseUrl = options.baseUrl instanceof URL ? options.baseUrl : new URL(options.baseUrl);
     this.apiToken = options.apiToken?.trim() || null;
-    this.timeoutMs = options.timeoutMs ?? 8000;
+    this.timeoutMs = normalizeTimeoutMs(options.timeoutMs);
     this.proxyFactory = options.proxyFactory;
-    this.requestFn = options.requestFn ?? requestJson;
+    this.requestFn = options.requestFn ?? requestViaProxyHttpPackage;
   }
 
   /**
@@ -199,16 +273,21 @@ export class ControlPlaneClient {
       headers.authorization = `Bearer ${this.apiToken}`;
     }
 
-    const response = await this.requestFn<TResponse>(
-      url,
-      {
-        method: "POST",
-        headers,
-        body: payload,
-        timeoutMs: this.timeoutMs
-      },
-      this.proxyFactory
-    );
+    let response: ControlPlaneResponse<TResponse>;
+    try {
+      response = await this.requestFn<TResponse>(
+        url,
+        {
+          method: "POST",
+          headers,
+          body: payload,
+          timeoutMs: this.timeoutMs
+        },
+        this.proxyFactory
+      );
+    } catch (error) {
+      throw normalizeTransportError(url, error);
+    }
 
     this.assertSuccess(url, response);
     return response.body as TResponse;
@@ -221,10 +300,121 @@ export class ControlPlaneClient {
    * @param response HTTP response envelope.
    * @returns Nothing.
    */
-  private assertSuccess(url: URL, response: JsonResponse<unknown>): void {
+  private assertSuccess(url: URL, response: ControlPlaneResponse<unknown>): void {
     if (response.status >= 200 && response.status < 300) {
       return;
     }
     throw new ControlPlaneHttpError(response.status, url.toString(), response.body);
   }
+}
+
+/**
+ * Default request adapter that routes through package-managed proxy/http contracts.
+ *
+ * Uses `@commandrelay/proxy-http-client` for HTTP transport and passes through
+ * proxy resolution via `@commandrelay/proxy-agent` compatible resolvers.
+ *
+ * @param url Target URL.
+ * @param options Request options.
+ * @param proxyFactory Optional proxy resolver.
+ * @returns Control-plane response envelope.
+ */
+const requestViaProxyHttpPackage: ControlPlaneRequestFunction = async <TBody = unknown>(
+  url: string | URL,
+  options: ControlPlaneRequestOptions,
+  proxyFactory: ControlPlaneProxyResolver | undefined = undefined
+): Promise<ControlPlaneResponse<TBody>> => {
+  const requestOptions: ProxyHttpRequestOptions = {
+    method: options.method,
+    headers: options.headers,
+    body: options.body,
+    timeoutMs: options.timeoutMs,
+    throwOnHttpError: false,
+    proxyResolver: toProxyAgentResolver(proxyFactory)
+  };
+
+  const response: ProxyHttpJsonResponse<TBody> = await requestJsonViaPackage<TBody>(
+    url,
+    requestOptions
+  );
+
+  return {
+    status: response.status,
+    headers: response.headers as Record<string, string | string[] | undefined>,
+    body: response.body
+  };
+};
+
+/**
+ * Converts the legacy control-plane proxy resolver contract to package resolver contract.
+ *
+ * @param proxyFactory Optional control-plane proxy resolver.
+ * @returns Proxy agent resolver for package request client.
+ */
+function toProxyAgentResolver(
+  proxyFactory: ControlPlaneProxyResolver | undefined
+): ProxyAgentResolver | undefined {
+  if (!proxyFactory) {
+    return undefined;
+  }
+
+  return {
+    resolve(target: URL) {
+      const resolved = proxyFactory.resolve(target);
+      return { agent: resolved.agent };
+    }
+  };
+}
+
+/**
+ * Normalizes configured timeout values.
+ *
+ * @param timeoutMs Raw timeout option.
+ * @returns Finite positive timeout in milliseconds.
+ */
+function normalizeTimeoutMs(timeoutMs: number | undefined): number {
+  if (timeoutMs === undefined) {
+    return 8_000;
+  }
+
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return 8_000;
+  }
+
+  return Math.floor(timeoutMs);
+}
+
+/**
+ * Ensures thrown outbound request values are represented as typed `Error` instances.
+ *
+ * @param url Request URL.
+ * @param error Thrown value from request layer.
+ * @returns Transport error to throw.
+ */
+function normalizeTransportError(url: URL, error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  const code = inferTransportErrorCode(error);
+  return new ControlPlaneTransportError(code, url.toString(), error);
+}
+
+/**
+ * Derives a transport error code from a thrown non-Error value.
+ *
+ * @param error Thrown request-layer value.
+ * @returns Transport error code.
+ */
+function inferTransportErrorCode(error: unknown): ControlPlaneTransportErrorCode {
+  if (typeof error === "string") {
+    if (error.startsWith("request_timeout:")) {
+      return "request_timeout";
+    }
+    if (error === "request_aborted") {
+      return "request_aborted";
+    }
+    return "transport_error";
+  }
+  return "unknown_transport_error";
 }

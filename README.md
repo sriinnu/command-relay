@@ -319,6 +319,9 @@ Native-first planning and execution files:
 2. [`docs/roadmap-native.md`](docs/roadmap-native.md)
 3. [`docs/ios-swift-architecture.md`](docs/ios-swift-architecture.md)
 4. [`docs/android-architecture.md`](docs/android-architecture.md)
+5. [`docs/proxy/package-model.md`](docs/proxy/package-model.md)
+6. [`docs/architecture/proxy-runtime-integration.md`](docs/architecture/proxy-runtime-integration.md)
+7. [`docs/proxy/security-performance.md`](docs/proxy/security-performance.md)
 
 ## Status
 

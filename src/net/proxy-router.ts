@@ -1,161 +1,76 @@
 /**
- * @file Proxy routing utilities for outbound HTTP/WebSocket calls.
+ * @file Compatibility wrapper for proxy routing primitives.
  */
 
-/**
- * @typedef {object} ProxySettings
- * @property {string | null} httpProxy Proxy for http:// and ws:// targets.
- * @property {string | null} httpsProxy Proxy for https:// and wss:// targets.
- * @property {string | null} allProxy Global fallback proxy.
- * @property {NoProxyRule[]} noProxy Parsed no_proxy rules.
- */
+import {
+  loadProxySettings as loadProxySettingsPrimitive,
+  parseNoProxy as parseNoProxyPrimitive,
+  resolveProxyForUrl as resolveProxyForUrlPrimitive,
+  shouldBypassProxy as shouldBypassProxyPrimitive,
+  type NoProxyRule as PrimitiveNoProxyRule,
+  type ProxyEnvironment,
+  type ProxySettings as PrimitiveProxySettings
+} from "../../packages/proxy-agent/src/proxy-settings.js";
 
-/**
- * @typedef {object} NoProxyRule
- * @property {string} host Hostname token from no_proxy.
- * @property {number | null} port Optional exact port constraint.
- * @property {boolean} wildcardSubdomains Whether subdomains should match.
- */
+/** Parsed `NO_PROXY` matcher rule used by runtime net code. */
+export type NoProxyRule = PrimitiveNoProxyRule;
+
+/** Normalized proxy settings used by runtime net code. */
+export type ProxySettings = PrimitiveProxySettings;
 
 /**
  * Loads proxy settings from process-like environment variables.
  *
- * @param {Record<string, string | undefined>} [env=process.env] Env source.
- * @returns {ProxySettings} Normalized proxy settings.
+ * This compatibility wrapper preserves historical fallback behavior where
+ * lowercase env vars are used when uppercase variants are present but empty.
+ *
+ * @param env Env source.
+ * @returns Normalized proxy settings.
  */
-export function loadProxySettings(env = process.env) {
-  const httpProxy = env.HTTP_PROXY || env.http_proxy || null;
-  const httpsProxy = env.HTTPS_PROXY || env.https_proxy || null;
-  const allProxy = env.ALL_PROXY || env.all_proxy || null;
-  const noProxyRaw = env.NO_PROXY || env.no_proxy || "";
-
-  return {
-    httpProxy: sanitizeProxyUrl(httpProxy),
-    httpsProxy: sanitizeProxyUrl(httpsProxy),
-    allProxy: sanitizeProxyUrl(allProxy),
-    noProxy: parseNoProxy(noProxyRaw)
+export function loadProxySettings(
+  env: Record<string, string | undefined> = process.env
+): ProxySettings {
+  const compatibilityEnv: ProxyEnvironment = {
+    HTTP_PROXY: env.HTTP_PROXY || env.http_proxy,
+    HTTPS_PROXY: env.HTTPS_PROXY || env.https_proxy,
+    ALL_PROXY: env.ALL_PROXY || env.all_proxy,
+    NO_PROXY: env.NO_PROXY || env.no_proxy
   };
+
+  return loadProxySettingsPrimitive(compatibilityEnv);
 }
 
 /**
  * Resolves the proxy URL to use for a target URL.
  *
- * @param {string | URL} target Target URL.
- * @param {ProxySettings} settings Proxy settings.
- * @returns {string | null} Proxy URL or null when direct should be used.
+ * @param target Target URL.
+ * @param settings Proxy settings.
+ * @returns Proxy URL or null when direct should be used.
  */
-export function resolveProxyForUrl(target, settings) {
-  const url = target instanceof URL ? target : new URL(String(target));
-
-  if (shouldBypassProxy(url, settings.noProxy)) {
-    return null;
-  }
-
-  switch (url.protocol) {
-    case "http:":
-    case "ws:":
-      return settings.httpProxy || settings.allProxy || null;
-    case "https:":
-    case "wss:":
-      return settings.httpsProxy || settings.httpProxy || settings.allProxy || null;
-    default:
-      return settings.allProxy || null;
-  }
+export function resolveProxyForUrl(
+  target: string | URL,
+  settings: ProxySettings
+): string | null {
+  return resolveProxyForUrlPrimitive(target, settings);
 }
 
 /**
  * Checks whether no_proxy rules bypass proxying for a URL.
  *
- * @param {URL} target Target URL.
- * @param {NoProxyRule[]} rules Parsed no_proxy rules.
- * @returns {boolean} True when proxy should be bypassed.
+ * @param target Target URL.
+ * @param rules Parsed no_proxy rules.
+ * @returns True when proxy should be bypassed.
  */
-export function shouldBypassProxy(target, rules) {
-  if (rules.length === 0) return false;
-  const hostname = target.hostname.toLowerCase();
-  const port =
-    target.port ||
-    (target.protocol === "https:" || target.protocol === "wss:" ? "443" : "80");
-
-  for (const rule of rules) {
-    if (rule.host === "*") return true;
-
-    const exactHostMatch = hostname === rule.host;
-    const subdomainMatch =
-      rule.wildcardSubdomains && hostname.endsWith(`.${rule.host}`);
-
-    if (!exactHostMatch && !subdomainMatch) {
-      continue;
-    }
-
-    if (rule.port === null || String(rule.port) === String(port)) {
-      return true;
-    }
-  }
-
-  return false;
+export function shouldBypassProxy(target: URL, rules: NoProxyRule[]): boolean {
+  return shouldBypassProxyPrimitive(target, rules);
 }
 
 /**
  * Parses no_proxy CSV into matching rules.
  *
- * @param {string} raw Raw no_proxy value.
- * @returns {NoProxyRule[]} Parsed rules.
+ * @param raw Raw no_proxy value.
+ * @returns Parsed rules.
  */
-export function parseNoProxy(raw) {
-  return raw
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      if (entry === "*") {
-        return {
-          host: "*",
-          port: null,
-          wildcardSubdomains: false
-        };
-      }
-
-      const stripped = entry.startsWith(".") ? entry.slice(1) : entry;
-      const [hostPart, portPart] = stripped.split(":");
-
-      return {
-        host: hostPart.toLowerCase(),
-        port: parsePort(portPart),
-        wildcardSubdomains: entry.startsWith(".") || !hostPart.includes(".")
-      };
-    })
-    .filter((rule) => Boolean(rule.host));
-}
-
-/**
- * Parses an optional port token.
- *
- * @param {string | undefined} token Port token.
- * @returns {number | null} Parsed port or null when unspecified/invalid.
- */
-function parsePort(token) {
-  if (!token) return null;
-  const parsed = Number.parseInt(token, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 65535) return null;
-  return parsed;
-}
-
-/**
- * Sanitizes proxy URL values.
- *
- * @param {string | null} value Candidate proxy value.
- * @returns {string | null} Sanitized value or null.
- */
-function sanitizeProxyUrl(value) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  try {
-    const parsed = new URL(trimmed);
-    if (!parsed.protocol) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
+export function parseNoProxy(raw: string): NoProxyRule[] {
+  return parseNoProxyPrimitive(raw);
 }

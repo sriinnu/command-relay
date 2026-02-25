@@ -38,6 +38,22 @@ test("selects HTTP proxy agent for http target", () => {
   assert.equal(result.agent.constructor.name, "HttpProxyAgent");
 });
 
+test("selects HTTP proxy agent for ws target", () => {
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: "http://proxy.local:8080",
+      httpsProxy: null,
+      allProxy: null,
+      noProxy: []
+    }
+  });
+
+  const result = factory.resolve("ws://example.com/socket");
+  assert.equal(result.viaProxy, true);
+  assert.equal(result.proxyUrl, "http://proxy.local:8080");
+  assert.equal(result.agent.constructor.name, "HttpProxyAgent");
+});
+
 test("selects HTTPS proxy agent for https target", () => {
   const factory = new ProxyAgentFactory({
     settings: {
@@ -49,6 +65,21 @@ test("selects HTTPS proxy agent for https target", () => {
   });
 
   const result = factory.resolve("https://example.com");
+  assert.equal(result.viaProxy, true);
+  assert.equal(result.agent.constructor.name, "HttpsProxyAgent");
+});
+
+test("selects HTTPS proxy agent for wss target", () => {
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: null,
+      httpsProxy: "http://secure-proxy.local:8443",
+      allProxy: null,
+      noProxy: []
+    }
+  });
+
+  const result = factory.resolve("wss://example.com/socket");
   assert.equal(result.viaProxy, true);
   assert.equal(result.agent.constructor.name, "HttpsProxyAgent");
 });
@@ -100,4 +131,8 @@ test("honors no_proxy bypass rules", () => {
 
   const proxied = factory.resolve("https://external.local");
   assert.equal(proxied.viaProxy, true);
+
+  const bypassedWss = factory.resolve("wss://api.internal.local");
+  assert.equal(bypassedWss.viaProxy, false);
+  assert.equal(bypassedWss.agent, null);
 });

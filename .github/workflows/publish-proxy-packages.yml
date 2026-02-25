@@ -1,0 +1,383 @@
+name: Publish Proxy Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode"
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - publish
+      package_selector:
+        description: "Wildcard filter for full package names"
+        required: false
+        type: string
+        default: "@commandrelay/proxy-*"
+      dist_tag:
+        description: "npm dist-tag"
+        required: false
+        type: string
+        default: latest
+      confirm_publish:
+        description: "Required in publish mode: publish-proxy-packages"
+        required: false
+        type: string
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-proxy-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Discover Publish Set
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      count: ${{ steps.select.outputs.count }}
+      run_mode: ${{ steps.select.outputs.run_mode }}
+      dist_tag: ${{ steps.select.outputs.dist_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select proxy packages
+        id: select
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || '' }}
+          RELEASE_TARGET: ${{ github.event.release.target_commitish || '' }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease || 'false' }}
+          INPUT_MODE: ${{ github.event.inputs.mode || '' }}
+          INPUT_SELECTOR: ${{ github.event.inputs.package_selector || '' }}
+          INPUT_DIST_TAG: ${{ github.event.inputs.dist_tag || '' }}
+          INPUT_CONFIRM: ${{ github.event.inputs.confirm_publish || '' }}
+        run: |
+          set -euo pipefail
+
+          run_mode="dry-run"
+          selector="@commandrelay/proxy-*"
+          dist_tag="latest"
+
+          if [[ "$EVENT_NAME" == "release" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^proxy- ]]; then
+              echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+              echo "count=0" >> "$GITHUB_OUTPUT"
+              echo "run_mode=publish" >> "$GITHUB_OUTPUT"
+              echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+
+              {
+                echo "### Proxy publish skipped"
+                echo
+                echo "Release tag '$RELEASE_TAG' does not start with 'proxy-'."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            run_mode="publish"
+            selector="@commandrelay/proxy-*"
+            dist_tag="latest"
+
+            if [[ "$RELEASE_PRERELEASE" == "true" ]]; then
+              dist_tag="next"
+            fi
+
+            if [[ -n "$RELEASE_TARGET" && "$RELEASE_TARGET" != "$DEFAULT_BRANCH" ]]; then
+              echo "::error::Release target '$RELEASE_TARGET' must match default branch '$DEFAULT_BRANCH'."
+              exit 1
+            fi
+          else
+            run_mode="${INPUT_MODE:-dry-run}"
+            selector="${INPUT_SELECTOR:-@commandrelay/proxy-*}"
+            dist_tag="${INPUT_DIST_TAG:-latest}"
+
+            if [[ "$run_mode" == "publish" ]]; then
+              if [[ "$INPUT_CONFIRM" != "publish-proxy-packages" ]]; then
+                echo "::error::confirm_publish must be exactly 'publish-proxy-packages' in publish mode."
+                exit 1
+              fi
+
+              if [[ "$REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+                echo "::error::publish mode is restricted to default branch '$DEFAULT_BRANCH'."
+                exit 1
+              fi
+            fi
+          fi
+
+          if [[ -z "$selector" ]]; then
+            echo "::error::package_selector cannot be empty."
+            exit 1
+          fi
+
+          if [[ ! "$dist_tag" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$ ]]; then
+            echo "::error::dist_tag '$dist_tag' is not a valid npm dist-tag."
+            exit 1
+          fi
+
+          PACKAGE_SELECTOR="$selector" node <<'NODE' > /tmp/proxy-matrix.json
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*';
+          const packagesDir = path.resolve('packages');
+
+          const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+          const selectorRegex = new RegExp(
+            '^' +
+              selector
+                .split('*')
+                .map((part) => part.split('?').map(escapeRegExp).join('.'))
+                .join('.*') +
+              '$'
+          );
+          const packageNameRegex = /^@commandrelay\/proxy-[a-z0-9][a-z0-9-]*$/;
+
+          const selected = [];
+          if (fs.existsSync(packagesDir)) {
+            const dirs = fs
+              .readdirSync(packagesDir, { withFileTypes: true })
+              .filter((entry) => entry.isDirectory())
+              .map((entry) => entry.name)
+              .sort();
+
+            for (const dirName of dirs) {
+              const packageJsonPath = path.join(packagesDir, dirName, 'package.json');
+              if (!fs.existsSync(packageJsonPath)) {
+                continue;
+              }
+
+              const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+              if (pkg.private === true) {
+                continue;
+              }
+
+              if (typeof pkg.name !== 'string' || typeof pkg.version !== 'string') {
+                continue;
+              }
+
+              if (!packageNameRegex.test(pkg.name)) {
+                continue;
+              }
+
+              if (!selectorRegex.test(pkg.name)) {
+                continue;
+              }
+
+              selected.push({
+                packageDir: dirName,
+                dir: `packages/${dirName}`,
+                packageName: pkg.name,
+                version: pkg.version,
+              });
+            }
+          }
+
+          process.stdout.write(JSON.stringify(selected));
+          NODE
+
+          count="$(node -e "const fs=require('node:fs');const items=JSON.parse(fs.readFileSync('/tmp/proxy-matrix.json','utf8'));process.stdout.write(String(items.length));")"
+
+          if [[ "$EVENT_NAME" != "release" && "$count" -eq 0 ]]; then
+            echo "::error::No packages matched selector '$selector'."
+            exit 1
+          fi
+
+          matrix_json="$(cat /tmp/proxy-matrix.json)"
+
+          {
+            echo "matrix<<EOF"
+            echo "{\"include\":$matrix_json}"
+            echo "EOF"
+            echo "count=$count"
+            echo "run_mode=$run_mode"
+            echo "dist_tag=$dist_tag"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Proxy publish selection"
+            echo
+            echo "- Event: $EVENT_NAME"
+            echo "- Mode: $run_mode"
+            echo "- Dist-tag: $dist_tag"
+            echo "- Selector: $selector"
+            echo "- Matched packages: $count"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$count" -gt 0 ]]; then
+            node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+            const fs = require('node:fs');
+            const items = JSON.parse(fs.readFileSync('/tmp/proxy-matrix.json', 'utf8'));
+            for (const item of items) {
+              process.stdout.write(`- ${item.packageName}@${item.version} (${item.dir})\n`);
+            }
+            NODE
+          fi
+
+  verify:
+    name: Verify ${{ matrix.packageName }}
+    needs: discover
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check, build, and test
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.dir }}
+        run: |
+          set -euo pipefail
+          npm --prefix "$PACKAGE_DIR" run check
+          npm --prefix "$PACKAGE_DIR" run build
+          npm --prefix "$PACKAGE_DIR" run test
+
+      - name: Pack tarball
+        id: pack
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.dir }}
+          PACKAGE_KEY: ${{ matrix.packageDir }}
+          PACKAGE_VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/npm-tarballs"
+
+          pushd "$PACKAGE_DIR" > /dev/null
+          pack_file="$(npm pack --json | node -e "let data='';process.stdin.on('data',(chunk)=>data+=chunk);process.stdin.on('end',()=>{const parsed=JSON.parse(data);if(!Array.isArray(parsed)||parsed.length===0||!parsed[0].filename){process.exit(1)}process.stdout.write(parsed[0].filename);});")"
+          popd > /dev/null
+
+          output_path="$RUNNER_TEMP/npm-tarballs/${PACKAGE_KEY}-${PACKAGE_VERSION}.tgz"
+          mv "$PACKAGE_DIR/$pack_file" "$output_path"
+          echo "tarball=$output_path" >> "$GITHUB_OUTPUT"
+
+      - name: npm publish dry-run
+        if: needs.discover.outputs.run_mode == 'dry-run'
+        shell: bash
+        working-directory: ${{ matrix.dir }}
+        env:
+          DIST_TAG: ${{ needs.discover.outputs.dist_tag }}
+        run: |
+          set -euo pipefail
+          npm publish --dry-run --access public --tag "$DIST_TAG"
+
+      - name: Upload tarball artifact
+        if: needs.discover.outputs.run_mode == 'publish'
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball-${{ matrix.packageDir }}-${{ matrix.version }}
+          path: ${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish ${{ matrix.packageName }}
+    needs:
+      - discover
+      - verify
+    if: needs.discover.outputs.count != '0' && needs.discover.outputs.run_mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: npm-publish
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+
+    steps:
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball-${{ matrix.packageDir }}-${{ matrix.version }}
+          path: ${{ runner.temp }}/npm-tarballs
+
+      - name: Validate npm token
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "::error::Missing repository secret NPM_TOKEN."
+            exit 1
+          fi
+
+      - name: Skip if already published
+        id: exists
+        shell: bash
+        env:
+          PACKAGE_NAME: ${{ matrix.packageName }}
+          PACKAGE_VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          published_version="$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry=https://registry.npmjs.org 2>/dev/null || true)"
+          if [[ "$published_version" == "$PACKAGE_VERSION" ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### $PACKAGE_NAME"
+              echo
+              echo "- Version $PACKAGE_VERSION already exists on npm. Skipped."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish with provenance
+        if: steps.exists.outputs.publish == 'true'
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ needs.discover.outputs.dist_tag }}
+          PACKAGE_NAME: ${{ matrix.packageName }}
+          PACKAGE_VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          tarball="$(find "$RUNNER_TEMP/npm-tarballs" -maxdepth 1 -type f -name '*.tgz' | head -n 1)"
+          if [[ -z "$tarball" ]]; then
+            echo "::error::No tarball artifact found for $PACKAGE_NAME@$PACKAGE_VERSION."
+            exit 1
+          fi
+
+          npm publish "$tarball" --provenance --access public --tag "$DIST_TAG"
+
+          {
+            echo "### $PACKAGE_NAME"
+            echo
+            echo "- Published version $PACKAGE_VERSION with dist-tag '$DIST_TAG'."
+            echo "- npm provenance enabled via OIDC."
+          } >> "$GITHUB_STEP_SUMMARY"

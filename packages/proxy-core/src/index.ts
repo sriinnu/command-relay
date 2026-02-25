@@ -433,7 +433,13 @@ function sanitizeProxyUrl(rawValue: string | undefined): string | null {
 
   try {
     const parsed = new URL(candidate);
-    if (!parsed.hostname) {
+    const protocol = parsed.protocol.toLowerCase();
+    const supported = /^(http:|https:|socks:|socks4:|socks4a:|socks5:|socks5h:|pac\+http:|pac\+https:|pac\+file:|pac\+data:)$/.test(protocol);
+    if (!supported) {
+      return null;
+    }
+    const hostOptional = protocol === "pac+file:" || protocol === "pac+data:";
+    if (!hostOptional && !parsed.hostname) {
       return null;
     }
 

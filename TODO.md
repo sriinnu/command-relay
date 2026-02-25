@@ -158,3 +158,52 @@ Owner scope: iOS first, Android second, web fallback last.
   - replay coverage results
   - iOS/Android local test results
   - perf summary (`p50/p95/p99`)
+
+## Home-Mac Continuation Checklist (2026-02-26)
+
+### Session Bootstrap (single owner)
+
+- [ ] Confirm Node.js `v22.x` and clean install: `node -v && npm ci`.
+- [ ] Confirm local MCP wiring and Chitragupta launch command from `docs/operations.md`.
+- [ ] Start evidence log for this run (tests, perf, publish dry-run outputs).
+
+### Parallel Track A: tmux Engine Follow-up
+
+- [ ] Run replay/ordering suites:
+  - `node --import tsx --test src/bridge/bridge-engine.replay.test.ts`
+  - `node --import tsx --test src/server/bridge-server.replay.e2e.test.ts`
+- [ ] Run tmux fixture harness:
+  - `scripts/tmux-fixtures/create-fixture.sh --session fixture_smoke --panes 2`
+  - `scripts/tmux-fixtures/emit-fixture-output.sh --session fixture_smoke --profile replay --cycles 5`
+  - `scripts/tmux-fixtures/teardown-fixture.sh --session fixture_smoke`
+- [ ] Run perf smoke (`connect`, `list`, `input`) with `--iterations 20`; record `p50/p95/p99`.
+- [ ] Mark tmux track complete only when replay + fixture + perf evidence is captured.
+
+### Parallel Track B: iOS Follow-up
+
+- [ ] `cd apps/ios/M0ProtocolMockClient && swift test --filter M0WebSocketTransportClientTests`.
+- [ ] `cd apps/ios/M0ProtocolMockClient && swift test`.
+- [ ] Validate controlled-input safety behavior against gateway kill-switch on/off runs.
+- [ ] Capture iOS evidence summary (pass/fail, flaky tests, retry count).
+
+### Merge Gate (both tracks)
+
+- [ ] Run full aggregate check: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Update `scripts/checkpoints/runs/2026-02-25-weekly-cross-platform-checkpoint.md` with outcomes.
+- [ ] Update proxy release gate status in `docs/release/proxy-publish.md`.
+
+## Proxy Package Release Gates (for internal v0.1 prep)
+
+- [ ] Gate 1: version readiness confirmed for each `@commandrelay/proxy-*` package.
+- [ ] Gate 2: root/package `check`, `build`, `test` all green on Mac run.
+- [ ] Gate 3: publish workflow dry-run green with expected package selector and `dist_tag`.
+- [ ] Gate 4: `NPM_TOKEN` + `npm-publish` environment policy verified.
+- [ ] Gate 5: release notes/changelog draft reviewed before any publish-mode trigger.
+
+## Proposed Internal v0.1 Tag Plan (proposal only; do not create tags yet)
+
+- [ ] `2026-02-26`: complete tmux + iOS parallel follow-up tracks and evidence capture.
+- [ ] `2026-02-27`: run proxy publish dry-run gate review and resolve blockers.
+- [ ] `2026-02-28`: freeze internal v0.1 candidate scope and finalize release notes draft.
+- [ ] `2026-03-02`: final go/no-go check (tests, perf, release gates, checkpoint sign-off).
+- [ ] `2026-03-03`: if all gates stay green, prepare internal `v0.1` tag request in PR/release notes (still no tag creation in this step).
