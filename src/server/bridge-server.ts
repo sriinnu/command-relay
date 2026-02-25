@@ -7,6 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
 import { envelope, parseMessage } from "../protocol.js";
 import { BridgeEngine } from "../bridge/bridge-engine.js";
+import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalInt } from "./message-validation.js";
@@ -25,30 +26,7 @@ import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
 /**
  * Starts the CommandRelay bridge server.
  *
- * @param {{
- *   config: {
- *     host: string,
- *     port: number,
- *     strictProtocolParsing: boolean,
- *     pollIntervalMs: number,
- *     replayLines: number,
- *     maxHistoryEvents: number,
- *     maxInputBytes: number,
- *     maxAttachedPanes: number,
- *     maxMessagesPerMinute: number,
- *     maxInputsPerMinute: number,
- *     globalInputDisabled: boolean,
- *     authToken: string | null,
- *     auditLogPath: string | null
- *   },
- *   tmux: {
- *     isAvailable: () => Promise<boolean>,
- *     listPanes: () => Promise<Array<Record<string, unknown>>>,
- *     sendInput: (paneId: string, input: string) => Promise<void>,
- *     capturePane: (paneId: string, lines: number) => Promise<string>
- *   },
- *   logger?: Pick<Console, "info" | "warn" | "error">
- * }} deps Runtime dependencies.
+ * @param {object} deps Runtime dependencies.
  * @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown.
  */
 export async function startBridgeServer(deps) {
@@ -61,6 +39,8 @@ export async function startBridgeServer(deps) {
 
   const startupTs = Date.now();
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
+  const telemetry = new BridgeTelemetryCollector();
+  const pendingAttachLag = new Map<string, number>();
 
   /** @type {Map<string, ClientState>} */
   const clients = new Map();
@@ -82,11 +62,18 @@ export async function startBridgeServer(deps) {
     onOutput: (clientId, event) => {
       const client = clients.get(clientId);
       if (!client) return;
+      const lagKey = `${clientId}:${event.paneId}`;
+      const lagStart = pendingAttachLag.get(lagKey);
+      if (lagStart !== undefined) {
+        telemetry.recordStreamLag(Date.now() - lagStart);
+        pendingAttachLag.delete(lagKey);
+      }
       send(client.socket, envelope("output", event as unknown as Record<string, unknown>));
     },
     onError: (clientId, paneId, error) => {
       const client = clients.get(clientId);
       if (!client) return;
+      pendingAttachLag.delete(`${clientId}:${paneId}`);
       send(client.socket, envelope("error", {
         code: "pane_poll_failed",
         paneId,
@@ -106,6 +93,7 @@ export async function startBridgeServer(deps) {
           0
         ),
         engine: engine.getStats(),
+        telemetry: telemetry.getSafeSnapshot(clients.size),
         timestamp: Date.now()
       };
       res.writeHead(200, { "content-type": "application/json" });
@@ -134,6 +122,7 @@ export async function startBridgeServer(deps) {
   });
 
   wsServer.on("connection", (socket) => {
+    const connectStartedAtMs = Date.now();
     const client = {
       id: randomUUID(),
       socket,
@@ -157,8 +146,10 @@ export async function startBridgeServer(deps) {
         maxAttachedPanes: config.maxAttachedPanes
       })
     );
+    telemetry.recordConnectLatency(Date.now() - connectStartedAtMs);
 
     socket.on("message", async (raw) => {
+      const requestStartedAtMs = Date.now();
       if (!messageLimiter.allow(client.id)) {
         send(client.socket, envelope("error", { code: "rate_limited" }));
         return;
@@ -182,7 +173,12 @@ export async function startBridgeServer(deps) {
           type,
           payload,
           requestId,
-          audit
+          audit,
+          telemetry,
+          requestStartedAtMs,
+          trackAttachLag: (clientId, paneId, startedAtMs) => {
+            pendingAttachLag.set(`${clientId}:${paneId}`, startedAtMs);
+          }
         });
       } catch (error) {
         send(client.socket, envelope("error", {
@@ -196,6 +192,12 @@ export async function startBridgeServer(deps) {
       engine.detachAll(client.id);
       messageLimiter.clear(client.id);
       inputLimiter.clear(client.id);
+      telemetry.recordConnectionClosed();
+      for (const key of pendingAttachLag.keys()) {
+        if (key.startsWith(`${client.id}:`)) {
+          pendingAttachLag.delete(key);
+        }
+      }
       clients.delete(client.id);
     });
   });
@@ -247,25 +249,7 @@ export function parseIncomingClientMessage(raw, strictProtocolParsing) {
 /**
  * Handles a single parsed client message.
  *
- * @param {{
- *   client: ClientState,
- *   tmux: {
- *     listPanes: () => Promise<Array<Record<string, unknown>>>,
- *     sendInput: (paneId: string, input: string) => Promise<void>
- *   },
- *   engine: BridgeEngine,
- *   config: {
- *     authToken: string | null,
- *     maxInputBytes: number,
- *     maxAttachedPanes: number,
- *     globalInputDisabled: boolean
- *   },
- *   inputLimiter: SlidingWindowRateLimiter,
- *   type: string,
- *   payload: Record<string, unknown>,
- *   requestId: string | undefined,
- *   audit: AuditLogger
- * }} ctx Message context.
+ * @param {object} ctx Message context.
  * @returns {Promise<void>} Completion signal.
  */
 export async function handleClientMessage(ctx) {
@@ -278,8 +262,12 @@ export async function handleClientMessage(ctx) {
     type,
     payload,
     requestId,
-    audit
+    audit,
+    telemetry,
+    requestStartedAtMs,
+    trackAttachLag
   } = ctx;
+  const startedAtMs = requestStartedAtMs ?? Date.now();
 
   if (!client.authenticated && type !== "auth") {
     send(client.socket, envelope("error", { code: "auth_required" }, requestId));
@@ -311,6 +299,7 @@ export async function handleClientMessage(ctx) {
     case "list_sessions": {
       const panes = await tmux.listPanes();
       const sessions = groupSessionsByName(panes);
+      telemetry?.recordListLatency(Date.now() - startedAtMs);
       send(client.socket, envelope("session_list", { panes, sessions }, requestId));
       return;
     }
@@ -327,8 +316,14 @@ export async function handleClientMessage(ctx) {
       }
       const lastSeq = parseOptionalInt(payload.lastSeq);
       client.attachedPanes.add(paneId);
+      trackAttachLag?.(client.id, paneId, startedAtMs);
       await engine.attach(client.id, paneId, lastSeq);
       await audit.write({ action: "attach", clientId: client.id, details: { paneId, lastSeq } });
+      const attachLatencyMs = Date.now() - startedAtMs;
+      telemetry?.recordAttachLatency(attachLatencyMs);
+      if (lastSeq !== null) {
+        telemetry?.recordReconnectLatency(attachLatencyMs);
+      }
       send(client.socket, envelope("ack", { action: "attach", paneId }, requestId));
       return;
     }
@@ -425,6 +420,7 @@ export async function handleClientMessage(ctx) {
           sha256: createHash("sha256").update(data).digest("hex")
         }
       });
+      telemetry?.recordInputAckLatency(Date.now() - startedAtMs);
       send(client.socket, envelope("ack", { action: "input", paneId, bytes: data.length }, requestId));
       return;
     }

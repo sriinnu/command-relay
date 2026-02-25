@@ -1,23 +1,19 @@
 {
   "mcpServers": {
     "chitragupta": {
-      "command": "pnpm",
+      "command": "/absolute/path/to/terminal/scripts/chitragupta/start-mcp.sh",
       "args": [
-        "--dir",
+        "--chitragupta-dir",
         "/absolute/path/to/chitragupta",
-        "exec",
-        "node",
-        "--import",
-        "tsx",
-        "packages/cli/src/mcp-entry.ts",
-        "--stdio",
         "--project",
         "/absolute/path/to/terminal",
-        "--agent"
+        "--name",
+        "terminal"
       ],
       "env": {
         "CHITRAGUPTA_MCP_AGENT": "true",
-        "CHITRAGUPTA_MCP_PROJECT": "/absolute/path/to/terminal"
+        "CHITRAGUPTA_MCP_PROJECT": "/absolute/path/to/terminal",
+        "CHITRAGUPTA_MCP_NAME": "terminal"
       }
     }
   }

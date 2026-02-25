@@ -31,6 +31,63 @@ The first implementation scaffold now exists at `apps/ios/CommandRelay` with:
 
 This baseline is intentionally stub-backed so transport, repositories, and rendering layers can be implemented incrementally without breaking top-level flow contracts.
 
+## Screen Map + Navigation Contract (Read-Only Spike, 2026-02-25)
+
+The current scaffold uses a `TabView` in `AppRootView.swift` to expose each feature independently for development speed. For the read-only spike UX contract, navigation must run as one linear app flow with explicit route transitions.
+
+### Screen Map (Core Flows)
+
+1. `AuthGateScreen`
+   - states: unpaired, pairing-in-progress, paired, error
+   - actions: scan/claim pair code, retry pairing, continue
+2. `SessionListScreen`
+   - states: loading, loaded, empty, error
+   - actions: search, refresh, select session/pane, revoke/unpair
+3. `PaneViewerScreen` (read-only)
+   - states: attaching, live stream, replaying, detached/error
+   - actions: detach, retry attach, copy output
+
+### Navigation Graph
+
+```text
+AppLaunch
+  -> AuthGateScreen (when no valid device/token)
+  -> SessionListScreen (when paired token is valid)
+
+AuthGateScreen
+  -> SessionListScreen (pair + capability fetch success)
+
+SessionListScreen
+  -> PaneViewerScreen(sessionID, paneID, lastSeq=0) (user selects a pane)
+  -> AuthGateScreen (user revokes/unpairs device)
+
+PaneViewerScreen
+  -> SessionListScreen (user detaches/back navigation)
+  -> AuthGateScreen (auth refresh fails / pairing invalidated)
+```
+
+### Route Model (Single Navigation Owner)
+
+Use one root coordinator in `CommandRelayApp` and keep feature views route-agnostic.
+
+1. `AppRoute.auth`
+2. `AppRoute.sessions`
+3. `AppRoute.paneViewer(sessionID: String, paneID: String, lastSeq: UInt64)`
+
+Navigation rules:
+
+1. Only the root coordinator mutates `NavigationPath`.
+2. `AuthGateView` emits `onPaired` callback; it does not push routes directly.
+3. `SessionListView` emits `onPaneSelected(sessionID:paneID:)`.
+4. `ReadOnlyStreamView` emits `onDetach` and `onAuthExpired`.
+
+### Migration Steps from Current Scaffold
+
+1. Replace `TabView` in `AppRootView.swift` with a single `NavigationStack`.
+2. Start stack at `AuthGateView` or `SessionListView` based on bootstrap auth state.
+3. Push `ReadOnlyStreamView` from `SessionListView` using selected session/pane IDs.
+4. Keep pane viewer read-only; input enable remains out of scope for this spike.
+
 ## Batch Outcomes (2026-02-24)
 
 ### iOS Transport Layer Outcome

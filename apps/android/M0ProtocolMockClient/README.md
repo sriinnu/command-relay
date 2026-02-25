@@ -8,6 +8,8 @@ Kotlin/JVM mirror of the iOS `M0ProtocolMockClient` contract package.
 2. Resume request model.
 3. Replay planner.
 4. Replay cursor store interface + in-memory implementation.
+5. Controlled-input policy domain models.
+6. Session list domain models.
 
 ## Run Tests
 

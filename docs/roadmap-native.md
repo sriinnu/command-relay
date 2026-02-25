@@ -1,6 +1,6 @@
 # CommandRelay Native-First Roadmap
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 Execution order: iOS Swift app -> Android app -> web fallback.
 
 ## Goal
@@ -140,7 +140,17 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 3. Start iOS spike: auth + session list + attach + output stream.
 4. Define iOS UX copy for input safety and confirmation states.
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
-6. Finalize weekly milestone review cadence with owners and blockers.
+6. Run and commit the first scripted weekly cross-platform checkpoint artifact.
+
+## Weekly Cross-Platform Checkpoint Workflow
+
+1. Run checkpoint generation before the weekly sync:
+`scripts/checkpoints/generate-weekly-checkpoint.sh --date YYYY-MM-DD --facilitator "Owner Name"`.
+2. Default output path is `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`.
+3. During the sync, fill iOS, Android, web fallback, and shared gateway sections from the template.
+4. Track completion by checking all `Sign-off` boxes in the generated checkpoint note.
+5. Commit the checkpoint note in the same change that updates roadmap/TODO decisions for that week.
+6. Use checkpoint ID format `YYYY-Www-YYYY-MM-DD` as the source-of-truth reference in review notes.
 
 ## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
 

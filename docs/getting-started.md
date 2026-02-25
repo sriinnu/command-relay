@@ -68,169 +68,51 @@ The matrix validates required v1 event types:
 8. `heartbeat`
 9. `policy_update`
 
-## Tonight on Mac (Batch Validation Commands - 2026-02-24)
+## Tonight on Mac (iOS Read-Only Spike Validation - 2026-02-25)
 
-Run this command set exactly as written:
+Run this command pack exactly as written to validate the new iOS read-only spike artifacts.
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 node -v
 npm -v
 tmux -V
+swift --version
+xcodebuild -version
+xcodegen --version
 npm ci
-npm run check
-node --import tsx --test src/protocol.conformance.test.ts
-node --import tsx --test src/bridge/bridge-engine.test.ts
-node --import tsx --test src/server/bridge-server.e2e.test.ts
-node --import tsx --test src/server/ws-contract-matrix.test.ts
-node --import tsx --test src/server/bridge-server.policy.test.ts
-node --import tsx --test src/server/startup-validation.test.ts
+
+test -f apps/ios/CommandRelay/CommandRelayApp/App/AppRootView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Auth/AuthGateView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Sessions/SessionListView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Stream/ReadOnlyStreamView.swift
+test -f apps/ios/CommandRelay/Packages/CommandRelayKit/Sources/TransportKit/Interfaces/RelayTransportClient.swift
+test -f apps/ios/M0ProtocolMockClient/Tests/M0ProtocolMockClientTests/M0ReplayTests.swift
+
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/CommandRelay
+xcodegen generate
+xcodebuild -list -project CommandRelay.xcodeproj
+xcodebuild -project CommandRelay.xcodeproj -scheme CommandRelay -destination 'generic/platform=iOS Simulator' build
+
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/CommandRelay/Packages/CommandRelayKit
+swift test
+
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/M0ProtocolMockClient
 swift test --filter M0ReplayTests
 swift test
-```
 
-What this covers tonight:
-
-1. iOS transport replay path via `M0ReplayTests`.
-2. Android parity contract gate via strict protocol and websocket matrix tests.
-3. tmux fixture harness via `src/server/bridge-server.e2e.test.ts`.
-4. Replay delta/snapshot behavior via `src/bridge/bridge-engine.test.ts`.
-
-## Mac Nightly Validation Checklist (Exact Order)
-
-Run these commands in order. Do not skip or reorder.
-
-1. Move to repo root.
-
-```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-```
-
-Expected output: no error.
-
-2. Confirm toolchain versions.
-
-```bash
-node -v
-npm -v
-tmux -V
-```
-
-Expected output:
-
-```text
-v22.x.x
-10.x.x
-tmux 3.x
-```
-
-3. Install dependencies cleanly.
-
-```bash
-npm ci
-```
-
-Expected output contains `added` and no `npm ERR!`.
-
-4. Run type check gate.
-
-```bash
-npm run check
-```
-
-Expected output contains no TypeScript errors.
-
-5. Run strict protocol conformance matrix.
-
-```bash
 node --import tsx --test src/protocol.conformance.test.ts
-```
-
-Expected output footer:
-
-```text
-# pass 1
-# fail 0
-```
-
-6. Run strict websocket contract + policy transition matrix.
-
-```bash
 node --import tsx --test src/server/ws-contract-matrix.test.ts
 ```
 
-Expected output footer:
+Pass criteria for tonight:
 
-```text
-# pass 1
-# fail 0
-```
-
-7. Validate policy behavior for input enable/disable flow.
-
-```bash
-node --import tsx --test src/server/bridge-server.policy.test.ts
-```
-
-Expected output footer:
-
-```text
-# pass 1
-# fail 0
-```
-
-8. Validate startup parsing for kill switch and auth safety checks.
-
-```bash
-node --import tsx --test src/server/startup-validation.test.ts
-```
-
-Expected output footer:
-
-```text
-# pass 1
-# fail 0
-```
-
-9. Validate strict parser behavior (`strictV1` off vs on).
-
-```bash
-node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
-```
-
-Expected output:
-
-```text
-STRICT_OFF {"ok":true,...}
-STRICT_ON {"ok":false,"error":"unsupported_type"}
-```
-
-Strict protocol toggle guidance:
-
-1. `STRICT_OFF` represents loose parsing (unknown message types pass through).
-2. `STRICT_ON` represents strict v1 parsing (`strictV1: true`), where unsupported types are rejected.
-3. Live socket strictness is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default).
-
-10. Optional kill-switch parse sanity.
-
-```bash
-node --import tsx -e 'import { loadConfig } from "./src/config.ts"; console.log("KILL_SWITCH_TRUE", loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "true" }).globalInputDisabled); console.log("KILL_SWITCH_OFF", loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "off" }).globalInputDisabled);'
-```
-
-Expected output:
-
-```text
-KILL_SWITCH_TRUE true
-KILL_SWITCH_OFF false
-```
-
-Nightly pass criteria:
-
-1. Step 4 exits cleanly.
-2. Steps 5-8 each show `# fail 0`.
-3. Step 9 shows `STRICT_OFF ok:true` and `STRICT_ON unsupported_type`.
-4. Optional step 10 shows the exact `true`/`false` toggle values.
+1. All `test -f ...` checks exit with code `0`.
+2. `xcodebuild ... build` exits `0` for scheme `CommandRelay`.
+3. `swift test --filter M0ReplayTests` exits `0`.
+4. Full `swift test` in both `CommandRelayKit` and `M0ProtocolMockClient` exits `0`.
+5. Both Node protocol gates end with `# fail 0`.
 
 ## Setup Steps
 
@@ -238,7 +120,7 @@ Nightly pass criteria:
 2. Start CommandRelay bridge daemon on the home machine.
 3. Confirm daemon is reachable over Tailscale.
 4. Open client UI and authenticate.
-5. Attach to a pane and enable input when needed.
+5. Attach to a pane and verify read-only output streaming.
 
 ## Minimal tmux Commands
 

@@ -1,6 +1,6 @@
 # CommandRelay Execution TODO (Native-First)
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 Owner scope: iOS first, Android second, web fallback last.
 
 ## Gateway Runtime Baseline
@@ -98,10 +98,21 @@ Owner scope: iOS first, Android second, web fallback last.
 
 - [x] Create `v1` protocol contract tests in gateway repo.
 - [ ] Build iOS spike for WebSocket connect/list/attach/output (no input yet).
-- [ ] Define iOS screen map and navigation for three core flows.
-- [ ] Decide telemetry schema (connect time, replay time, input ack latency).
-- [ ] Schedule weekly cross-platform checkpoint with single source of truth in `docs/roadmap-native.md`.
+- [x] Define iOS screen map and navigation for three core flows.
+- [x] Decide telemetry schema (connect time, replay time, input ack latency).
+- [x] Implement weekly checkpoint workflow artifacts (`scripts/checkpoints/generate-weekly-checkpoint.sh` + template) and document tracking in `docs/roadmap-native.md`.
 - [x] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
+
+## Weekly Cross-Platform Checkpoint Runbook
+
+- [x] Workflow script: `scripts/checkpoints/generate-weekly-checkpoint.sh`
+- [x] Template: `scripts/checkpoints/templates/weekly-cross-platform-checkpoint.md`
+- [ ] Weekly command:
+  `scripts/checkpoints/generate-weekly-checkpoint.sh --date YYYY-MM-DD --facilitator "Owner Name"`
+- [ ] Weekly artifact to track in git:
+  `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`
+- [ ] Post-sync tracking rule:
+  checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `TODO.md`.
 
 ## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-24)
 

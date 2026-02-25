@@ -13,21 +13,66 @@ Proxy-aware outbound behavior is supported through standard env vars:
 3. `ALL_PROXY`
 4. `NO_PROXY`
 
-## Local MCP Startup Workaround (tsx EPERM)
+## Local Chitragupta Bootstrap + Health
 
-When starting local chitragupta MCP, direct `tsx` execution can fail with `EPERM` in some environments. Use Node with the `tsx` import hook instead.
+Use the local scripts in `scripts/chitragupta` to validate and run MCP safely.
 
-Recommended command:
+Bootstrap (dependencies + entrypoint readiness):
 
 ```bash
-pnpm --dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta exec node --import tsx packages/cli/src/mcp-entry.ts --stdio --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal --agent
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/bootstrap.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+```
+
+Health diagnostics (includes `--check` from MCP entrypoint):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/health.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+```
+
+Start command (EPERM-safe, uses `node --import tsx`):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/start-mcp.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --name terminal
 ```
 
 Operational notes:
 
-1. This command is the baseline used in `.mcp.json`.
-2. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
-3. If you see `EPERM` and the process exits early, verify you are not using `pnpm ... exec tsx ...`.
+1. `start-mcp.sh` avoids direct `tsx` execution to prevent `EPERM`.
+2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
+3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
+
+## Missing `tsx` Recovery (Tonight Path: 2026-02-25)
+
+Use this exact sequence to restore agentic capability tonight:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta
+pnpm install
+pnpm exec node -p "require.resolve('tsx/package.json')"
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/start-mcp.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --name terminal
+```
+
+If `tsx` is still missing after `pnpm install`:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta
+pnpm add -D tsx
+pnpm exec node -p "require.resolve('tsx/package.json')"
+```
 
 ## Protocol Contract Test Matrix Execution
 
@@ -46,19 +91,16 @@ Coverage baseline:
 
 Use this suite as the protocol gate before merging schema changes.
 
-## Batch Outcomes Snapshot (2026-02-24)
+## Batch Outcomes Snapshot (2026-02-25)
 
-This batch locked four outcomes used as tonight's validation scope:
+Tonight's validation scope for the iOS read-only spike is:
 
-1. iOS transport layer contract is defined in `RelayTransportClient` and `RelayTransportState`.
-2. Android parity module boundary is documented (`core:protocol` + `core:transport` + `core:auth` + `data:repository`).
-3. tmux fixture harness is active in server e2e tests via `createFakeTmux()` in `src/server/bridge-server.e2e.test.ts`.
-4. Replay test strategy is split into:
-   - bridge replay/delta unit tests (`src/bridge/bridge-engine.test.ts`)
-   - websocket contract tests (`src/server/ws-contract-matrix.test.ts`)
-   - iOS mock replay tests (`apps/ios/M0ProtocolMockClient/Tests/M0ProtocolMockClientTests/M0ReplayTests.swift`)
+1. App shell artifact set in `apps/ios/CommandRelay` (`AppRootView`, `AuthGateView`, `SessionListView`, `ReadOnlyStreamView`).
+2. Domain/transport contracts in `CommandRelayKit` (`AuthSessionServicing`, `SessionListServicing`, `ReadOnlyStreamServicing`, `RelayTransportClient`).
+3. Replay behavior in `M0ProtocolMockClient` (`M0ReplayPlanner`, `M0MockClient.reconnect()`, `M0ReplayTests`).
+4. Gateway protocol compatibility gates (`src/protocol.conformance.test.ts`, `src/server/ws-contract-matrix.test.ts`).
 
-## Tonight on Mac (Exact Command Pack - 2026-02-24)
+## Tonight on Mac (Exact iOS Spike Command Pack - 2026-02-25)
 
 Run in this exact order:
 
@@ -67,66 +109,46 @@ cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 node -v
 npm -v
 tmux -V
+swift --version
+xcodebuild -version
+xcodegen --version
 npm ci
-npm run check
-node --import tsx --test src/protocol.conformance.test.ts
-node --import tsx --test src/bridge/bridge-engine.test.ts
-node --import tsx --test src/server/bridge-server.e2e.test.ts
-node --import tsx --test src/server/ws-contract-matrix.test.ts
-node --import tsx --test src/server/bridge-server.policy.test.ts
-node --import tsx --test src/server/startup-validation.test.ts
+
+test -f apps/ios/CommandRelay/CommandRelayApp/App/AppRootView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Auth/AuthGateView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Sessions/SessionListView.swift
+test -f apps/ios/CommandRelay/CommandRelayApp/Features/Stream/ReadOnlyStreamView.swift
+test -f apps/ios/CommandRelay/Packages/CommandRelayKit/Sources/TransportKit/Interfaces/RelayTransportClient.swift
+test -f apps/ios/M0ProtocolMockClient/Tests/M0ProtocolMockClientTests/M0ReplayTests.swift
+
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/CommandRelay
+xcodegen generate
+xcodebuild -list -project CommandRelay.xcodeproj
+xcodebuild -project CommandRelay.xcodeproj -scheme CommandRelay -destination 'generic/platform=iOS Simulator' build
+
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/CommandRelay/Packages/CommandRelayKit
+swift test
+
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal/apps/ios/M0ProtocolMockClient
 swift test --filter M0ReplayTests
 swift test
-```
 
-Tonight pass criteria:
-
-1. Every Node test command ends with `# fail 0`.
-2. `src/server/bridge-server.e2e.test.ts` passes (verifies tmux fixture harness flow for hello/auth/list/attach/input).
-3. `swift test --filter M0ReplayTests` passes (verifies reconnect resume cursor and replay window behavior).
-4. Full `swift test` passes for package-wide regression coverage.
-
-## Mac Nightly Validation Runbook (Exact Command Order)
-
-Run nightly from the repo root:
-
-```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-node -v
-npm -v
-tmux -V
-npm ci
-npm run check
 node --import tsx --test src/protocol.conformance.test.ts
 node --import tsx --test src/server/ws-contract-matrix.test.ts
-node --import tsx --test src/server/bridge-server.policy.test.ts
-node --import tsx --test src/server/startup-validation.test.ts
-node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
 ```
 
-Expected output checks:
+Pass/fail gate:
 
-1. Every `node --test ...` command ends with:
-
-```text
-# pass 1
-# fail 0
-```
-
-2. Strict protocol toggle command prints:
-
-```text
-STRICT_OFF {"ok":true,...}
-STRICT_ON {"ok":false,"error":"unsupported_type"}
-```
-
-3. If any test shows `# fail 1` (or more), treat nightly as failed and block protocol/runtime merges until fixed.
+1. All command exits are `0`.
+2. No Swift test failures in `CommandRelayKit` and `M0ProtocolMockClient`.
+3. Both Node protocol suites end with `# fail 0`.
+4. Any failure blocks nightly acceptance of the iOS read-only spike artifacts.
 
 Strict protocol toggle guidance:
 
 1. Live bridge strict mode is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default); legacy alias `COMMANDRELAY_STRICT_V1` is also supported.
-2. The parser flag (`strictV1: true`) remains useful for local deterministic checks like the toggle command above.
+2. The parser flag (`strictV1: true`) remains useful for local deterministic parse checks in ad-hoc CLI scripts.
 3. Use strict-mode suites (`src/protocol.conformance.test.ts`, `src/server/ws-contract-matrix.test.ts`) as the authoritative nightly contract gate.
 
 Kill-switch toggle guidance (runtime config sanity):
