@@ -114,6 +114,14 @@ export async function fetchProfile(userId: string) {
 }
 ```
 
+### 4) Adapter examples for axios/undici/got/fetch call styles
+
+- Overview: [docs/examples/README.md](./docs/examples/README.md)
+- Axios-style adapter: [docs/examples/axios.md](./docs/examples/axios.md)
+- Undici-style adapter: [docs/examples/undici.md](./docs/examples/undici.md)
+- Got-style adapter: [docs/examples/got.md](./docs/examples/got.md)
+- Fetch-style adapter: [docs/examples/fetch.md](./docs/examples/fetch.md)
+
 ## API Summary
 
 ```ts
@@ -158,6 +166,7 @@ Exported error classes:
 - Only `http:` and `https:` URLs are accepted; unsupported protocols throw `UnsupportedProtocolError`.
 - Request bodies are always JSON-serialized when `body` is provided.
 - Default response size cap is `1 MiB` to bound memory use.
+- Responses with `content-length` above `maxResponseBytes` are rejected before body buffering.
 - Proxy resolver failures are wrapped into `ProxyResolutionError` with a `cause`.
 - Avoid logging raw payloads when handling `HttpStatusError` or `JsonParseError`.
 

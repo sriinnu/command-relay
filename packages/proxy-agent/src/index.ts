@@ -1,8 +1,13 @@
 export {
   ProxyAgentFactory,
   createProxyAgent,
+  type HttpProxyAgentConstructorOptions,
+  type HttpsProxyAgentConstructorOptions,
+  type PacProxyAgentConstructorOptions,
+  type ProxyAgentConstructorOptions,
   type ProxyAgentFactoryOptions,
-  type ProxyAgentResolution
+  type ProxyAgentResolution,
+  type SocksProxyAgentConstructorOptions
 } from "./proxy-agent-factory.js";
 export {
   loadProxySettings,

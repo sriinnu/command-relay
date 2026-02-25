@@ -234,3 +234,32 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] `2026-02-28`: freeze internal v0.1 candidate scope and finalize release notes draft.
 - [ ] `2026-03-02`: final go/no-go check (tests, perf, release gates, checkpoint sign-off).
 - [ ] `2026-03-03`: if all gates stay green, prepare internal `v0.1` tag request in PR/release notes (still no tag creation in this step).
+
+## Proxy Ecosystem Expansion Backlog
+
+Reference roadmap: `docs/proxy-ecosystem-roadmap.md`.
+
+- [x] Harden current package line for external use (`@commandrelay/proxy-core`, `@commandrelay/proxy-agent`, `@commandrelay/proxy-http-client`) with reusable docs/assets/examples.
+- [ ] Publish/validate adapter ecosystem package plan and naming contract (`@termina/proxy-*`).
+- [ ] P1 package wave:
+  - `@termina/cli-proxy`
+  - `@termina/proxy-undici`
+  - `@termina/proxy-fetch`
+- [ ] P2 package wave:
+  - `@termina/proxy-axios`
+  - `@termina/proxy-got`
+  - `@termina/proxy-runtime`
+- [ ] P3 exploration:
+  - `@termina/proxy-ssh` (`ssh-proxy`) feasibility and threat model.
+- [ ] External compatibility checks against ecosystem dependencies/counterparts:
+  - `agent-base`
+  - `data-uri-to-buffer`
+  - `degenerator`
+  - `get-uri`
+  - `http-proxy-agent`
+  - `https-proxy-agent`
+  - `pac-proxy-agent`
+  - `pac-resolver`
+  - `proxy-agent`
+  - `proxy`
+  - `socks-proxy-agent`

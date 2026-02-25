@@ -27,6 +27,43 @@ Keep `proxy-core` focused on policy decisions and build protocol/framework adapt
 
 This keeps shared behavior consistent while allowing each adapter package to evolve independently.
 
+## Companion Adapter Pattern
+
+Treat adapter packages as thin translators around `proxy-core` decisions:
+
+1. Parse and cache settings once (`loadProxySettings`).
+2. Resolve per-request proxy with `resolveProxyForUrl`.
+3. Return transport-specific options without re-implementing policy.
+
+```ts
+import {
+  loadProxySettings,
+  resolveProxyForUrl,
+  type ProxySettings
+} from "@commandrelay/proxy-core";
+
+export type ProxyAdapterResult<TOptions> = TOptions & { proxyUrl: string | null };
+
+const settings: ProxySettings = loadProxySettings(process.env);
+
+export function withProxy<TOptions extends object>(
+  target: string | URL,
+  options: TOptions
+): ProxyAdapterResult<TOptions> {
+  return { ...options, proxyUrl: resolveProxyForUrl(target, settings) };
+}
+```
+
+## External Naming Conventions (`@termina/proxy-*`)
+
+For external consumers that mirror this ecosystem (for example `@termina/*`), keep package role names stable:
+
+- `@termina/proxy-core`: policy/parsing only
+- `@termina/proxy-<transport>`: transport bindings only (`undici`, `fetch`, `axios`, etc.)
+- `@termina/proxy-runtime` (optional): refresh/diagnostics utilities
+
+Guideline: keep one package per role and preserve the `proxy-*` suffixes so cross-repo docs and migrations stay predictable.
+
 ## Quick Start
 
 ```ts

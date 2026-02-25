@@ -20,6 +20,17 @@ npm install @commandrelay/proxy-agent
 - npm `>=9`
 - ESM package (`"type": "module"`)
 
+## Version support policy
+
+- Current line: `0.1.x`
+- While pre-`1.0`, pin minor versions in production (`~0.1.0`).
+
+## Export surface
+
+- `@commandrelay/proxy-agent` (root API)
+- `@commandrelay/proxy-agent/package.json` (metadata only)
+- Deep imports such as `@commandrelay/proxy-agent/dist/*` are intentionally unsupported.
+
 ## External Reuse
 
 This package is designed for proxy-agent style consumers: libraries/services that need a per-target Node agent.
@@ -31,7 +42,14 @@ Integration note: [NOTES.md](./NOTES.md)
 ```ts
 import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
 
-const factory = new ProxyAgentFactory({ env: process.env, maxCacheEntries: 256 });
+const factory = new ProxyAgentFactory({
+  env: process.env,
+  maxCacheEntries: 256,
+  agentOptions: {
+    http: { keepAlive: true },
+    https: { keepAlive: true }
+  }
+});
 
 export function resolveAgent(target: string | URL) {
   const { agent } = factory.resolve(target);
@@ -39,44 +57,13 @@ export function resolveAgent(target: string | URL) {
 }
 ```
 
-### Axios example
+### Adapter examples
 
-```ts
-import axios from "axios";
-import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
-
-const factory = new ProxyAgentFactory();
-const target = "https://api.example.com/data";
-const { agent } = factory.resolve(target);
-
-const response = await axios.get(target, {
-  proxy: false,
-  httpAgent: agent ?? undefined,
-  httpsAgent: agent ?? undefined
-});
-
-console.log(response.status);
-```
-
-### Got example
-
-```ts
-import got from "got";
-import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
-
-const factory = new ProxyAgentFactory();
-const target = "https://api.example.com/data";
-const { agent } = factory.resolve(target);
-
-const body = await got(target, {
-  agent: {
-    http: agent ?? undefined,
-    https: agent ?? undefined
-  }
-}).text();
-
-console.log(body.length);
-```
+- Overview: [docs/examples/README.md](./docs/examples/README.md)
+- Axios: [docs/examples/axios.md](./docs/examples/axios.md)
+- Undici: [docs/examples/undici.md](./docs/examples/undici.md)
+- Got: [docs/examples/got.md](./docs/examples/got.md)
+- Fetch (Node.js): [docs/examples/fetch.md](./docs/examples/fetch.md)
 
 ## API
 
@@ -92,6 +79,7 @@ interface ProxyAgentFactoryOptions {
   settings?: ProxySettings;
   env?: ProxyEnvironment;
   maxCacheEntries?: number;
+  agentOptions?: ProxyAgentConstructorOptions;
 }
 
 class ProxyAgentFactory {
@@ -113,7 +101,7 @@ Also exported:
 - `resolveProxyForUrl(target: string | URL, settings: ProxySettings): string | null`
 - `shouldBypassProxy(target: URL, rules: NoProxyRule[]): boolean`
 - `parseNoProxy(raw: string): NoProxyRule[]`
-- Types: `NoProxyRule`, `ProxyEnvironment`, `ProxySettings`, `ProxyAgentFactoryOptions`, `ProxyAgentResolution`
+- Types: `NoProxyRule`, `ProxyEnvironment`, `ProxySettings`, `ProxyAgentFactoryOptions`, `ProxyAgentResolution`, `ProxyAgentConstructorOptions`
 
 ## Security and Ops
 

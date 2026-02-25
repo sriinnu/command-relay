@@ -1,16 +1,19 @@
 import type { Agent } from "node:http";
 import { HttpProxyAgent } from "http-proxy-agent";
+import type { HttpProxyAgentOptions } from "http-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import type { HttpsProxyAgentOptions } from "https-proxy-agent";
 import { PacProxyAgent } from "pac-proxy-agent";
+import type { PacProxyAgentOptions } from "pac-proxy-agent";
 import { SocksProxyAgent } from "socks-proxy-agent";
+import type { SocksProxyAgentOptions } from "socks-proxy-agent";
+import { BoundedAgentCache, normalizeCacheEntries } from "./bounded-agent-cache.js";
 import {
   loadProxySettings,
   resolveProxyForUrl,
   type ProxyEnvironment,
   type ProxySettings
 } from "./proxy-settings.js";
-
-const DEFAULT_CACHE_ENTRIES = 256;
 
 const SOCKS_PROTOCOLS = new Set([
   "socks:",
@@ -27,11 +30,64 @@ const PAC_PROTOCOLS = new Set([
   "pac+data:"
 ]);
 const TARGET_PROTOCOLS = new Set(["http:", "https:", "ws:", "wss:"]);
+const PAC_SECURE_DEFAULTS: Pick<PacProxyAgentConstructorOptions, "fallbackToDirect"> = {
+  fallbackToDirect: false
+};
 type DisposableAgent = Agent & {
   destroy?: (() => unknown) | undefined;
   dispose?: (() => unknown) | undefined;
   close?: (() => unknown) | undefined;
 };
+
+/**
+ * Constructor options forwarded to `HttpProxyAgent`.
+ */
+export type HttpProxyAgentConstructorOptions =
+  | HttpProxyAgentOptions<"http://proxy.local">
+  | HttpProxyAgentOptions<"https://proxy.local">;
+
+/**
+ * Constructor options forwarded to `HttpsProxyAgent`.
+ */
+export type HttpsProxyAgentConstructorOptions =
+  | HttpsProxyAgentOptions<"http://proxy.local">
+  | HttpsProxyAgentOptions<"https://proxy.local">;
+
+/**
+ * Constructor options forwarded to `SocksProxyAgent`.
+ */
+export type SocksProxyAgentConstructorOptions = SocksProxyAgentOptions;
+
+/**
+ * Constructor options forwarded to `PacProxyAgent`.
+ */
+export type PacProxyAgentConstructorOptions =
+  | PacProxyAgentOptions<"pac+http://proxy.local/proxy.pac">
+  | PacProxyAgentOptions<"pac+https://proxy.local/proxy.pac">
+  | PacProxyAgentOptions<"pac+file:///proxy.pac">
+  | PacProxyAgentOptions<"pac+data://proxy.pac">;
+
+/**
+ * Per-agent constructor options used when creating proxy agents.
+ */
+export interface ProxyAgentConstructorOptions {
+  /**
+   * Applied when the selected agent class is `HttpProxyAgent`.
+   */
+  http?: HttpProxyAgentConstructorOptions;
+  /**
+   * Applied when the selected agent class is `HttpsProxyAgent`.
+   */
+  https?: HttpsProxyAgentConstructorOptions;
+  /**
+   * Applied when the selected agent class is `SocksProxyAgent`.
+   */
+  socks?: SocksProxyAgentConstructorOptions;
+  /**
+   * Applied when the selected agent class is `PacProxyAgent`.
+   */
+  pac?: PacProxyAgentConstructorOptions;
+}
 
 /**
  * Result of resolving an agent for a target URL.
@@ -50,6 +106,10 @@ export interface ProxyAgentFactoryOptions {
   settings?: ProxySettings;
   env?: ProxyEnvironment;
   maxCacheEntries?: number;
+  /**
+   * Optional per-agent constructor options forwarded when creating agents.
+   */
+  agentOptions?: ProxyAgentConstructorOptions;
 }
 
 /**
@@ -127,6 +187,7 @@ export class ProxyAgentFactory {
   private settings: ProxySettings;
   private readonly envSource: ProxyEnvironment | undefined;
   private readonly cache: BoundedAgentCache<string, Agent>;
+  private readonly agentOptions: ProxyAgentConstructorOptions;
 
   /**
    * Creates a factory.
@@ -136,6 +197,7 @@ export class ProxyAgentFactory {
   constructor(options: ProxyAgentFactoryOptions = {}) {
     this.envSource = options.env;
     this.settings = options.settings ?? loadProxySettings(options.env);
+    this.agentOptions = options.agentOptions ?? {};
     this.cache = new BoundedAgentCache(
       normalizeCacheEntries(options.maxCacheEntries),
       tryDisposeAgent
@@ -172,7 +234,7 @@ export class ProxyAgentFactory {
       };
     }
 
-    const created = createProxyAgent(proxyUrl, targetUrl.protocol);
+    const created = createProxyAgent(proxyUrl, targetUrl.protocol, this.agentOptions);
     this.cache.set(cacheKey, created);
 
     return {
@@ -239,29 +301,40 @@ export class ProxyAgentFactory {
  *
  * @param proxyUrl Proxy URL.
  * @param targetProtocol Target URL protocol (for example `http:`).
+ * @param options Optional per-agent constructor options.
  * @returns Agent instance.
  */
-export function createProxyAgent(proxyUrl: string, targetProtocol: string): Agent {
+export function createProxyAgent(
+  proxyUrl: string,
+  targetProtocol: string,
+  options: ProxyAgentConstructorOptions = {}
+): Agent {
   const normalizedTargetProtocol = normalizeTargetProtocol(targetProtocol);
   const protocol = parseProtocol(proxyUrl);
 
   if (SOCKS_PROTOCOLS.has(protocol)) {
-    return new SocksProxyAgent(proxyUrl) as unknown as Agent;
+    return new SocksProxyAgent(proxyUrl, options.socks) as unknown as Agent;
   }
 
   if (PAC_PROTOCOLS.has(protocol)) {
-    return new PacProxyAgent(proxyUrl) as unknown as Agent;
+    return new PacProxyAgent(proxyUrl, toPacAgentOptions(options.pac)) as unknown as Agent;
   }
 
   if (protocol === "http:" || protocol === "https:") {
     if (normalizedTargetProtocol === "http:" || normalizedTargetProtocol === "ws:") {
-      return new HttpProxyAgent(proxyUrl) as unknown as Agent;
+      return new HttpProxyAgent(proxyUrl, options.http) as unknown as Agent;
     }
 
-    return new HttpsProxyAgent(proxyUrl) as unknown as Agent;
+    return new HttpsProxyAgent(proxyUrl, options.https) as unknown as Agent;
   }
 
   throw new UnsupportedProxyProtocolError(protocol);
+}
+
+function toPacAgentOptions(
+  options: PacProxyAgentConstructorOptions | undefined
+): PacProxyAgentConstructorOptions {
+  return { ...PAC_SECURE_DEFAULTS, ...options };
 }
 
 /**
@@ -335,110 +408,5 @@ function invokeSafe(method: () => unknown, context: DisposableAgent): void {
     method.call(context);
   } catch {
     // Ignore cleanup failures to keep cache operations safe in production.
-  }
-}
-
-/**
- * Normalizes maximum cache entries.
- *
- * @param value Raw max entries value.
- * @returns Safe integer max entries.
- */
-function normalizeCacheEntries(value: number | undefined): number {
-  if (value === undefined) {
-    return DEFAULT_CACHE_ENTRIES;
-  }
-
-  if (!Number.isFinite(value) || value < 0) {
-    return DEFAULT_CACHE_ENTRIES;
-  }
-
-  const normalized = Math.floor(value);
-  if (!Number.isSafeInteger(normalized)) {
-    return DEFAULT_CACHE_ENTRIES;
-  }
-  return normalized;
-}
-
-/**
- * Small bounded LRU-style cache backed by `Map`.
- */
-class BoundedAgentCache<K, V> {
-  private readonly store = new Map<K, V>();
-  private readonly maxEntries: number;
-  private readonly onEvict: ((value: V) => void) | undefined;
-
-  /**
-   * @param maxEntries Maximum entry count.
-   * @param onEvict Optional callback for evicted/cleared values.
-   */
-  constructor(maxEntries: number, onEvict?: (value: V) => void) {
-    this.maxEntries = maxEntries;
-    this.onEvict = onEvict;
-  }
-
-  /**
-   * Current number of items in cache.
-   */
-  get size(): number {
-    return this.store.size;
-  }
-
-  /**
-   * Clears all cache entries.
-   */
-  clear(): void {
-    for (const value of this.store.values()) {
-      this.onEvict?.(value);
-    }
-    this.store.clear();
-  }
-
-  /**
-   * Gets a value and refreshes its recency.
-   *
-   * @param key Cache key.
-   * @returns Cached value or `null`.
-   */
-  get(key: K): V | null {
-    const value = this.store.get(key);
-    if (value === undefined) {
-      return null;
-    }
-
-    this.store.delete(key);
-    this.store.set(key, value);
-    return value;
-  }
-
-  /**
-   * Sets a value and evicts least-recently-used entries when needed.
-   *
-   * @param key Cache key.
-   * @param value Cache value.
-   */
-  set(key: K, value: V): void {
-    if (this.maxEntries === 0) {
-      return;
-    }
-
-    if (this.store.has(key)) {
-      const prior = this.store.get(key) as V;
-      this.store.delete(key);
-      if (prior !== value) {
-        this.onEvict?.(prior);
-      }
-    }
-    this.store.set(key, value);
-
-    while (this.store.size > this.maxEntries) {
-      const oldestKey = this.store.keys().next().value as K | undefined;
-      if (oldestKey === undefined) {
-        break;
-      }
-      const oldestValue = this.store.get(oldestKey) as V;
-      this.store.delete(oldestKey);
-      this.onEvict?.(oldestValue);
-    }
   }
 }

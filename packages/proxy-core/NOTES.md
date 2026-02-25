@@ -18,17 +18,45 @@ Use `@commandrelay/proxy-core` as the single source of truth for proxy environme
 
 This split keeps policy stable while allowing transport-specific packages to iterate independently.
 
-## Minimal Adapter Example
+## Companion Adapter Pattern
+
+Build adapters as pure translation layers over one shared `ProxySettings` instance:
+
+1. Cache `loadProxySettings(process.env)` at startup.
+2. Resolve `proxyUrl` from `resolveProxyForUrl(target, settings)`.
+3. Attach the result to transport-specific options.
+
+## Minimal Typed Example
 
 ```ts
-import { loadProxySettings, resolveProxyForUrl } from "@commandrelay/proxy-core";
+import {
+  loadProxySettings,
+  resolveProxyForUrl,
+  type ProxySettings
+} from "@commandrelay/proxy-core";
 
-const proxySettings = loadProxySettings(process.env);
+export type AdapterInput = { target: string | URL; timeoutMs: number };
+export type AdapterOutput = { timeoutMs: number; proxyUrl: string | null };
 
-export function resolveOutboundProxy(target: string | URL): string | null {
-  return resolveProxyForUrl(target, proxySettings);
+const proxySettings: ProxySettings = loadProxySettings(process.env);
+
+export function toAdapterOptions(input: AdapterInput): AdapterOutput {
+  return {
+    timeoutMs: input.timeoutMs,
+    proxyUrl: resolveProxyForUrl(input.target, proxySettings)
+  };
 }
 ```
+
+## External Package Naming (`@termina/proxy-*`)
+
+When publishing companion packages outside `@commandrelay`, preserve the role-based suffix model:
+
+- `@termina/proxy-core` for policy/parsing
+- `@termina/proxy-<transport>` for transport adapters
+- `@termina/proxy-runtime` for optional runtime helpers
+
+Avoid role overlap (for example two different packages both acting as the primary fetch adapter).
 
 ## Operational Notes
 

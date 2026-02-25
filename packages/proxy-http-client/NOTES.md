@@ -7,6 +7,7 @@ Use this package as your app's HTTP boundary adapter.
 - Keep calls in one module (for example `src/infra/http/client.ts`).
 - Set `timeoutMs` per upstream SLA; do not rely on defaults for critical flows.
 - Set `maxResponseBytes` to realistic payload ceilings per endpoint.
+- Large payloads are blocked early when upstream sends an oversized `content-length`.
 - Map library errors to app-domain errors in one place.
 - Inject `proxyResolver` only when your runtime requires proxy routing.
 - Avoid logging full response bodies for failures in production.

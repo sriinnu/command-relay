@@ -246,6 +246,17 @@ function throwIfAborted(signal: AbortSignal | undefined, target: string): void {
   }
 }
 
+function parseContentLength(headers: IncomingHttpHeaders): number | null {
+  const headerValue = headers["content-length"];
+  const raw = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed)) return null;
+  return parsed;
+}
+
 function executeJsonRequest<TBody>(
   params: ExecuteJsonRequestParams
 ): Promise<JsonResponse<TBody>> {
@@ -286,6 +297,23 @@ function executeJsonRequest<TBody>(
         agent: params.agent
       },
       (response) => {
+        // Fail fast when upstream advertises a payload larger than the allowed cap.
+        const declaredContentLength = parseContentLength(response.headers);
+        if (declaredContentLength !== null && declaredContentLength > params.maxResponseBytes) {
+          const preflightOverflowError = new ResponseSizeLimitError(
+            target.toString(),
+            response.statusCode ?? 0,
+            params.maxResponseBytes,
+            declaredContentLength
+          );
+          settleReject(preflightOverflowError);
+          if (typeof (response as { resume?: unknown }).resume === "function") {
+            response.resume();
+          }
+          request.destroy(preflightOverflowError);
+          return;
+        }
+
         const chunks: Buffer[] = [];
         let receivedBytes = 0;
         let overflowError: ResponseSizeLimitError | null = null;
