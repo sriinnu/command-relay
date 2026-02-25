@@ -9,32 +9,59 @@ import {
 } from "node:http";
 import * as nodeHttp from "node:http";
 import * as nodeHttps from "node:https";
+import type { RequestOptions as HttpsRequestOptions } from "node:https";
+import {
+  HttpStatusError,
+  JsonParseError,
+  ProxyResolutionError,
+  RequestAbortedError,
+  RequestTimeoutError,
+  ResponseSizeLimitError,
+  UnsupportedProtocolError
+} from "./errors.js";
+
 const DEFAULT_TIMEOUT_MS = 8_000;
+const DEFAULT_MAX_RESPONSE_BYTES = 1_048_576;
 const HTTP_TOKEN_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
 const SUPPORTED_REQUEST_PROTOCOLS = new Set(["http:", "https:"]);
 const DEFAULT_TRANSPORT: JsonRequestTransport = {
   httpRequest: nodeHttp.request,
   httpsRequest: nodeHttps.request
 };
+
+export {
+  HttpStatusError,
+  JsonParseError,
+  ProxyResolutionError,
+  RequestAbortedError,
+  RequestTimeoutError,
+  ResponseSizeLimitError,
+  UnsupportedProtocolError
+} from "./errors.js";
+
 /** Request function signature used for HTTP and HTTPS transports. */
 export type JsonRequestFunction = (
   options: RequestOptions,
   callback: (response: IncomingMessage) => void
 ) => ClientRequest;
+
 /** HTTP transport adapter used by `requestJson`. */
 export interface JsonRequestTransport {
   httpRequest: JsonRequestFunction;
   httpsRequest: JsonRequestFunction;
 }
+
 /** Proxy resolution result for a target URL. */
 export interface ProxyAgentResolution {
   agent: Agent | null;
 }
+
 /** Optional resolver interface for injecting proxy-aware HTTP agents. */
 export interface ProxyAgentResolver {
   /** Resolves an agent for the provided target URL. */
   resolve(target: URL): ProxyAgentResolution | Promise<ProxyAgentResolution>;
 }
+
 /** Request options for JSON HTTP calls. */
 export interface JsonRequestOptions {
   /** HTTP method, defaults to `GET`. */
@@ -45,129 +72,36 @@ export interface JsonRequestOptions {
   body?: unknown;
   /** Request timeout in milliseconds, defaults to `8000`. */
   timeoutMs?: number;
+  /**
+   * Maximum allowed response payload size in bytes.
+   * Defaults to `1048576` (1 MiB).
+   */
+  maxResponseBytes?: number;
   /** Optional external cancellation signal. */
   signal?: AbortSignal;
   /** Optional injected proxy resolver. */
   proxyResolver?: ProxyAgentResolver;
+  /**
+   * Additional Node request options such as `ca`, `cert`, `key`, `servername`, or `lookup`.
+   *
+   * Core routing fields are still controlled by `requestJson`.
+   */
+  requestOptions?: Omit<
+    RequestOptions & HttpsRequestOptions,
+    "protocol" | "hostname" | "port" | "path" | "method" | "headers" | "agent" | "signal"
+  >;
   /** Throw `HttpStatusError` on status >= 400. Defaults to `true`. */
   throwOnHttpError?: boolean;
   /** Optional HTTP transport adapter, primarily for tests and advanced integrations. */
   transport?: JsonRequestTransport;
 }
+
 /** Parsed JSON HTTP response details. */
 export interface JsonResponse<TBody> {
   status: number;
   headers: IncomingHttpHeaders;
   body: TBody | null;
   rawBody: string;
-}
-/** Error thrown when request URL protocol is not HTTP(S). */
-export class UnsupportedProtocolError extends Error {
-  readonly protocol: string;
-
-  /** @param protocol URL protocol token. */
-  constructor(protocol: string) {
-    super(`unsupported_protocol:${protocol}`);
-    this.name = "UnsupportedProtocolError";
-    this.protocol = protocol;
-  }
-}
-
-/** Error thrown when proxy resolution fails. */
-export class ProxyResolutionError extends Error {
-  readonly target: string;
-
-  /**
-   * @param target Target URL string.
-   * @param cause Resolver failure cause.
-   */
-  constructor(target: string, cause: unknown) {
-    super("proxy_resolution_error");
-    this.name = "ProxyResolutionError";
-    this.target = target;
-    this.cause = cause;
-  }
-}
-
-/** Error thrown when a request is cancelled. */
-export class RequestAbortedError extends Error {
-  readonly target: string;
-  readonly reason: unknown;
-
-  /**
-   * @param target Target URL string.
-   * @param reason Abort reason.
-   */
-  constructor(target: string, reason: unknown) {
-    super("request_aborted");
-    this.name = "RequestAbortedError";
-    this.target = target;
-    this.reason = reason;
-  }
-}
-
-/** Error thrown when an HTTP response status indicates failure. */
-export class HttpStatusError<TBody = unknown> extends Error {
-  readonly status: number;
-  readonly headers: IncomingHttpHeaders;
-  readonly body: TBody | null;
-  readonly rawBody: string;
-
-  /**
-   * @param status HTTP status code.
-   * @param headers Response headers.
-   * @param body Parsed response body.
-   * @param rawBody Raw response body.
-   */
-  constructor(
-    status: number,
-    headers: IncomingHttpHeaders,
-    body: TBody | null,
-    rawBody: string
-  ) {
-    super(`http_status_error:${status}`);
-    this.name = "HttpStatusError";
-    this.status = status;
-    this.headers = headers;
-    this.body = body;
-    this.rawBody = rawBody;
-  }
-}
-
-/** Error thrown when the request exceeds the configured timeout. */
-export class RequestTimeoutError extends Error {
-  readonly timeoutMs: number;
-  readonly target: string;
-
-  /**
-   * @param timeoutMs Timeout value in milliseconds.
-   * @param target Target URL string.
-   */
-  constructor(timeoutMs: number, target: string) {
-    super(`request_timeout:${timeoutMs}`);
-    this.name = "RequestTimeoutError";
-    this.timeoutMs = timeoutMs;
-    this.target = target;
-  }
-}
-
-/** Error thrown when a non-empty response cannot be parsed as JSON. */
-export class JsonParseError extends Error {
-  readonly status: number;
-  readonly rawBody: string;
-
-  /**
-   * @param status HTTP status code.
-   * @param rawBody Raw response body.
-   * @param cause Parsing cause.
-   */
-  constructor(status: number, rawBody: string, cause: unknown) {
-    super(`json_parse_error:${status}`);
-    this.name = "JsonParseError";
-    this.status = status;
-    this.rawBody = rawBody;
-    this.cause = cause;
-  }
 }
 
 /**
@@ -182,6 +116,7 @@ export async function requestJson<TBody = unknown>(
   validateProtocol(target.protocol);
 
   const timeoutMs = normalizeTimeout(options.timeoutMs);
+  const maxResponseBytes = normalizeMaxResponseBytes(options.maxResponseBytes);
   const method = normalizeMethod(options.method);
   const bodyText = serializeRequestBody(options.body);
   const headers = buildHeaders(options.headers ?? {}, bodyText);
@@ -201,9 +136,11 @@ export async function requestJson<TBody = unknown>(
     bodyText,
     headers,
     timeoutMs,
+    maxResponseBytes,
     signal: options.signal,
     throwOnHttpError,
     agent: resolverResult?.agent ?? undefined,
+    requestOptions: options.requestOptions,
     requester
   });
 }
@@ -214,9 +151,11 @@ interface ExecuteJsonRequestParams {
   bodyText: string | undefined;
   headers: OutgoingHttpHeaders;
   timeoutMs: number;
+  maxResponseBytes: number;
   signal: AbortSignal | undefined;
   throwOnHttpError: boolean;
   agent: Agent | undefined;
+  requestOptions: JsonRequestOptions["requestOptions"];
   requester: JsonRequestFunction;
 }
 
@@ -242,6 +181,14 @@ function normalizeTimeout(timeoutMs: number | undefined): number {
   const value = timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isFinite(value) || value < 0) {
     throw new TypeError("timeoutMs must be a finite number >= 0");
+  }
+  return value;
+}
+
+function normalizeMaxResponseBytes(maxResponseBytes: number | undefined): number {
+  const value = maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new TypeError("maxResponseBytes must be a safe integer > 0");
   }
   return value;
 }
@@ -329,6 +276,7 @@ function executeJsonRequest<TBody>(
 
     const request = params.requester(
       {
+        ...(params.requestOptions ?? {}),
         protocol: target.protocol,
         hostname: target.hostname,
         port: target.port || undefined,
@@ -339,15 +287,41 @@ function executeJsonRequest<TBody>(
       },
       (response) => {
         const chunks: Buffer[] = [];
+        let receivedBytes = 0;
+        let overflowError: ResponseSizeLimitError | null = null;
 
         response.on("data", (chunk: Buffer | string) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          if (overflowError) {
+            return;
+          }
+          const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          receivedBytes += chunkBuffer.byteLength;
+
+          if (receivedBytes > params.maxResponseBytes) {
+            overflowError = new ResponseSizeLimitError(
+              target.toString(),
+              response.statusCode ?? 0,
+              params.maxResponseBytes,
+              receivedBytes
+            );
+            settleReject(overflowError);
+            request.destroy(overflowError);
+            return;
+          }
+
+          chunks.push(chunkBuffer);
         });
+
         response.on("error", settleReject);
         response.on("aborted", () => {
           settleReject(abortError);
         });
+
         response.on("end", () => {
+          if (overflowError) {
+            return;
+          }
+
           const rawBody = Buffer.concat(chunks).toString("utf8");
           const status = response.statusCode ?? 0;
 

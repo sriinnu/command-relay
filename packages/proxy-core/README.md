@@ -8,7 +8,22 @@ Core TypeScript utilities for loading proxy settings from environment variables 
 npm install @commandrelay/proxy-core
 ```
 
-Node.js `>=22` is required.
+## Runtime support
+
+- Node.js `>=18`
+- npm `>=9`
+- ESM package (`"type": "module"`)
+
+## Version support policy
+
+- Current line: `0.1.x`
+- While this package is pre-`1.0`, prefer pinning minor versions for production (`~0.1.0`) to avoid unexpected breaking changes.
+
+## Export surface
+
+- `@commandrelay/proxy-core` (root API)
+- `@commandrelay/proxy-core/package.json` (metadata only)
+- Deep imports such as `@commandrelay/proxy-core/dist/*` are intentionally unsupported.
 
 ## Usage
 
@@ -28,6 +43,17 @@ const telemetryProxy = resolveProxyForUrl(new URL("http://telemetry.example.com"
 const proxyFromEnv = resolveProxyForUrlFromEnv("https://edge.example.com");
 
 console.log({ controlPlaneProxy, telemetryProxy, proxyFromEnv });
+```
+
+### JavaScript (ESM) usage
+
+```js
+import { loadProxySettings, resolveProxyForUrl } from "@commandrelay/proxy-core";
+
+const settings = loadProxySettings(process.env);
+const proxyUrl = resolveProxyForUrl("https://example.com", settings);
+
+console.log(proxyUrl);
 ```
 
 ### `NO_PROXY` matching

@@ -22,13 +22,16 @@
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist"
@@ -39,7 +42,7 @@
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "test": "tsc -p tsconfig.json --noEmit false --outDir .test-dist && node --test .test-dist/test/request-json.test.js && node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\""
+    "test": "tsc -p tsconfig.json --noEmit false --outDir .test-dist && node --test .test-dist/test/*.test.js && node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
@@ -47,6 +50,7 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=18",
+    "npm": ">=9"
   }
 }

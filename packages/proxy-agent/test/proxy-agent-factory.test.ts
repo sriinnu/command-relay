@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ProxyAgentFactory, createProxyAgent } from "../src/proxy-agent-factory.js";
 import type { ProxySettings } from "../src/proxy-settings.js";
+import type { Agent } from "node:http";
 
 function createSettings(overrides: Partial<ProxySettings>): ProxySettings {
   return {
@@ -11,6 +12,19 @@ function createSettings(overrides: Partial<ProxySettings>): ProxySettings {
     noProxy: [],
     ...overrides
   };
+}
+
+function setLifecycleMethod(
+  agent: Agent,
+  method: "destroy" | "dispose" | "close",
+  onCall: () => void
+): void {
+  Object.defineProperty(agent, method, {
+    configurable: true,
+    value: () => {
+      onCall();
+    }
+  });
 }
 
 test("returns direct mode when no proxy is configured", () => {
@@ -154,6 +168,141 @@ test("enforces bounded cache eviction", () => {
   assert.equal(secondHttp.fromCache, false);
   assert.notEqual(firstHttp.agent, secondHttp.agent);
   assert.equal(factory.cacheSize, 1);
+});
+
+test("destroys evicted cached agents when available", () => {
+  const factory = new ProxyAgentFactory({
+    settings: createSettings({
+      httpProxy: "http://proxy.local:8080",
+      httpsProxy: "http://proxy.local:8080"
+    }),
+    maxCacheEntries: 1
+  });
+
+  const first = factory.resolve("http://example.com");
+  assert.ok(first.agent);
+
+  let destroyCalls = 0;
+  setLifecycleMethod(first.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+
+  factory.resolve("https://example.com");
+  assert.equal(destroyCalls, 1);
+});
+
+test("clear destroys all cached agents when available", () => {
+  const factory = new ProxyAgentFactory({
+    settings: createSettings({
+      httpProxy: "http://proxy.local:8080",
+      httpsProxy: "http://proxy.local:8080"
+    })
+  });
+
+  const httpEntry = factory.resolve("http://example.com");
+  const httpsEntry = factory.resolve("https://example.com");
+  assert.ok(httpEntry.agent);
+  assert.ok(httpsEntry.agent);
+
+  let destroyCalls = 0;
+  setLifecycleMethod(httpEntry.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+  setLifecycleMethod(httpsEntry.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+
+  factory.clear();
+  assert.equal(destroyCalls, 2);
+  assert.equal(factory.cacheSize, 0);
+});
+
+test("destroy clears cache and destroys cached agents", () => {
+  const factory = new ProxyAgentFactory({
+    settings: createSettings({
+      httpProxy: "http://proxy.local:8080"
+    })
+  });
+
+  const entry = factory.resolve("http://example.com");
+  assert.ok(entry.agent);
+
+  let destroyCalls = 0;
+  setLifecycleMethod(entry.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+
+  factory.destroy();
+  assert.equal(destroyCalls, 1);
+  assert.equal(factory.cacheSize, 0);
+});
+
+test("dispose is an alias for destroy", () => {
+  const factory = new ProxyAgentFactory({
+    settings: createSettings({
+      httpProxy: "http://proxy.local:8080"
+    })
+  });
+
+  const entry = factory.resolve("http://example.com");
+  assert.ok(entry.agent);
+
+  let destroyCalls = 0;
+  setLifecycleMethod(entry.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+
+  factory.dispose();
+  assert.equal(destroyCalls, 1);
+  assert.equal(factory.cacheSize, 0);
+});
+
+test("updateSettings swaps settings and clears stale cached agents", () => {
+  const factory = new ProxyAgentFactory({
+    settings: createSettings({
+      httpProxy: "http://proxy-one.local:8080"
+    })
+  });
+
+  const first = factory.resolve("http://example.com");
+  assert.ok(first.agent);
+
+  let destroyCalls = 0;
+  setLifecycleMethod(first.agent, "destroy", () => {
+    destroyCalls += 1;
+  });
+
+  factory.updateSettings(
+    createSettings({
+      httpProxy: "http://proxy-two.local:8080"
+    })
+  );
+
+  const second = factory.resolve("http://example.com");
+  assert.ok(second.agent);
+  assert.equal(second.proxyUrl, "http://proxy-two.local:8080");
+  assert.equal(destroyCalls, 1);
+  assert.notEqual(first.agent, second.agent);
+});
+
+test("reloadFromEnvironment updates settings and bypass behavior", () => {
+  const env: Record<string, string> = {
+    HTTP_PROXY: "http://proxy.local:8080",
+    NO_PROXY: "internal.local"
+  };
+
+  const factory = new ProxyAgentFactory({ env });
+
+  const bypassed = factory.resolve("https://service.internal.local");
+  const proxied = factory.resolve("https://service.external.local");
+  assert.equal(bypassed.viaProxy, false);
+  assert.equal(proxied.viaProxy, true);
+
+  env.NO_PROXY = "internal.local,external.local";
+  factory.reloadFromEnvironment();
+
+  const nowBypassed = factory.resolve("https://service.external.local");
+  assert.equal(nowBypassed.viaProxy, false);
 });
 
 test("honors no_proxy bypass rules", () => {

@@ -27,6 +27,11 @@ const PAC_PROTOCOLS = new Set([
   "pac+data:"
 ]);
 const TARGET_PROTOCOLS = new Set(["http:", "https:", "ws:", "wss:"]);
+type DisposableAgent = Agent & {
+  destroy?: (() => unknown) | undefined;
+  dispose?: (() => unknown) | undefined;
+  close?: (() => unknown) | undefined;
+};
 
 /**
  * Result of resolving an agent for a target URL.
@@ -119,7 +124,8 @@ export class UnsupportedTargetProtocolError extends Error {
  * Reusable protocol-aware proxy agent factory with bounded cache.
  */
 export class ProxyAgentFactory {
-  private readonly settings: ProxySettings;
+  private settings: ProxySettings;
+  private readonly envSource: ProxyEnvironment | undefined;
   private readonly cache: BoundedAgentCache<string, Agent>;
 
   /**
@@ -128,9 +134,11 @@ export class ProxyAgentFactory {
    * @param options Factory settings.
    */
   constructor(options: ProxyAgentFactoryOptions = {}) {
+    this.envSource = options.env;
     this.settings = options.settings ?? loadProxySettings(options.env);
     this.cache = new BoundedAgentCache(
-      normalizeCacheEntries(options.maxCacheEntries)
+      normalizeCacheEntries(options.maxCacheEntries),
+      tryDisposeAgent
     );
   }
 
@@ -176,10 +184,46 @@ export class ProxyAgentFactory {
   }
 
   /**
-   * Clears all cached agents.
+   * Clears all cached agents and destroys them when supported.
    */
   clear(): void {
+    this.destroy();
+  }
+
+  /**
+   * Destroys all cached agents and clears the cache.
+   */
+  destroy(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Alias for `destroy()` for dispose-oriented integrations.
+   */
+  dispose(): void {
+    this.destroy();
+  }
+
+  /**
+   * Replaces active proxy settings and clears existing cached agents.
+   *
+   * @param settings New proxy settings.
+   */
+  updateSettings(settings: ProxySettings): void {
+    this.settings = settings;
+    this.destroy();
+  }
+
+  /**
+   * Reloads proxy settings from environment and clears cached agents.
+   *
+   * @param env Environment source. Defaults to constructor `env`, then `process.env`.
+   * @returns Newly loaded proxy settings.
+   */
+  reloadFromEnvironment(env: ProxyEnvironment = this.envSource ?? process.env): ProxySettings {
+    this.settings = loadProxySettings(env);
+    this.destroy();
+    return this.settings;
   }
 
   /**
@@ -261,6 +305,40 @@ function normalizeTargetProtocol(targetProtocol: string): string {
 }
 
 /**
+ * Best-effort lifecycle cleanup for cached agents.
+ *
+ * Uses `destroy()`, then `dispose()`, then `close()` when available.
+ */
+function tryDisposeAgent(agent: Agent): void {
+  const disposable = agent as DisposableAgent;
+
+  const destroy = disposable.destroy;
+  if (typeof destroy === "function") {
+    invokeSafe(destroy, disposable);
+    return;
+  }
+
+  const dispose = disposable.dispose;
+  if (typeof dispose === "function") {
+    invokeSafe(dispose, disposable);
+    return;
+  }
+
+  const close = disposable.close;
+  if (typeof close === "function") {
+    invokeSafe(close, disposable);
+  }
+}
+
+function invokeSafe(method: () => unknown, context: DisposableAgent): void {
+  try {
+    method.call(context);
+  } catch {
+    // Ignore cleanup failures to keep cache operations safe in production.
+  }
+}
+
+/**
  * Normalizes maximum cache entries.
  *
  * @param value Raw max entries value.
@@ -288,12 +366,15 @@ function normalizeCacheEntries(value: number | undefined): number {
 class BoundedAgentCache<K, V> {
   private readonly store = new Map<K, V>();
   private readonly maxEntries: number;
+  private readonly onEvict: ((value: V) => void) | undefined;
 
   /**
    * @param maxEntries Maximum entry count.
+   * @param onEvict Optional callback for evicted/cleared values.
    */
-  constructor(maxEntries: number) {
+  constructor(maxEntries: number, onEvict?: (value: V) => void) {
     this.maxEntries = maxEntries;
+    this.onEvict = onEvict;
   }
 
   /**
@@ -307,6 +388,9 @@ class BoundedAgentCache<K, V> {
    * Clears all cache entries.
    */
   clear(): void {
+    for (const value of this.store.values()) {
+      this.onEvict?.(value);
+    }
     this.store.clear();
   }
 
@@ -339,7 +423,11 @@ class BoundedAgentCache<K, V> {
     }
 
     if (this.store.has(key)) {
+      const prior = this.store.get(key) as V;
       this.store.delete(key);
+      if (prior !== value) {
+        this.onEvict?.(prior);
+      }
     }
     this.store.set(key, value);
 
@@ -348,7 +436,9 @@ class BoundedAgentCache<K, V> {
       if (oldestKey === undefined) {
         break;
       }
+      const oldestValue = this.store.get(oldestKey) as V;
       this.store.delete(oldestKey);
+      this.onEvict?.(oldestValue);
     }
   }
 }
