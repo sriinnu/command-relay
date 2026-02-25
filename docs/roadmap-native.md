@@ -118,13 +118,13 @@ Acceptance criteria:
 Dependencies:
 1. Existing gateway + protocol stack from mobile milestones.
 2. Basic frontend hosting and auth integration.
-3. Shared parity matrix maintained across iOS and web control-lane flows.
+3. Shared parity matrix maintained across iOS and web control-lane flows (`docs/control-lane-parity-checklist.md`).
 
 ## M6 - macOS Menu Bar + iOS/Web Parity Follow-Through (2026-07-06 to 2026-07-24)
 
 Deliverables:
 1. macOS menu bar companion surface for quick session attach and explicit input arm/disarm status.
-2. Shared iOS/web control-lane parity matrix (connect/auth/attach/replay/enable/disable/input/conflict/takeover).
+2. Shared iOS/web control-lane parity matrix (connect/auth/attach/replay/enable/disable/input/conflict/takeover) documented at `docs/control-lane-parity-checklist.md`.
 3. Regression fixture pack proving lane handoff between iOS and web clients on the same pane.
 
 Acceptance criteria:
@@ -159,7 +159,7 @@ Mitigation: early internal track submissions and pre-review checklists.
 5. Team focus drift to web too early.
 Mitigation: enforce milestone gates; block web work before M4 exit.
 6. Concurrent input from multiple clients on same pane.
-Mitigation: operator handoff runbook (disable -> enable) and kill-switch emergency fallback.
+Mitigation: server-side pane ownership arbitration + operator handoff runbook (disable -> enable) + kill-switch emergency fallback.
 
 ## Immediate Next Actions (Next 10 Working Days)
 
@@ -170,9 +170,9 @@ Mitigation: operator handoff runbook (disable -> enable) and kill-switch emergen
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
 6. Run and commit the first scripted weekly cross-platform checkpoint artifact. (Completed 2026-02-25)
 7. Publish web control-lane user flow addendum in protocol docs with conflict/takeover handling. (Completed 2026-02-25)
-8. Draft macOS menu bar companion spec with lane state model and quick-action constraints.
-9. Build iOS/web parity checklist for control-lane flows and map each row to tests/fixtures.
-10. Add cross-client fixture scenarios for iOS-writer/web-takeover and web-writer/iOS-takeover.
+8. Draft macOS menu bar companion spec with lane state model and quick-action constraints. (Completed 2026-02-25, see `docs/macos-menu-bar-control-lane-spec.md`)
+9. Build iOS/web parity checklist for control-lane flows and map each row to tests/fixtures. (Completed 2026-02-25, see `docs/control-lane-parity-checklist.md`)
+10. Add cross-client fixture scenarios for iOS-writer/web-takeover and web-writer/iOS-takeover. (Completed 2026-02-25, see `src/server/bridge-server.policy.test.ts`)
 
 ## Weekly Cross-Platform Checkpoint Workflow
 

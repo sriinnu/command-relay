@@ -39,3 +39,5 @@ Local MCP note:
 7. [ios-swift-architecture.md](ios-swift-architecture.md)
 8. [android-architecture.md](android-architecture.md)
 9. [roadmap-native.md](roadmap-native.md)
+10. [macos-menu-bar-control-lane-spec.md](macos-menu-bar-control-lane-spec.md)
+11. [control-lane-parity-checklist.md](control-lane-parity-checklist.md)

@@ -21,6 +21,7 @@ interface FakeSocket {
 }
 
 interface PolicyClientHarness {
+  clientId: string;
   ctx: Parameters<typeof handleClientMessage>[0];
   sent: SentEnvelope[];
 }
@@ -97,9 +98,13 @@ function createContext(globalInputDisabled: boolean) {
  * Creates two clients sharing one pane for ownership arbitration tests.
  *
  * @param overrideEnabled Whether ownership override is allowed.
+ * @param clientIds Optional explicit client identifiers.
  * @returns Shared ownership test harness.
  */
-function createOwnershipHarness(overrideEnabled: boolean): OwnershipHarness {
+function createOwnershipHarness(
+  overrideEnabled: boolean,
+  clientIds?: { clientA: string; clientB: string }
+): OwnershipHarness {
   const sentInputs: Array<{ paneId: string; input: string }> = [];
   const paneInputOwners = new Map<string, string>();
   const baseConfig = {
@@ -115,6 +120,7 @@ function createOwnershipHarness(overrideEnabled: boolean): OwnershipHarness {
   const createClient = (clientId: string): PolicyClientHarness => {
     const recorder = createSocketRecorder();
     return {
+      clientId,
       sent: recorder.sent,
       ctx: {
         client: {
@@ -147,8 +153,8 @@ function createOwnershipHarness(overrideEnabled: boolean): OwnershipHarness {
 
   return {
     sentInputs,
-    clientA: createClient("client-a"),
-    clientB: createClient("client-b")
+    clientA: createClient(clientIds?.clientA ?? "client-a"),
+    clientB: createClient(clientIds?.clientB ?? "client-b")
   };
 }
 
@@ -176,6 +182,18 @@ async function dispatch(
   const message = client.sent[client.sent.length - 1];
   assert.ok(message, `expected response envelope for ${type}`);
   return message;
+}
+
+/**
+ * Asserts an input-lane conflict with expected owner id.
+ *
+ * @param message Emitted envelope.
+ * @param ownerClientId Expected current input owner.
+ */
+function assertInputLaneConflict(message: SentEnvelope, ownerClientId: string): void {
+  assert.equal(message.type, "error");
+  assert.equal(message.payload.code, "input_lane_conflict");
+  assert.equal(message.payload.ownerClientId, ownerClientId);
 }
 
 test("enables and accepts input when global kill switch is off", async () => {
@@ -351,4 +369,64 @@ test("arbitration releases ownership on detach and disconnect", async () => {
     data: "echo owner-a-again\n"
   });
   assert.equal(afterDisconnect.type, "ack");
+});
+
+test("fixture scenario iOS writer -> web takeover enforces explicit lane handoff", async () => {
+  const harness = createOwnershipHarness(true, {
+    clientA: "ios-client",
+    clientB: "web-client"
+  });
+  const ios = harness.clientA;
+  const web = harness.clientB;
+  await dispatch(ios, "enable_input", "ios-enable");
+  await dispatch(web, "enable_input", "web-enable");
+
+  assert.equal(
+    (await dispatch(ios, "input", "ios-input-1", { paneId: "pane-1", data: "ios writer\n" })).type,
+    "ack"
+  );
+  assertInputLaneConflict(
+    await dispatch(web, "input", "web-input-conflict", { paneId: "pane-1", data: "web blocked\n" }),
+    ios.clientId
+  );
+
+  assert.equal(
+    (await dispatch(web, "input", "web-input-takeover", { paneId: "pane-1", data: "web takeover\n", override: true })).type,
+    "ack"
+  );
+  assertInputLaneConflict(
+    await dispatch(ios, "input", "ios-input-after-handoff", { paneId: "pane-1", data: "ios blocked\n" }),
+    web.clientId
+  );
+  assert.deepEqual(harness.sentInputs.map(({ input }) => input), ["ios writer\n", "web takeover\n"]);
+});
+
+test("fixture scenario web writer -> iOS takeover enforces explicit lane handoff", async () => {
+  const harness = createOwnershipHarness(true, {
+    clientA: "web-client",
+    clientB: "ios-client"
+  });
+  const web = harness.clientA;
+  const ios = harness.clientB;
+  await dispatch(web, "enable_input", "web-enable");
+  await dispatch(ios, "enable_input", "ios-enable");
+
+  assert.equal(
+    (await dispatch(web, "input", "web-input-1", { paneId: "pane-1", data: "web writer\n" })).type,
+    "ack"
+  );
+  assertInputLaneConflict(
+    await dispatch(ios, "input", "ios-input-conflict", { paneId: "pane-1", data: "ios blocked\n" }),
+    web.clientId
+  );
+
+  assert.equal(
+    (await dispatch(ios, "input", "ios-input-takeover", { paneId: "pane-1", data: "ios takeover\n", override: true })).type,
+    "ack"
+  );
+  assertInputLaneConflict(
+    await dispatch(web, "input", "web-input-after-handoff", { paneId: "pane-1", data: "web blocked again\n" }),
+    ios.clientId
+  );
+  assert.deepEqual(harness.sentInputs.map(({ input }) => input), ["web writer\n", "ios takeover\n"]);
 });

@@ -87,13 +87,13 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## M6 - macOS Menu Bar + iOS/Web Parity Follow-Through (Target: 2026-07-24)
 
-- [ ] Define macOS menu bar scope: quick connect, session pick, read-only attach, explicit input arm/disarm.
-- [ ] Specify menu bar lane-state indicators (`read-only`, `input-enabled`, `lane-conflict`, `kill-switch-blocked`).
-- [ ] Reuse the same gateway client contract/events used by iOS/web (`hello`, `policy_update`, `ack`, `error`).
-- [ ] Build parity matrix covering iOS/web/menu bar for connect/auth/list/attach/replay/enable/disable/input/conflict/takeover.
-- [ ] Add cross-client fixture cases:
-  - iOS writer -> web takeover
-  - web writer -> iOS takeover
+- [x] Define macOS menu bar scope: quick connect, session pick, read-only attach, explicit input arm/disarm (`docs/macos-menu-bar-control-lane-spec.md`, completed 2026-02-25).
+- [x] Specify menu bar lane-state indicators (`read-only`, `input-enabled`, `lane-conflict`, `kill-switch-blocked`) (`docs/macos-menu-bar-control-lane-spec.md`, completed 2026-02-25).
+- [x] Reuse the same gateway client contract/events used by iOS/web (`hello`, `policy_update`, `ack`, `error`) in spec mapping (`docs/macos-menu-bar-control-lane-spec.md`, completed 2026-02-25).
+- [ ] Build parity matrix covering iOS/web/menu bar for connect/auth/list/attach/replay/enable/disable/input/conflict/takeover (baseline iOS/web matrix: `docs/control-lane-parity-checklist.md`).
+- [ ] Add remaining cross-client fixture cases:
+  - [x] iOS writer -> web takeover (`src/server/bridge-server.policy.test.ts`, completed 2026-02-25)
+  - [x] web writer -> iOS takeover (`src/server/bridge-server.policy.test.ts`, completed 2026-02-25)
   - menu bar observer -> iOS writer handoff
   - menu bar writer -> web takeover
 - [ ] Exit criteria met:
@@ -127,9 +127,9 @@ Owner scope: iOS first, Android second, web fallback last.
 - [x] Decide telemetry schema (connect time, replay time, input ack latency).
 - [x] Implement weekly checkpoint workflow artifacts (`scripts/checkpoints/generate-weekly-checkpoint.sh` + template) and document tracking in `docs/roadmap-native.md`.
 - [x] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
-- [ ] Draft macOS menu bar control-lane spec and state diagram.
-- [ ] Author iOS/web parity checklist for control-lane flows and map each item to an automated/manual test.
-- [ ] Add two gateway fixture scenarios for lane conflict + explicit takeover (iOS writer -> web takeover, web writer -> iOS takeover).
+- [x] Draft macOS menu bar control-lane spec and state diagram (`docs/macos-menu-bar-control-lane-spec.md`, completed 2026-02-25).
+- [x] Author iOS/web parity checklist for control-lane flows and map each item to an automated/manual test (`docs/control-lane-parity-checklist.md`, completed 2026-02-25).
+- [x] Add two gateway fixture scenarios for lane conflict + explicit takeover (iOS writer -> web takeover, web writer -> iOS takeover) (`src/server/bridge-server.policy.test.ts`, completed 2026-02-25).
 
 ## Weekly Cross-Platform Checkpoint Runbook
 
