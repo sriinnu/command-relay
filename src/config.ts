@@ -15,6 +15,7 @@ export interface BridgeConfig {
   maxMessagesPerMinute: number;
   maxInputsPerMinute: number;
   globalInputDisabled: boolean;
+  allowInputOwnershipOverride: boolean;
   authToken: string | null;
   auditLogPath: string | null;
 }
@@ -130,6 +131,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       env.COMMANDRELAY_INPUT_KILL_SWITCH,
       false,
       "COMMANDRELAY_INPUT_KILL_SWITCH"
+    ),
+    allowInputOwnershipOverride: parseBooleanEnv(
+      env.COMMANDRELAY_ALLOW_INPUT_OVERRIDE,
+      true,
+      "COMMANDRELAY_ALLOW_INPUT_OVERRIDE"
     ),
     authToken: parseOptionalStringEnv(env.COMMANDRELAY_AUTH_TOKEN),
     auditLogPath: parseOptionalStringEnv(env.COMMANDRELAY_AUDIT_LOG)

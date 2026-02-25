@@ -6,21 +6,36 @@ import SessionDomainKit
 
 /// Controlled input service backed by a dedicated bridge WebSocket session.
 actor BridgeWebSocketControlledInputService: ControlledInputServicing {
+    private static let ownershipOverrideReasonMarkers: [String] = [
+        "ownership_override",
+        "ownership-override",
+        "force_ownership_override",
+        "force-ownership-override"
+    ]
+
     private let configuration: BridgeGatewayConfiguration
     private let urlSession: URLSession
+    private let defaultOwnershipOverrideEnabled: Bool
     private var requestCounter: UInt64 = 0
 
     private var activePaneID: String?
     private var activeSocket: URLSessionWebSocketTask?
     private var policySnapshot = PolicySnapshot(inputEnabled: false, globalInputDisabled: false)
+    private var sessionOwnershipOverrideRequested = false
 
     /// Creates a gateway-backed controlled input service.
     /// - Parameters:
     ///   - configuration: Gateway URL/token configuration.
     ///   - urlSession: URLSession used for websocket tasks.
-    init(configuration: BridgeGatewayConfiguration, urlSession: URLSession = .shared) {
+    ///   - defaultOwnershipOverrideEnabled: Enables ownership-conflict override retries by default.
+    init(
+        configuration: BridgeGatewayConfiguration,
+        urlSession: URLSession = .shared,
+        defaultOwnershipOverrideEnabled: Bool = false
+    ) {
         self.configuration = configuration
         self.urlSession = urlSession
+        self.defaultOwnershipOverrideEnabled = defaultOwnershipOverrideEnabled
     }
 
     /// Enables controlled input for a pane/session.
@@ -29,6 +44,9 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
     func enableInput(request: EnableInputRequest) async throws -> InputControlState {
         try validateSessionID(request.sessionID)
         let socket = try await ensureAttachedSocket(for: request.sessionID)
+        if reasonRequestsOwnershipOverride(request.reason) {
+            sessionOwnershipOverrideRequested = true
+        }
 
         let requestId = nextRequestID(prefix: "enable")
         let envelope = try BridgeGatewayProtocol.encodeClientRequest(
@@ -59,6 +77,7 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
     /// - Returns: Updated input control state.
     func disableInput(request: DisableInputRequest) async throws -> InputControlState {
         try validateSessionID(request.sessionID)
+        sessionOwnershipOverrideRequested = false
 
         guard let socket = activeSocket, activePaneID == request.sessionID else {
             return makeControlState(
@@ -103,32 +122,48 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
         guard payloadBytes > 0 else {
             throw BridgeGatewayError.missingField(name: "data")
         }
-        guard policySnapshot.inputEnabled && !policySnapshot.globalInputDisabled else {
-            throw BridgeGatewayError.requestRejected(code: "input_disabled")
-        }
 
         let socket = try await ensureAttachedSocket(for: request.sessionID)
-        let requestId = nextRequestID(prefix: "input")
-        let envelope = try BridgeGatewayProtocol.encodeClientRequest(
-            type: "input",
-            requestId: requestId,
-            payload: [
-                "paneId": request.sessionID,
-                "data": request.payload.text
-            ]
+        guard !policySnapshot.globalInputDisabled else {
+            throw BridgeGatewayError.requestRejected(code: "input_disabled")
+        }
+        let shouldAttemptOverride = shouldAttemptOwnershipOverride
+        guard policySnapshot.inputEnabled || shouldAttemptOverride else {
+            throw BridgeGatewayError.requestRejected(code: "input_disabled")
+        }
+        let wasInputEnabledAtSendStart = policySnapshot.inputEnabled
+        let baseRequestID = nextRequestID(prefix: shouldAttemptOverride && !policySnapshot.inputEnabled ? "input_override" : "input")
+        var response = try await sendInputEnvelope(
+            socket: socket,
+            requestId: baseRequestID,
+            sessionID: request.sessionID,
+            data: request.payload.text,
+            useOwnershipOverride: shouldAttemptOverride && !policySnapshot.inputEnabled
         )
-        try await socket.send(envelope)
 
-        let response = try await waitForReply(
-            socket,
-            expectedTypes: Set(["ack", "error"]),
-            requestId: requestId
-        )
         if response.type == "error" {
-            let code = BridgeGatewayProtocol.payloadString("code", in: response) ?? "input_failed"
-            throw BridgeGatewayError.requestRejected(code: code)
+            let code = BridgeGatewayProtocol.normalizedErrorCode(in: response, fallback: "input_failed")
+            if BridgeGatewayProtocol.isOwnershipConflictCode(code) {
+                // Keep local gate read-only once ownership is disputed until explicit re-enable.
+                policySnapshot = policySnapshot.readOnlyCopy()
+            }
+
+            if BridgeGatewayProtocol.isOwnershipConflictCode(code) && shouldAttemptOverride && wasInputEnabledAtSendStart {
+                let overrideRequestID = nextRequestID(prefix: "input_override")
+                response = try await sendInputEnvelope(
+                    socket: socket,
+                    requestId: overrideRequestID,
+                    sessionID: request.sessionID,
+                    data: request.payload.text,
+                    useOwnershipOverride: true
+                )
+            }
         }
 
+        if response.type == "error" {
+            let code = BridgeGatewayProtocol.normalizedErrorCode(in: response, fallback: "input_failed")
+            throw BridgeGatewayError.requestRejected(code: code)
+        }
         guard BridgeGatewayProtocol.payloadString("action", in: response) == "input" else {
             throw BridgeGatewayError.invalidEnvelope
         }
@@ -152,6 +187,7 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
         if let socket = activeSocket, activePaneID == sessionID {
             return socket
         }
+        let shouldResetOverrideForSessionSwitch = activePaneID != nil && activePaneID != sessionID
 
         await terminateConnection(closeCode: .goingAway)
 
@@ -168,7 +204,45 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
         activeSocket = socket
         activePaneID = sessionID
         policySnapshot = policySnapshot.readOnlyCopy()
+        if shouldResetOverrideForSessionSwitch {
+            sessionOwnershipOverrideRequested = false
+        }
         return socket
+    }
+
+    private func sendInputEnvelope(
+        socket: URLSessionWebSocketTask,
+        requestId: String,
+        sessionID: String,
+        data: String,
+        useOwnershipOverride: Bool
+    ) async throws -> BridgeGatewayEnvelope {
+        var payload: [String: Any] = [
+            "paneId": sessionID,
+            "data": data
+        ]
+
+        if useOwnershipOverride {
+            // Send dual keys for forward compatibility across gateway variants.
+            payload["override"] = true
+            payload["takeOwnership"] = true
+            payload["ownershipOverride"] = true
+            payload["forceOwnership"] = true
+            payload["reason"] = "ios_ownership_override"
+        }
+
+        let envelope = try BridgeGatewayProtocol.encodeClientRequest(
+            type: "input",
+            requestId: requestId,
+            payload: payload
+        )
+        try await socket.send(envelope)
+
+        return try await waitForReply(
+            socket,
+            expectedTypes: Set(["ack", "error"]),
+            requestId: requestId
+        )
     }
 
     private func authenticate(_ socket: URLSessionWebSocketTask) async throws {
@@ -220,7 +294,13 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
         fallbackCode: String
     ) throws -> PolicySnapshot {
         if envelope.type == "error" {
-            let code = BridgeGatewayProtocol.payloadString("code", in: envelope) ?? fallbackCode
+            let code = BridgeGatewayProtocol.normalizedErrorCode(in: envelope, fallback: fallbackCode)
+            if BridgeGatewayProtocol.isOwnershipConflictCode(code) {
+                // Ownership conflicts should force a safe local read-only state.
+                let globalInputDisabled = BridgeGatewayProtocol.payloadBool("globalInputDisabled", in: envelope)
+                    ?? policySnapshot.globalInputDisabled
+                policySnapshot = PolicySnapshot(inputEnabled: false, globalInputDisabled: globalInputDisabled)
+            }
             throw BridgeGatewayError.requestRejected(code: code)
         }
         guard envelope.type == "policy_update" else {
@@ -295,6 +375,22 @@ actor BridgeWebSocketControlledInputService: ControlledInputServicing {
         activePaneID = nil
         activeSocket?.cancel(with: closeCode, reason: nil)
         activeSocket = nil
+    }
+
+    private var shouldAttemptOwnershipOverride: Bool {
+        defaultOwnershipOverrideEnabled || sessionOwnershipOverrideRequested
+    }
+
+    private func reasonRequestsOwnershipOverride(_ reason: String?) -> Bool {
+        guard let rawReason = reason?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawReason.isEmpty else {
+            return false
+        }
+
+        let normalized = rawReason.lowercased()
+        return Self.ownershipOverrideReasonMarkers.contains { marker in
+            normalized.contains(marker)
+        }
     }
 
     private func nextRequestID(prefix: String) -> String {

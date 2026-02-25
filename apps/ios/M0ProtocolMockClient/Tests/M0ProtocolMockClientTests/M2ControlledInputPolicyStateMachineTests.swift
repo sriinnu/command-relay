@@ -2,6 +2,8 @@ import XCTest
 @testable import M0ProtocolMockClient
 
 final class M2ControlledInputPolicyStateMachineTests: XCTestCase {
+    private static let ownershipConflictErrorCode = "ownership_conflict"
+
     func testDefaultStateIsReadOnlyAndIdle() {
         let state = M2ControlledInputPolicyState()
 
@@ -44,5 +46,41 @@ final class M2ControlledInputPolicyStateMachineTests: XCTestCase {
             M2ControlledInputPolicyStateMachine.killSwitchBlockedErrorCode
         )
         XCTAssertEqual(ignoredAck, attemptedEnable)
+    }
+
+    func testOwnershipConflictFailureKeepsReadOnlyAndAllowsRetry() {
+        let machine = M2ControlledInputPolicyStateMachine()
+        let initial = M2ControlledInputPolicyState()
+        let pending = machine.transition(from: initial, trigger: .requestEnable)
+        let failed = machine.transition(
+            from: pending,
+            trigger: .requestFailed(errorCode: Self.ownershipConflictErrorCode)
+        )
+        let retryPending = machine.transition(from: failed, trigger: .requestEnable)
+
+        XCTAssertEqual(failed.mode, .readOnly)
+        XCTAssertEqual(failed.phase, .failed)
+        XCTAssertEqual(failed.lastErrorCode, Self.ownershipConflictErrorCode)
+
+        XCTAssertEqual(retryPending.phase, .pendingEnable)
+        XCTAssertNil(retryPending.lastErrorCode)
+    }
+
+    func testSafetyOverrideIgnoresStaleEnableAckAfterKillSwitchCycle() {
+        let machine = M2ControlledInputPolicyStateMachine()
+        let initial = M2ControlledInputPolicyState()
+        let pendingEnable = machine.transition(from: initial, trigger: .requestEnable)
+        let blocked = machine.transition(from: pendingEnable, trigger: .setKillSwitch(enabled: true))
+        let unblocked = machine.transition(from: blocked, trigger: .setKillSwitch(enabled: false))
+        let staleEnableAck = machine.transition(from: unblocked, trigger: .ackEnable)
+
+        XCTAssertEqual(blocked.mode, .readOnly)
+        XCTAssertEqual(blocked.phase, .blockedByKillSwitch)
+        XCTAssertEqual(blocked.lastErrorCode, M2ControlledInputPolicyStateMachine.killSwitchBlockedErrorCode)
+
+        XCTAssertEqual(unblocked.mode, .readOnly)
+        XCTAssertEqual(unblocked.phase, .idle)
+        XCTAssertEqual(unblocked.lastErrorCode, M2ControlledInputPolicyStateMachine.killSwitchBlockedErrorCode)
+        XCTAssertEqual(staleEnableAck, unblocked)
     }
 }

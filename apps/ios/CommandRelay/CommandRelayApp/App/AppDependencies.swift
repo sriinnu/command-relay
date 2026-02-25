@@ -13,12 +13,19 @@ struct AppDependencies {
         guard let configuration = BridgeGatewayConfiguration.fromEnvironment(environment) else {
             return makeStub()
         }
+        let allowOwnershipOverride = resolveTruthyFlag(
+            keys: ["COMMANDRELAY_INPUT_OWNERSHIP_OVERRIDE", "COMMANDRELAY_FORCE_INPUT_OWNERSHIP_OVERRIDE"],
+            environment: environment
+        )
 
         return AppDependencies(
             authService: GatewayAuthService(configuration: configuration),
             sessionsService: BridgeWebSocketSessionListService(configuration: configuration),
             streamService: BridgeWebSocketReadOnlyStreamService(configuration: configuration),
-            inputService: BridgeWebSocketControlledInputService(configuration: configuration)
+            inputService: BridgeWebSocketControlledInputService(
+                configuration: configuration,
+                defaultOwnershipOverrideEnabled: allowOwnershipOverride
+            )
         )
     }
 
@@ -29,6 +36,25 @@ struct AppDependencies {
             streamService: StubReadOnlyStreamService(),
             inputService: StubControlledInputService()
         )
+    }
+
+    private static func resolveTruthyFlag(
+        keys: [String],
+        environment: [String: String]
+    ) -> Bool {
+        let truthyValues: Set<String> = ["1", "true", "yes", "on"]
+        for key in keys {
+            guard let rawValue = environment[key] else {
+                continue
+            }
+            let normalized = rawValue
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            if truthyValues.contains(normalized) {
+                return true
+            }
+        }
+        return false
     }
 }
 

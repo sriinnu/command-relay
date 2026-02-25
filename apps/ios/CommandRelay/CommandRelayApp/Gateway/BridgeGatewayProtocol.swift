@@ -142,4 +142,74 @@ enum BridgeGatewayProtocol {
         }
         return nil
     }
+
+    /// Reads an object payload field from an envelope.
+    /// - Parameters:
+    ///   - field: Payload key.
+    ///   - envelope: Source envelope.
+    /// - Returns: JSON object field when present.
+    static func payloadObject(_ field: String, in envelope: BridgeGatewayEnvelope) -> [String: Any]? {
+        envelope.payload[field] as? [String: Any]
+    }
+
+    /// Resolves the best available error code from common gateway payload layouts.
+    /// - Parameters:
+    ///   - envelope: Source envelope.
+    ///   - fallback: Code used when no explicit code is present.
+    /// - Returns: Normalized lowercase code for compatibility checks.
+    static func normalizedErrorCode(in envelope: BridgeGatewayEnvelope, fallback: String) -> String {
+        if let directCode = firstErrorCode(in: envelope.payload) {
+            return normalizeErrorCode(directCode)
+        }
+
+        if let details = payloadObject("details", in: envelope),
+           let nestedCode = firstErrorCode(in: details) {
+            return normalizeErrorCode(nestedCode)
+        }
+
+        if let nestedError = payloadObject("error", in: envelope),
+           let nestedCode = firstErrorCode(in: nestedError) {
+            return normalizeErrorCode(nestedCode)
+        }
+
+        return normalizeErrorCode(fallback)
+    }
+
+    /// Returns whether an error code indicates an input ownership/arbitration conflict.
+    /// - Parameter code: Error code to evaluate.
+    /// - Returns: `true` when the code should be treated as an ownership conflict.
+    static func isOwnershipConflictCode(_ code: String) -> Bool {
+        let normalized = normalizeErrorCode(code)
+        let knownCodes: Set<String> = [
+            "input_lane_conflict",
+            "lane_conflict",
+            "ownership_conflict",
+            "input_ownership_conflict",
+            "arbitration_conflict",
+            "input_arbitration_conflict"
+        ]
+
+        if knownCodes.contains(normalized) {
+            return true
+        }
+
+        return (normalized.contains("ownership") && normalized.contains("conflict")) ||
+            (normalized.contains("arbitration") && normalized.contains("conflict"))
+    }
+
+    private static func firstErrorCode(in payload: [String: Any]) -> String? {
+        let supportedKeys = ["code", "errorCode", "reasonCode"]
+        for key in supportedKeys {
+            if let code = payload[key] as? String,
+               !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return code
+            }
+        }
+        return nil
+    }
+
+    private static func normalizeErrorCode(_ code: String) -> String {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return trimmed.replacingOccurrences(of: "-", with: "_")
+    }
 }

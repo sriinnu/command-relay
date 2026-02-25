@@ -377,3 +377,56 @@ test("startBridgeServer e2e rejects strict-protocol-incompatible message type", 
     await runtime.close();
   }
 });
+
+test("startBridgeServer e2e arbitrates pane input ownership and releases on detach/disconnect", async (t) => {
+  if (!(await canBindLoopback())) return void t.skip("loopback bind not permitted in this runtime");
+  const port = await reservePort();
+  const tmux = createFakeTmux();
+  const runtime = await startBridgeServer({
+    config: {
+      host: HOST, port, strictProtocolParsing: true, pollIntervalMs: 10_000, replayLines: 200,
+      maxHistoryEvents: 100, maxInputBytes: 512, maxAttachedPanes: 4, maxMessagesPerMinute: 1_000,
+      maxInputsPerMinute: 1_000, globalInputDisabled: false, authToken: null, auditLogPath: null,
+      inputOwnershipEnforced: true, inputOwnershipOverrideEnabled: true, allowInputOwnershipOverride: true
+    } as any,
+    tmux,
+    logger: { info: () => {}, warn: () => {}, error: () => {} }
+  });
+  const probeA = await createWsProbe(`ws://${HOST}:${port}/ws`);
+  const probeB = await createWsProbe(`ws://${HOST}:${port}/ws`);
+  const attachAndEnable = async (probe: WsProbe, id: string) => {
+    await probe.next((message) => message.type === "hello");
+    probe.sendRequest("attach", `${id}-attach`, { paneId: "%1" });
+    await probe.next((message) => message.type === "ack" && message.requestId === `${id}-attach`);
+    await probe.next((message) => message.type === "output" && message.payload.paneId === "%1");
+    probe.sendRequest("enable_input", `${id}-enable`, {});
+    await probe.next((message) => message.type === "policy_update" && message.requestId === `${id}-enable`);
+  };
+
+  try {
+    await attachAndEnable(probeA, "a");
+    await attachAndEnable(probeB, "b");
+    probeA.sendRequest("input", "a-input-1", { paneId: "%1", data: "echo a1\n" });
+    assert.equal((await probeA.next((message) => message.requestId === "a-input-1")).type, "ack");
+    probeB.sendRequest("input", "b-input-1", { paneId: "%1", data: "echo b1\n" });
+    assert.equal((await probeB.next((message) => message.requestId === "b-input-1")).type, "error");
+    probeB.sendRequest("input", "b-input-2", { paneId: "%1", data: "echo b2\n", override: true });
+    assert.equal((await probeB.next((message) => message.requestId === "b-input-2")).type, "ack");
+    probeB.sendRequest("detach", "b-detach", { paneId: "%1" });
+    assert.equal((await probeB.next((message) => message.requestId === "b-detach")).payload.action, "detach");
+    probeA.sendRequest("input", "a-input-2", { paneId: "%1", data: "echo a2\n" });
+    assert.equal((await probeA.next((message) => message.requestId === "a-input-2")).type, "ack");
+    probeA.sendRequest("disconnect", "a-disconnect", {});
+    assert.equal((await probeA.next((message) => message.requestId === "a-disconnect")).payload.action, "disconnect");
+    probeB.sendRequest("attach", "b-attach-2", { paneId: "%1" });
+    await probeB.next((message) => message.type === "ack" && message.requestId === "b-attach-2");
+    await probeB.next((message) => message.type === "output" && message.payload.paneId === "%1");
+    probeB.sendRequest("input", "b-input-3", { paneId: "%1", data: "echo b3\n" });
+    assert.equal((await probeB.next((message) => message.requestId === "b-input-3")).type, "ack");
+    assert.deepEqual(tmux.sentInputs.map((entry) => entry.input), ["echo a1\n", "echo b2\n", "echo a2\n", "echo b3\n"]);
+  } finally {
+    await closeWs(probeA.socket);
+    await closeWs(probeB.socket);
+    await runtime.close();
+  }
+});

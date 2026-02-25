@@ -48,7 +48,7 @@ Recommended wire shape:
 }
 ```
 
-### 2.1 Runtime Parse Rules (current implementation)
+### 2.1 Compatibility Parse Rules (`COMMANDRELAY_STRICT_PROTOCOL_PARSING=false`)
 
 1. Incoming frame MUST parse as JSON object.
 2. `type` MUST be a non-empty string.
@@ -57,7 +57,7 @@ Recommended wire shape:
 5. Socket ingress strictness is controlled by `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (`true` by default, legacy alias `COMMANDRELAY_STRICT_V1`).
 6. Parse failures return `error` with `code` values such as `invalid_json`, `invalid_json_object`, `missing_type`.
 
-### 2.2 Strict v1 Parse Rules (conformance profile)
+### 2.2 Strict v1 Parse Rules (default runtime mode + conformance profile)
 
 1. `v` MUST equal `1`.
 2. `type` MUST be one of the strict allow-list types: the 9 core v1 types plus runtime extensions (`hello`, `auth_ok`, `auth_error`, `session_list`, `detach`, `enable_input`, `disable_input`, `disconnect`, `heartbeat_ack`).
@@ -149,7 +149,7 @@ Rules:
 2. `mode` is `snapshot` or `delta`.
 3. No explicit replay flag is emitted in current runtime.
 
-### 3.6 Input channel controls (`C->S` + `S->C`)
+### 3.6 Input channel controls and ownership arbitration (`C->S` + `S->C`)
 
 Control requests:
 
@@ -167,9 +167,12 @@ Policy response:
 
 Rules:
 
-1. `enable_input` sets client input true only when global kill switch is off.
-2. `disable_input` always sets client input false.
-3. Both requests return `policy_update` with effective policy.
+1. `enable_input` updates input state for the requesting WebSocket client only.
+2. `disable_input` updates input state for the requesting WebSocket client only.
+3. Effective policy remains `clientInputEnabled && !globalInputDisabled`.
+4. Pane input ownership is enforced at `input` send time (first successful writer claims the lane for that pane).
+5. `policy_update` currently carries only `inputEnabled` and `globalInputDisabled` (ownership state is signaled on `input` conflict errors).
+6. Both requests return `policy_update` with effective policy.
 
 ### 3.7 `input` (`C->S`)
 
@@ -178,7 +181,8 @@ Request payload:
 ```json
 {
   "paneId": "%1",
-  "data": "git status\n"
+  "data": "git status\n",
+  "override": false
 }
 ```
 
@@ -189,11 +193,12 @@ Acceptance requirements:
 3. `paneId` and `data` are non-empty strings.
 4. Target pane is currently attached by that client.
 5. UTF-8 byte length of `data` is `<= maxInputBytes`.
+6. If another client already owns the pane input lane, caller must request takeover (`payload.override=true` or `payload.takeOwnership=true`) and server must allow override.
 
 Responses:
 
 1. Success: `ack` with `{ action: "input", paneId, bytes }`.
-2. Rejections: `input_rate_limited`, `input_disabled`, `invalid_input`, `pane_not_attached`, `input_too_large`.
+2. Rejections: `input_rate_limited`, `input_disabled`, `invalid_input`, `pane_not_attached`, `input_too_large`, `input_lane_conflict`.
 
 ### 3.8 `heartbeat` (`C->S`) and `heartbeat_ack` (`S->C`)
 
@@ -242,12 +247,20 @@ When client sends `attach(paneId,lastSeq)`:
 3. Kill switch blocks `enable_input` from becoming effective.
 4. Kill switch causes subsequent `input` to fail with `input_disabled`.
 
+## 6.1 Multi-Client Pane Arbitration Semantics
+
+1. Arbitration unit is the WebSocket client connection (`hello.payload.clientId`).
+2. `enable_input` does not reserve a pane globally and does not preempt other clients.
+3. If two clients are attached to the same pane and both are input-enabled, both can send `input`.
+4. Conflicts are therefore operationally managed (single-writer discipline), not protocol-enforced.
+
 ## 7. Attack/Mitigation Matrix (Protocol Level)
 
 | Threat | Attack Path | Mitigation in Protocol/Server | Residual Note |
 | --- | --- | --- | --- |
 | Unauthorized input before auth | Send `input` without successful `auth` | Server gates all non-`auth` messages with `auth_required` when auth is configured | Open mode depends on network isolation |
 | Input channel abuse | Flood `input` or send oversized payloads | `input_rate_limited`, `input_too_large`, and required attached pane membership | No command allowlist in protocol |
+| Concurrent writers on same pane | Two clients/tabs enable input and send simultaneously | No server-side pane owner arbitration in current runtime | Use operator single-writer runbook for handoffs |
 | Replay confusion on reconnect | Client resumes with stale or missing `lastSeq` | Sequence-based replay (`streamSeq > lastSeq`) with snapshot fallback | Exact missed range not guaranteed after retention loss |
 | Token probing | Repeated `auth` guesses | Static token + timing-safe compare + audit trail | No protocol-level lockout/backoff |
 | Kill switch bypass | Call `enable_input` while kill switch set | `policy_update` keeps `inputEnabled=false`, and `input` rejects | Kill switch value is static for process lifetime |
@@ -263,24 +276,44 @@ Common error payload:
 }
 ```
 
-Observed codes:
+Observed codes by stage:
+
+Strict/runtime parse stage:
 
 1. `invalid_json`
 2. `invalid_json_object`
 3. `missing_type`
-4. `rate_limited`
-5. `auth_required`
-6. `invalid_token`
-7. `invalid_pane_id`
-8. `max_attached_panes_exceeded`
-9. `input_rate_limited`
-10. `input_disabled`
-11. `invalid_input`
-12. `pane_not_attached`
-13. `input_too_large`
-14. `pane_poll_failed`
-15. `handler_failed`
-16. `unknown_type`
+4. `message_too_large`
+5. `invalid_version`
+6. `unsupported_type`
+7. `invalid_timestamp`
+8. `invalid_payload`
+9. `invalid_request_id`
+10. `missing_request_id`
+
+Message handling and policy stage:
+
+11. `rate_limited`
+12. `auth_required`
+13. `invalid_token`
+14. `invalid_pane_id`
+15. `max_attached_panes_exceeded`
+16. `input_rate_limited`
+17. `input_disabled`
+18. `invalid_input`
+19. `pane_not_attached`
+20. `input_too_large`
+21. `input_lane_conflict`
+22. `unknown_type`
+
+Streaming/runtime failure stage:
+
+23. `pane_poll_failed`
+24. `handler_failed`
+
+Ownership note:
+
+1. Current runtime emits `input_lane_conflict` when another client owns a pane input lane and takeover is not requested/allowed.
 
 ## 9. End-to-End Example
 
@@ -299,6 +332,6 @@ Client                                      Server
 
 ## 10. Compatibility Notes
 
-1. Strict parser profile and runtime server behavior are intentionally different today.
-2. Runtime server uses loose parsing for compatibility and extension events.
+1. Runtime supports strict and compatibility parser modes.
+2. Runtime default is strict parse mode (`COMMANDRELAY_STRICT_PROTOCOL_PARSING=true`), with optional compatibility mode when disabled.
 3. Clients should treat unknown server events as ignorable unless operating in strict test mode.

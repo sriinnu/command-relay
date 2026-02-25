@@ -22,6 +22,13 @@ final class ControlledInputInterfacesTests: XCTestCase {
         XCTAssertEqual(policy.maxPayloadBytes, 1)
     }
 
+    func testPolicyCapabilityOverrideKeepsInputBlockedWhenEnableIsNotAllowed() {
+        let policy = InputControlPolicy(canEnableInput: false)
+
+        XCTAssertFalse(policy.canSendInput(currentMode: .enabled))
+        XCTAssertFalse(policy.canSendInput(currentMode: .readOnly))
+    }
+
     func testAuditRecordCodableRoundTrip() throws {
         let actor = InputAuditActor(actorID: "device-1", displayName: "Primary iPhone")
         let record = InputAuditRecord(

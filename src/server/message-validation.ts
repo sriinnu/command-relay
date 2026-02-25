@@ -28,3 +28,19 @@ export function parseOptionalInt(value) {
   if (!Number.isFinite(parsed)) return null;
   return parsed;
 }
+
+/**
+ * Parses an optional boolean toggle.
+ *
+ * @param {unknown} value Candidate value.
+ * @returns {boolean | null} Parsed boolean or null when invalid.
+ */
+export function parseOptionalBoolean(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string" || !value.trim()) return null;
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  return null;
+}

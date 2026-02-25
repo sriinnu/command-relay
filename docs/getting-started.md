@@ -27,6 +27,7 @@ Run Codex/Claude inside `tmux` so CommandRelay can discover and control sessions
 
 1. Gateway controlled-input path is ready: `enable_input`, `input`, `disable_input`, and kill-switch enforcement are implemented and test-covered.
 2. iOS controlled-input baseline is implemented (explicit enable/disable + send path); full Mac runtime validation is pending.
+3. Pane input ownership arbitration is implemented; non-owner writes get `input_lane_conflict` unless override is requested and allowed.
 
 ## iOS Protocol Mock Package (M0)
 
@@ -161,6 +162,16 @@ Expected behavior:
 1. `ws-contract-matrix` covers `enable_input -> input -> disable_input` and blocked post-disable input.
 2. With kill switch `off`, input benchmark exits `0`.
 3. With kill switch `on`, benchmark exits non-zero after `enable_input` with input-disabled behavior.
+
+## Multi-Client Tabs: Operator Workflow (Current Runtime)
+
+Use this when two or more clients/tabs may attach to the same pane.
+
+1. Attach from all clients as needed, but allow only one writer client to run `enable_input`.
+2. Keep observer tabs read-only by not calling `enable_input` (or calling `disable_input` after diagnostics).
+3. For handoff, current writer first calls `disable_input` and confirms `policy_update.inputEnabled=false`; only then should the next writer call `enable_input`.
+4. If command collisions are suspected, restart bridge with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable exactly one writer.
+5. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
 
 ## iOS Live Environment
 

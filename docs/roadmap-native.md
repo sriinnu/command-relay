@@ -68,6 +68,7 @@ Dependencies:
 Status snapshot (2026-02-25):
 - [x] Gateway controlled-input policy path is implemented and covered by contract/policy tests.
 - [x] iOS controlled-input UX + transport baseline is implemented; Mac runtime validation is pending.
+- [x] Current gateway semantics documented: pane-level input ownership arbitration with controlled takeover path.
 
 ## M3 - iOS GA (2026-04-27 to 2026-05-15)
 
@@ -123,6 +124,7 @@ Dependencies:
 3. Test strategy: mocked event fixtures + end-to-end tmux integration tests.
 4. Observability: client crash reporting, gateway latency metrics, replay health.
 5. Release operations: signed builds, staged rollout, rollback paths.
+6. Multi-client operations: enforce single-writer tab/client runbook for shared panes.
 
 ## Key Risks
 
@@ -136,6 +138,8 @@ Mitigation: replay buffer SLAs, reconnect backoff tuning, chaos network tests.
 Mitigation: early internal track submissions and pre-review checklists.
 5. Team focus drift to web too early.
 Mitigation: enforce milestone gates; block web work before M4 exit.
+6. Concurrent input from multiple clients on same pane.
+Mitigation: operator handoff runbook (disable -> enable) and kill-switch emergency fallback.
 
 ## Immediate Next Actions (Next 10 Working Days)
 

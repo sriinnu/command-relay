@@ -10,8 +10,8 @@ import { BridgeEngine } from "../bridge/bridge-engine.js";
 import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
-import { parseNonEmptyString, parseOptionalInt } from "./message-validation.js";
-import { groupSessionsByName, sendEnvelope as send, tokenEquals } from "./bridge-server-utils.js";
+import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
+import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
 
 /**
@@ -41,6 +41,7 @@ export async function startBridgeServer(deps) {
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
   const telemetry = new BridgeTelemetryCollector();
   const pendingAttachLag = new Map<string, number>();
+  const inputOwnershipArbiter = new PaneInputOwnershipArbiter();
 
   /** @type {Map<string, ClientState>} */
   const clients = new Map();
@@ -176,6 +177,8 @@ export async function startBridgeServer(deps) {
           audit,
           telemetry,
           requestStartedAtMs,
+          inputOwnershipArbiter,
+          allowInputOwnershipOverride: config.allowInputOwnershipOverride ?? true,
           trackAttachLag: (clientId, paneId, startedAtMs) => {
             pendingAttachLag.set(`${clientId}:${paneId}`, startedAtMs);
           }
@@ -192,12 +195,9 @@ export async function startBridgeServer(deps) {
       engine.detachAll(client.id);
       messageLimiter.clear(client.id);
       inputLimiter.clear(client.id);
+      releaseClientInputOwnership(inputOwnershipArbiter, client.id);
       telemetry.recordConnectionClosed();
-      for (const key of pendingAttachLag.keys()) {
-        if (key.startsWith(`${client.id}:`)) {
-          pendingAttachLag.delete(key);
-        }
-      }
+      clearClientAttachLag(pendingAttachLag, client.id);
       clients.delete(client.id);
     });
   });
@@ -207,9 +207,7 @@ export async function startBridgeServer(deps) {
     httpServer.listen(config.port, config.host, () => resolve());
   });
 
-  logger.info(
-    `[bridge] listening on http://${config.host}:${config.port} (ws path: /ws)`
-  );
+  logger.info(`[bridge] listening on http://${config.host}:${config.port} (ws path: /ws)`);
 
   return {
     close: async () => {
@@ -265,9 +263,15 @@ export async function handleClientMessage(ctx) {
     audit,
     telemetry,
     requestStartedAtMs,
+    inputOwnershipArbiter,
+    paneInputOwnership,
+    paneInputOwners,
+    allowInputOwnershipOverride,
     trackAttachLag
   } = ctx;
   const startedAtMs = requestStartedAtMs ?? Date.now();
+  const laneOverrideAllowed = allowInputOwnershipOverride ?? config.allowInputOwnershipOverride ?? true;
+  const paneInputOwnerState = inputOwnershipArbiter ?? paneInputOwnership ?? paneInputOwners;
 
   if (!client.authenticated && type !== "auth") {
     send(client.socket, envelope("error", { code: "auth_required" }, requestId));
@@ -335,6 +339,7 @@ export async function handleClientMessage(ctx) {
         return;
       }
       client.attachedPanes.delete(paneId);
+      releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
       engine.detach(client.id, paneId);
       await audit.write({ action: "detach", clientId: client.id, details: { paneId } });
       send(client.socket, envelope("ack", { action: "detach", paneId }, requestId));
@@ -349,34 +354,14 @@ export async function handleClientMessage(ctx) {
         clientId: client.id,
         details: nextInputEnabled ? {} : { reason: "global_input_kill_switch" }
       });
-      send(
-        client.socket,
-        envelope(
-          "policy_update",
-          buildInputPolicyState({
-            clientInputEnabled: client.inputEnabled,
-            globalInputDisabled: config.globalInputDisabled
-          }) as unknown as Record<string, unknown>,
-          requestId
-        )
-      );
+      sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
 
     case "disable_input": {
       client.inputEnabled = false;
       await audit.write({ action: "disable_input", clientId: client.id, details: {} });
-      send(
-        client.socket,
-        envelope(
-          "policy_update",
-          buildInputPolicyState({
-            clientInputEnabled: client.inputEnabled,
-            globalInputDisabled: config.globalInputDisabled
-          }) as unknown as Record<string, unknown>,
-          requestId
-        )
-      );
+      sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
 
@@ -409,6 +394,13 @@ export async function handleClientMessage(ctx) {
         send(client.socket, envelope("error", { code: "input_too_large" }, requestId));
         return;
       }
+      const overrideRequested = parseOptionalBoolean(payload.override) === true || parseOptionalBoolean(payload.takeOwnership) === true;
+      const claimResult = claimPaneInputOwnership(paneInputOwnerState, paneId, client.id, overrideRequested, laneOverrideAllowed);
+      if (claimResult?.ok === false) {
+        const { ownerClientId, overrideAllowed } = claimResult;
+        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed }, requestId));
+        return;
+      }
 
       await tmux.sendInput(paneId, data);
       await audit.write({
@@ -417,7 +409,9 @@ export async function handleClientMessage(ctx) {
         details: {
           paneId,
           bytes: Buffer.byteLength(data, "utf8"),
-          sha256: createHash("sha256").update(data).digest("hex")
+          sha256: createHash("sha256").update(data).digest("hex"),
+          overrideRequested,
+          laneOverridden: claimResult?.ok ? claimResult.overridden : false
         }
       });
       telemetry?.recordInputAckLatency(Date.now() - startedAtMs);
@@ -432,6 +426,7 @@ export async function handleClientMessage(ctx) {
 
     case "disconnect": {
       engine.detachAll(client.id);
+      releaseClientInputOwnership(paneInputOwnerState, client.id);
       client.attachedPanes.clear();
       client.inputEnabled = false;
       await audit.write({ action: "disconnect", clientId: client.id, details: {} });

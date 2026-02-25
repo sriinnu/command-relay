@@ -27,3 +27,9 @@ test("forces read-only policy state when kill switch is on", () => {
   assert.equal(policy.globalInputDisabled, true);
   assert.equal(isInputAllowed({ clientInputEnabled: true, globalInputDisabled: true }), false);
 });
+
+test("keeps ownership arbitration subject to input policy gating", () => {
+  assert.equal(isInputAllowed({ clientInputEnabled: false, globalInputDisabled: false }), false);
+  assert.equal(isInputAllowed({ clientInputEnabled: true, globalInputDisabled: true }), false);
+  assert.equal(isInputAllowed({ clientInputEnabled: true, globalInputDisabled: false }), true);
+});

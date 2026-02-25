@@ -346,3 +346,71 @@ test("policy transition matrix enforces global kill switch", async () => {
   assert.equal(blockedInputError.payload.code, "input_disabled");
   assert.equal(sentInputs.length, 0);
 });
+
+test("policy transition matrix arbitrates pane input ownership across clients", async () => {
+  const sentInputs: Array<{ paneId: string; input: string }> = [];
+  const paneInputOwners = new Map<string, string>();
+  const baseConfig = {
+    authToken: null,
+    maxInputBytes: 4096,
+    maxAttachedPanes: 4,
+    globalInputDisabled: false,
+    inputOwnershipEnforced: true,
+    inputOwnershipOverrideEnabled: true,
+    allowInputOwnershipOverride: true
+  };
+
+  const makeClient = (clientId: string) => {
+    const { socket, sent } = createSocketRecorder();
+    return {
+      sent,
+      ctx: {
+        client: {
+          id: clientId,
+          socket,
+          authenticated: true,
+          inputEnabled: false,
+          attachedPanes: new Set<string>(["pane-1"])
+        },
+        tmux: {
+          listPanes: async () => [{ paneId: "pane-1", sessionName: "main" }],
+          sendInput: async (paneId: string, input: string) => sentInputs.push({ paneId, input })
+        },
+        engine: { attach: async () => {}, detach: () => {}, detachAll: () => {} },
+        config: baseConfig,
+        inputLimiter: new SlidingWindowRateLimiter({ maxEvents: 1000, windowMs: 60_000 }),
+        audit: new AuditLogger({ path: null, logger: console }),
+        paneInputOwners,
+        paneInputOwnership: paneInputOwners
+      } as Parameters<typeof handleClientMessage>[0]
+    };
+  };
+
+  const clientA = makeClient("client-a");
+  const clientB = makeClient("client-b");
+  const dispatch = async (
+    client: ReturnType<typeof makeClient>,
+    type: string,
+    requestId: string,
+    payload: Record<string, unknown> = {}
+  ) => {
+    await handleClientMessage({ ...client.ctx, type, payload, requestId } as any);
+    return client.sent[client.sent.length - 1];
+  };
+
+  await dispatch(clientA, "enable_input", "enable-a");
+  await dispatch(clientB, "enable_input", "enable-b");
+  assert.equal((await dispatch(clientA, "input", "input-a-1", { paneId: "pane-1", data: "a1\n" })).type, "ack");
+  assert.equal((await dispatch(clientB, "input", "input-b-1", { paneId: "pane-1", data: "b1\n" })).type, "error");
+  assert.equal(
+    (await dispatch(clientB, "input", "input-b-2", { paneId: "pane-1", data: "b2\n", override: true }))
+      .type,
+    "ack"
+  );
+  assert.equal((await dispatch(clientB, "detach", "detach-b", { paneId: "pane-1" })).payload.action, "detach");
+  assert.equal((await dispatch(clientA, "input", "input-a-2", { paneId: "pane-1", data: "a2\n" })).type, "ack");
+  assert.equal((await dispatch(clientA, "disconnect", "disconnect-a")).payload.action, "disconnect");
+  await dispatch(clientB, "attach", "attach-b", { paneId: "pane-1" });
+  assert.equal((await dispatch(clientB, "input", "input-b-3", { paneId: "pane-1", data: "b3\n" })).type, "ack");
+  assert.equal(sentInputs.length, 4);
+});

@@ -248,6 +248,12 @@ Baseline controls:
 6. Auditable input events and admin actions.
 7. Emergency global input disable switch.
 
+## Remote Control Reliability & Safety Notes
+
+Implementation notes and primary references for tmux control mode, WebSocket heartbeat handling, and lease/locking-based input safety are documented in:
+
+- [`docs/architecture.md`](docs/architecture.md)
+
 ## Networking Decision
 
 Preferred: Tailscale private mesh.

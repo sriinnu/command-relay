@@ -20,6 +20,17 @@ interface FakeSocket {
   send: (message: string) => void;
 }
 
+interface PolicyClientHarness {
+  ctx: Parameters<typeof handleClientMessage>[0];
+  sent: SentEnvelope[];
+}
+
+interface OwnershipHarness {
+  sentInputs: Array<{ paneId: string; input: string }>;
+  clientA: PolicyClientHarness;
+  clientB: PolicyClientHarness;
+}
+
 /**
  * Creates a writable fake socket that records emitted envelopes.
  *
@@ -80,6 +91,91 @@ function createContext(globalInputDisabled: boolean) {
       audit: new AuditLogger({ path: null, logger: console })
     }
   };
+}
+
+/**
+ * Creates two clients sharing one pane for ownership arbitration tests.
+ *
+ * @param overrideEnabled Whether ownership override is allowed.
+ * @returns Shared ownership test harness.
+ */
+function createOwnershipHarness(overrideEnabled: boolean): OwnershipHarness {
+  const sentInputs: Array<{ paneId: string; input: string }> = [];
+  const paneInputOwners = new Map<string, string>();
+  const baseConfig = {
+    authToken: null,
+    maxInputBytes: 4_096,
+    maxAttachedPanes: 8,
+    globalInputDisabled: false,
+    inputOwnershipEnforced: true,
+    inputOwnershipOverrideEnabled: overrideEnabled,
+    allowInputOwnershipOverride: overrideEnabled
+  };
+
+  const createClient = (clientId: string): PolicyClientHarness => {
+    const recorder = createSocketRecorder();
+    return {
+      sent: recorder.sent,
+      ctx: {
+        client: {
+          id: clientId,
+          socket: recorder.socket,
+          authenticated: true,
+          inputEnabled: false,
+          attachedPanes: new Set<string>(["pane-1"])
+        },
+        tmux: {
+          listPanes: async () => [{ paneId: "pane-1", sessionName: "main" }],
+          sendInput: async (paneId: string, input: string) => {
+            sentInputs.push({ paneId, input });
+          }
+        },
+        engine: {
+          attach: async () => {},
+          detach: () => {},
+          detachAll: () => {}
+        },
+        config: baseConfig,
+        inputLimiter: new SlidingWindowRateLimiter({ maxEvents: 1_000, windowMs: 60_000 }),
+        requestId: undefined,
+        audit: new AuditLogger({ path: null, logger: console }),
+        paneInputOwners,
+        paneInputOwnership: paneInputOwners
+      } as unknown as Parameters<typeof handleClientMessage>[0]
+    };
+  };
+
+  return {
+    sentInputs,
+    clientA: createClient("client-a"),
+    clientB: createClient("client-b")
+  };
+}
+
+/**
+ * Dispatches one client message and returns the latest emitted envelope.
+ *
+ * @param client Client harness.
+ * @param type Message type.
+ * @param requestId Request identifier.
+ * @param payload Message payload.
+ * @returns Last emitted envelope for the request.
+ */
+async function dispatch(
+  client: PolicyClientHarness,
+  type: string,
+  requestId: string,
+  payload: Record<string, unknown> = {}
+): Promise<SentEnvelope> {
+  await handleClientMessage({
+    ...client.ctx,
+    type,
+    payload,
+    requestId
+  } as unknown as Parameters<typeof handleClientMessage>[0]);
+  const message = client.sent[client.sent.length - 1];
+  assert.ok(message, `expected response envelope for ${type}`);
+  return message;
 }
 
 test("enables and accepts input when global kill switch is off", async () => {
@@ -169,4 +265,90 @@ test("parses and executes legacy policy command envelopes when strict parsing is
   assert.equal(policyUpdate.type, "policy_update");
   assert.equal(policyUpdate.requestId, "legacy-enable");
   assert.equal(policyUpdate.payload.inputEnabled, true);
+});
+
+test("arbitration establishes first input owner and blocks conflicting client input", async () => {
+  const harness = createOwnershipHarness(false);
+  await dispatch(harness.clientA, "enable_input", "enable-a");
+  await dispatch(harness.clientB, "enable_input", "enable-b");
+
+  const firstAck = await dispatch(harness.clientA, "input", "input-a-1", {
+    paneId: "pane-1",
+    data: "echo owner-a\n"
+  });
+  assert.equal(firstAck.type, "ack");
+  assert.equal(harness.sentInputs.length, 1);
+
+  const conflictingResult = await dispatch(harness.clientB, "input", "input-b-1", {
+    paneId: "pane-1",
+    data: "echo owner-b\n"
+  });
+  assert.equal(conflictingResult.type, "error");
+  assert.equal(harness.sentInputs.length, 1);
+});
+
+test("arbitration override takes pane ownership when override path is enabled", async () => {
+  const harness = createOwnershipHarness(true);
+  await dispatch(harness.clientA, "enable_input", "enable-a");
+  await dispatch(harness.clientB, "enable_input", "enable-b");
+
+  await dispatch(harness.clientA, "input", "input-a-1", {
+    paneId: "pane-1",
+    data: "echo owner-a\n"
+  });
+
+  const overrideResult = await dispatch(harness.clientB, "input", "input-b-override", {
+    paneId: "pane-1",
+    data: "echo owner-b\n",
+    override: true,
+    takeOwnership: true
+  });
+  assert.equal(overrideResult.type, "ack");
+  assert.equal(harness.sentInputs.length, 2);
+
+  const oldOwnerBlocked = await dispatch(harness.clientA, "input", "input-a-2", {
+    paneId: "pane-1",
+    data: "echo blocked\n"
+  });
+  assert.equal(oldOwnerBlocked.type, "error");
+  assert.equal(harness.sentInputs.length, 2);
+});
+
+test("arbitration releases ownership on detach and disconnect", async () => {
+  const harness = createOwnershipHarness(false);
+  await dispatch(harness.clientA, "enable_input", "enable-a");
+  await dispatch(harness.clientB, "enable_input", "enable-b");
+
+  await dispatch(harness.clientA, "input", "input-a-1", {
+    paneId: "pane-1",
+    data: "echo owner-a\n"
+  });
+  const blockedBeforeDetach = await dispatch(harness.clientB, "input", "input-b-1", {
+    paneId: "pane-1",
+    data: "echo blocked\n"
+  });
+  assert.equal(blockedBeforeDetach.type, "error");
+
+  const detachAck = await dispatch(harness.clientA, "detach", "detach-a", {
+    paneId: "pane-1"
+  });
+  assert.equal(detachAck.type, "ack");
+  assert.equal(detachAck.payload.action, "detach");
+
+  const afterDetach = await dispatch(harness.clientB, "input", "input-b-2", {
+    paneId: "pane-1",
+    data: "echo owner-b\n"
+  });
+  assert.equal(afterDetach.type, "ack");
+
+  const disconnectAck = await dispatch(harness.clientB, "disconnect", "disconnect-b");
+  assert.equal(disconnectAck.type, "ack");
+  assert.equal(disconnectAck.payload.action, "disconnect");
+
+  await dispatch(harness.clientA, "attach", "attach-a", { paneId: "pane-1" });
+  const afterDisconnect = await dispatch(harness.clientA, "input", "input-a-2", {
+    paneId: "pane-1",
+    data: "echo owner-a-again\n"
+  });
+  assert.equal(afterDisconnect.type, "ack");
 });
