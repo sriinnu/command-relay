@@ -107,9 +107,9 @@ Owner scope: iOS first, Android second, web fallback last.
 
 - [x] Workflow script: `scripts/checkpoints/generate-weekly-checkpoint.sh`
 - [x] Template: `scripts/checkpoints/templates/weekly-cross-platform-checkpoint.md`
-- [ ] Weekly command:
+- [x] Weekly command:
   `scripts/checkpoints/generate-weekly-checkpoint.sh --date YYYY-MM-DD --facilitator "Owner Name"`
-- [ ] Weekly artifact to track in git:
+- [x] Weekly artifact to track in git:
   `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`
 - [ ] Post-sync tracking rule:
   checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `TODO.md`.

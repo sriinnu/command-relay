@@ -140,7 +140,7 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 3. Start iOS spike: auth + session list + attach + output stream. (Completed 2026-02-25)
 4. Define iOS UX copy for input safety and confirmation states.
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
-6. Run and commit the first scripted weekly cross-platform checkpoint artifact.
+6. Run and commit the first scripted weekly cross-platform checkpoint artifact. (Completed 2026-02-25)
 
 ## Weekly Cross-Platform Checkpoint Workflow
 
