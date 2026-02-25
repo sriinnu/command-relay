@@ -7,6 +7,8 @@ export interface BridgeConfig {
   host: string;
   port: number;
   strictProtocolParsing: boolean;
+  appStaticEnabled: boolean;
+  appStaticDir: string;
   pollIntervalMs: number;
   replayLines: number;
   maxHistoryEvents: number;
@@ -96,6 +98,19 @@ function parseOptionalStringEnv(raw: string | undefined): string | null {
 }
 
 /**
+ * Parses a required-ish string env with fallback.
+ *
+ * @param raw Raw env value.
+ * @param fallback Fallback when value is unset or blank.
+ * @returns Trimmed string or fallback.
+ */
+function parseStringEnv(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+/**
  * Checks whether the host is loopback-only.
  *
  * @param host Hostname or address.
@@ -120,6 +135,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       "COMMANDRELAY_STRICT_V1",
       true
     ),
+    appStaticEnabled: parseBooleanEnv(
+      env.COMMANDRELAY_APP_STATIC_ENABLED,
+      true,
+      "COMMANDRELAY_APP_STATIC_ENABLED"
+    ),
+    appStaticDir: parseStringEnv(env.COMMANDRELAY_APP_STATIC_DIR, "apps/web"),
     pollIntervalMs: parseIntEnv(env.COMMANDRELAY_POLL_MS, 350, { min: 100, max: 5000 }),
     replayLines: parseIntEnv(env.COMMANDRELAY_REPLAY_LINES, 200, { min: 20, max: 5000 }),
     maxHistoryEvents: parseIntEnv(env.COMMANDRELAY_HISTORY_EVENTS, 300, { min: 50, max: 5000 }),

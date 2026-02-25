@@ -173,6 +173,8 @@ Rules:
 4. Pane input ownership is enforced at `input` send time (first successful writer claims the lane for that pane).
 5. `policy_update` currently carries only `inputEnabled` and `globalInputDisabled` (ownership state is signaled on `input` conflict errors).
 6. Both requests return `policy_update` with effective policy.
+7. Web control lane follows the same `enable_input`/`disable_input` flow as native clients; there are no web-only event types in v1.
+8. For web clients, lane identity is the WebSocket connection (`hello.payload.clientId`), which maps to a browser tab/window instance.
 
 ### 3.7 `input` (`C->S`)
 
@@ -209,6 +211,17 @@ Responses:
 
 1. `detach` removes one pane subscription and returns `ack(action=detach)`.
 2. `disconnect` detaches all panes, resets input state to false, and returns `ack(action=disconnect)`.
+
+### 3.10 Web app control lane user flow (`C->S` + `S->C`)
+
+Web app control uses the same v1 envelope and event names as iOS/Android. Required flow:
+
+1. Connect and authenticate (`hello` -> `auth` -> `auth_ok`), then `list_sessions` and `attach`.
+2. Stay read-only until explicit `enable_input`; treat `policy_update.inputEnabled=true` as the only write-ready state.
+3. First successful `input` on a pane claims that pane's write lane for the current `clientId`.
+4. If server returns `error(code=input_lane_conflict)`, web UI should block send and require explicit operator action for takeover.
+5. Takeover request uses `input` with `override=true` (or `takeOwnership=true`); server accepts only when override is allowed.
+6. On handoff, current writer should issue `disable_input` before `detach`/`disconnect` to reduce takeover ambiguity.
 
 ## 4. Ordering and Replay Semantics
 
@@ -251,8 +264,10 @@ When client sends `attach(paneId,lastSeq)`:
 
 1. Arbitration unit is the WebSocket client connection (`hello.payload.clientId`).
 2. `enable_input` does not reserve a pane globally and does not preempt other clients.
-3. If two clients are attached to the same pane and both are input-enabled, both can send `input`.
-4. Conflicts are therefore operationally managed (single-writer discipline), not protocol-enforced.
+3. First successful `input` claims pane ownership for that `clientId`.
+4. Non-owner `input` receives `error(code=input_lane_conflict)` with `ownerClientId` and `overrideAllowed`.
+5. Ownership is released when the owner detaches/disconnects from the pane.
+6. Ownership can transfer only via explicit takeover (`override=true` or `takeOwnership=true`) when override is allowed.
 
 ## 7. Attack/Mitigation Matrix (Protocol Level)
 
@@ -260,7 +275,7 @@ When client sends `attach(paneId,lastSeq)`:
 | --- | --- | --- | --- |
 | Unauthorized input before auth | Send `input` without successful `auth` | Server gates all non-`auth` messages with `auth_required` when auth is configured | Open mode depends on network isolation |
 | Input channel abuse | Flood `input` or send oversized payloads | `input_rate_limited`, `input_too_large`, and required attached pane membership | No command allowlist in protocol |
-| Concurrent writers on same pane | Two clients/tabs enable input and send simultaneously | No server-side pane owner arbitration in current runtime | Use operator single-writer runbook for handoffs |
+| Concurrent writers on same pane | Two clients/tabs enable input and send simultaneously | Server-side pane owner arbitration rejects non-owner writes with `input_lane_conflict` unless explicit takeover is requested and allowed | Keep single-writer runbook and require intentional takeover in UI |
 | Replay confusion on reconnect | Client resumes with stale or missing `lastSeq` | Sequence-based replay (`streamSeq > lastSeq`) with snapshot fallback | Exact missed range not guaranteed after retention loss |
 | Token probing | Repeated `auth` guesses | Static token + timing-safe compare + audit trail | No protocol-level lockout/backoff |
 | Kill switch bypass | Call `enable_input` while kill switch set | `policy_update` keeps `inputEnabled=false`, and `input` rejects | Kill switch value is static for process lifetime |
@@ -328,6 +343,20 @@ Client                                      Server
   | <-- policy_update(req=E1,inputEnabled=1)|
   | -- input(req=I1,\"ls\\n\") --------------> |
   | <-- ack(req=I1,action=input) ----------- |
+```
+
+Web control lane conflict/takeover example:
+
+```text
+Web Tab A                                  Server                                   Web Tab B
+  | -- attach(req=A1,paneId=%1) -----------> |                                        |
+  | -- enable_input(req=A2) ---------------> |                                        |
+  | -- input(req=A3,\"pwd\\n\") ------------> |                                        |
+  | <-- ack(req=A3,action=input) ----------- |                                        |
+  |                                          | <----------- input(req=B3,\"ls\\n\") -- |
+  |                                          | ---- error(code=input_lane_conflict) -> |
+  |                                          | <--- input(req=B4,\"ls\\n\",override=1)- |
+  |                                          | ---------------- ack(req=B4,action=input)->|
 ```
 
 ## 10. Compatibility Notes

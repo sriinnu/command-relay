@@ -21,6 +21,11 @@ async function main() {
   if (config.globalInputDisabled) {
     console.warn("[bridge] COMMANDRELAY_INPUT_KILL_SWITCH is active; remote input is disabled");
   }
+  if (config.appStaticEnabled) {
+    console.info(`[bridge] static app hosting enabled at /app from ${config.appStaticDir}`);
+  } else {
+    console.info("[bridge] static app hosting disabled");
+  }
 
   const tmux = new TmuxAdapter();
   const proxySettings = loadProxySettings();

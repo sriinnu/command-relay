@@ -20,6 +20,21 @@ CommandRelay treats remote terminal control as high-risk and defaults to read-on
 7. Sensitive actions (`auth_ok`, `auth_fail`, `attach`, `enable_input`, `disable_input`, `input`) are audit logged.
 8. Pane input ownership arbitration is enforced; first successful writer claims pane lane until release or explicit takeover.
 
+## Web Route and Auth Surface
+
+1. HTTP route surface includes exact `GET /health`; with static hosting enabled, `GET /` and `GET /app` redirect (`308`) to `/app/`, which serves static assets.
+2. Static serving is rooted at `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` default), with traversal-protection and `404` for missing/forbidden paths.
+3. Non-matching HTTP paths return `404`, and non-`/ws` WebSocket upgrades are rejected.
+4. Auth for web clients is message-based (`auth.payload.token`), not header-based.
+5. When auth token mode is enabled, all non-`auth` events are blocked with `auth_required` until successful auth.
+
+## Keyboard/Input Security Semantics
+
+1. The bridge accepts raw text input only (`input.payload.data`).
+2. Newline-separated payloads are executed as Enter-separated tmux sends.
+3. There is no server-side symbolic key translation layer for web clients.
+4. Security controls apply before dispatch: auth gate, input-enabled policy, pane attachment, byte limit, and input rate limit.
+
 ## Attack/Mitigation Matrix (Current Runtime)
 
 | Threat Area | Concrete Attack | Current Mitigation | Residual Risk / Operator Action |
@@ -56,4 +71,5 @@ CommandRelay treats remote terminal control as high-risk and defaults to read-on
 2. Set and rotate `COMMANDRELAY_AUTH_TOKEN`; do not reuse across environments.
 3. Enable `COMMANDRELAY_AUDIT_LOG` and protect log file access.
 4. Keep `COMMANDRELAY_MAX_INPUT_BYTES` and rate limits conservative.
-5. Treat kill switch as emergency brake and verify policy state from `policy_update`.
+5. Consider `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off` for stricter multi-tab control.
+6. Treat kill switch as emergency brake and verify policy state from `policy_update`.

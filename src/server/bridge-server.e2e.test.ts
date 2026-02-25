@@ -263,6 +263,23 @@ test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t)
 
   const probe = await createWsProbe(`ws://${HOST}:${port}/ws`);
   try {
+    const rootRedirect = await fetch(`http://${HOST}:${port}/`, { redirect: "manual" });
+    assert.equal(rootRedirect.status, 308);
+    assert.equal(rootRedirect.headers.get("location"), "/app/");
+
+    const appRedirect = await fetch(`http://${HOST}:${port}/app`, { redirect: "manual" });
+    assert.equal(appRedirect.status, 308);
+    assert.equal(appRedirect.headers.get("location"), "/app/");
+
+    const webAppResponse = await fetch(`http://${HOST}:${port}/app/`);
+    assert.equal(webAppResponse.status, 200);
+    assert.match(webAppResponse.headers.get("content-type") ?? "", /^text\/html\b/i);
+    const webAppBody = await webAppResponse.text();
+    assert.equal(webAppBody.includes("<body"), true);
+    const webAssetResponse = await fetch(`http://${HOST}:${port}/app/app.js`);
+    assert.equal(webAssetResponse.status, 200);
+    assert.match(webAssetResponse.headers.get("content-type") ?? "", /^text\/javascript\b/i);
+
     const hello = await probe.next((message) => message.type === "hello");
     assert.equal(typeof hello.payload.clientId, "string");
     assert.equal(hello.payload.requiresAuth, true);

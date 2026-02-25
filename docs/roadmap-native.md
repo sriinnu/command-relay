@@ -108,14 +108,34 @@ Deliverables:
 1. Minimal responsive web console for emergency access.
 2. Read-only streaming primary, guarded input secondary.
 3. Browser compatibility baseline for modern mobile and desktop.
+4. Web control lane behavior documented and implemented on the same v1 envelope (`enable_input`/`input`/`disable_input`, lane conflict, explicit takeover).
 
 Acceptance criteria:
 1. Core fallback flows work on Chrome/Safari current versions.
 2. Web remains explicitly non-primary in roadmap and release comms.
+3. Multi-tab lane conflict and takeover behavior is validated against gateway fixtures and contract tests.
 
 Dependencies:
 1. Existing gateway + protocol stack from mobile milestones.
 2. Basic frontend hosting and auth integration.
+3. Shared parity matrix maintained across iOS and web control-lane flows.
+
+## M6 - macOS Menu Bar + iOS/Web Parity Follow-Through (2026-07-06 to 2026-07-24)
+
+Deliverables:
+1. macOS menu bar companion surface for quick session attach and explicit input arm/disarm status.
+2. Shared iOS/web control-lane parity matrix (connect/auth/attach/replay/enable/disable/input/conflict/takeover).
+3. Regression fixture pack proving lane handoff between iOS and web clients on the same pane.
+
+Acceptance criteria:
+1. Menu bar flow can complete read-only attach and guarded input handoff without opening full app shell.
+2. iOS and web clients pass the same control-lane fixture suite with no schema or policy drift.
+3. Incident runbook includes menu bar + iOS/web handoff recovery procedure.
+
+Dependencies:
+1. Stable web fallback implementation from M5.
+2. Existing iOS controlled-input baseline and telemetry wiring.
+3. Gateway fixture harness for multi-client lane arbitration.
 
 ## Cross-Milestone Dependencies
 
@@ -149,6 +169,10 @@ Mitigation: operator handoff runbook (disable -> enable) and kill-switch emergen
 4. Define iOS UX copy for input safety and confirmation states.
 5. Set SLOs for connect time, replay catch-up time, and input ack latency.
 6. Run and commit the first scripted weekly cross-platform checkpoint artifact. (Completed 2026-02-25)
+7. Publish web control-lane user flow addendum in protocol docs with conflict/takeover handling. (Completed 2026-02-25)
+8. Draft macOS menu bar companion spec with lane state model and quick-action constraints.
+9. Build iOS/web parity checklist for control-lane flows and map each row to tests/fixtures.
+10. Add cross-client fixture scenarios for iOS-writer/web-takeover and web-writer/iOS-takeover.
 
 ## Weekly Cross-Platform Checkpoint Workflow
 

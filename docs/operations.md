@@ -13,6 +13,47 @@ Proxy-aware outbound behavior is supported through standard env vars:
 3. `ALL_PROXY`
 4. `NO_PROXY`
 
+## Web App Runtime Surface and Checks
+
+Implemented gateway routes:
+
+1. `GET /health` (exact path) returns health/status JSON.
+2. `GET /` and `GET /app` return `308` redirects to `/app/`; `GET /app/` and `GET /app/<path>` serve static app content when `COMMANDRELAY_APP_STATIC_ENABLED=true` (default).
+3. Static files are served from `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` default); missing/forbidden targets return `404` (`error=not_found`).
+4. WebSocket upgrade is accepted only on exact path `/ws`.
+5. Other HTTP routes return `404` (`error=not_found`), and non-`/ws` upgrades are rejected.
+
+Quick checks:
+
+```bash
+curl -sS http://127.0.0.1:8787/health
+curl -i http://127.0.0.1:8787/app/
+curl -i http://127.0.0.1:8787/does-not-exist
+```
+
+## Web Auth Token Operations
+
+1. `COMMANDRELAY_AUTH_TOKEN` is validated at startup and enforced for non-loopback binds.
+2. Auth is handled inside WebSocket protocol messages (`auth.payload.token`), not via HTTP `Authorization` headers.
+3. Rotate tokens by updating env and restarting the bridge process.
+4. Keep token values out of shell history and operator notes; audit logs store auth outcomes, not submitted token values.
+
+## Multi-Tab Safe Writer Operations
+
+1. Treat each tab/window as a separate client (`hello.payload.clientId`).
+2. Keep one writer per pane; others stay read-only.
+3. Pane write ownership is acquired on first successful `input`.
+4. Handoff: old writer `disable_input` then `detach`/`disconnect`; new writer `enable_input` and send first command.
+5. Optional hardening: set `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off` to block forced ownership takeover.
+6. Emergency freeze: restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`; resume by restarting with it off.
+
+## Keyboard/Input Operational Notes
+
+1. Input accepts only text payloads (`input.payload.data`).
+2. Newline (`\n`) in payload is sent as Enter boundaries.
+3. Very large pasted payloads can fail with `input_too_large` (default `maxInputBytes=4096`).
+4. Rapid key/send loops can fail with `input_rate_limited` (`COMMANDRELAY_MAX_INPUT_PER_MIN`).
+
 ## Local Chitragupta Bootstrap + Health
 
 Use the local scripts in `scripts/chitragupta` to validate and run MCP safely.

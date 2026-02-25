@@ -77,8 +77,28 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Build minimal responsive web console for emergency access.
 - [ ] Support auth, session list, pane attach, read-only stream.
 - [ ] Add guarded input behind explicit enable flow.
+- [ ] Keep web control lane on the same v1 envelope/event set as native clients (no web-only protocol fork).
+- [ ] Implement lane conflict UX: block send on `input_lane_conflict`, show owner context, require explicit takeover action.
+- [ ] Add takeover path using `override=true`/`takeOwnership=true` with clear operator confirmation.
+- [ ] Add multi-tab tests for single-writer lane ownership, detach/disconnect release, and takeover behavior.
 - [ ] Exit criteria met:
 - [ ] Works on modern mobile browsers as fallback only.
+- [ ] iOS + web lane handoff scenarios pass shared fixture suite without schema drift.
+
+## M6 - macOS Menu Bar + iOS/Web Parity Follow-Through (Target: 2026-07-24)
+
+- [ ] Define macOS menu bar scope: quick connect, session pick, read-only attach, explicit input arm/disarm.
+- [ ] Specify menu bar lane-state indicators (`read-only`, `input-enabled`, `lane-conflict`, `kill-switch-blocked`).
+- [ ] Reuse the same gateway client contract/events used by iOS/web (`hello`, `policy_update`, `ack`, `error`).
+- [ ] Build parity matrix covering iOS/web/menu bar for connect/auth/list/attach/replay/enable/disable/input/conflict/takeover.
+- [ ] Add cross-client fixture cases:
+  - iOS writer -> web takeover
+  - web writer -> iOS takeover
+  - menu bar observer -> iOS writer handoff
+  - menu bar writer -> web takeover
+- [ ] Exit criteria met:
+- [ ] Menu bar flow can attach read-only and complete guarded input handoff without protocol drift.
+- [ ] iOS/web/menu bar parity checklist is fully green in weekly checkpoint artifact.
 
 ## Dependencies
 
@@ -107,6 +127,9 @@ Owner scope: iOS first, Android second, web fallback last.
 - [x] Decide telemetry schema (connect time, replay time, input ack latency).
 - [x] Implement weekly checkpoint workflow artifacts (`scripts/checkpoints/generate-weekly-checkpoint.sh` + template) and document tracking in `docs/roadmap-native.md`.
 - [x] Wire the existing proxy stack into auth/pairing/telemetry outbound clients and add integration tests for `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
+- [ ] Draft macOS menu bar control-lane spec and state diagram.
+- [ ] Author iOS/web parity checklist for control-lane flows and map each item to an automated/manual test.
+- [ ] Add two gateway fixture scenarios for lane conflict + explicit takeover (iOS writer -> web takeover, web writer -> iOS takeover).
 
 ## Weekly Cross-Platform Checkpoint Runbook
 

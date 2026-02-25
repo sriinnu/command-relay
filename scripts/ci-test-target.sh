@@ -10,9 +10,13 @@ Usage: scripts/ci-test-target.sh <target> [tap_file]
 
 Targets:
   root
+  web-smoke
   proxy-core
   proxy-agent
   proxy-http-client
+
+Optional environment variables:
+  WEB_SMOKE_DIR   Relative or absolute path to the web app root for web-smoke target.
 USAGE
 }
 
@@ -47,6 +51,16 @@ write_failure_tap() {
   } >"${tap_file}"
 }
 
+write_skip_tap() {
+  local tap_file="$1"
+  local reason="$2"
+
+  {
+    echo "TAP version 13"
+    echo "1..0 # SKIP ${reason}"
+  } >"${tap_file}"
+}
+
 run_node_tap() {
   local workdir="$1"
   local tap_file="$2"
@@ -56,6 +70,183 @@ run_node_tap() {
     cd "${workdir}"
     node "$@"
   ) >"${tap_file}" 2>&1
+}
+
+run_web_smoke() {
+  local tap_file="$1"
+  local web_root_override="${WEB_SMOKE_DIR:-}"
+  local web_root=""
+  local first_existing_web_root=""
+  local candidate_root=""
+  local syntax_log
+  local log_file
+  local syntax_status=0
+  local -a candidate_roots=(
+    "apps/web"
+    "web"
+    "frontend"
+    "ui"
+  )
+  local -a web_source_files=()
+  local -a js_files=()
+
+  syntax_log="$(mktemp)"
+  log_file="$(mktemp)"
+
+  if [[ -n "${web_root_override}" ]]; then
+    if [[ "${web_root_override}" = /* ]]; then
+      web_root="${web_root_override}"
+    else
+      web_root="${REPO_ROOT}/${web_root_override}"
+    fi
+
+    if [[ ! -d "${web_root}" ]]; then
+      echo "WEB_SMOKE_DIR points to a missing directory: ${web_root}" >"${log_file}"
+      write_failure_tap "${tap_file}" "web smoke" "Configured web app directory is missing." "${log_file}"
+      rm -f "${syntax_log}" "${log_file}"
+      return 1
+    fi
+  else
+    for rel_root in "${candidate_roots[@]}"; do
+      candidate_root="${REPO_ROOT}/${rel_root}"
+      if [[ ! -d "${candidate_root}" ]]; then
+        continue
+      fi
+
+      if [[ -z "${first_existing_web_root}" ]]; then
+        first_existing_web_root="${candidate_root}"
+      fi
+
+      if find "${candidate_root}" \
+        -type f \
+        \( \
+        -name '*.html' -o \
+        -name '*.css' -o \
+        -name '*.js' -o \
+        -name '*.mjs' -o \
+        -name '*.cjs' -o \
+        -name '*.ts' -o \
+        -name '*.tsx' -o \
+        -name '*.jsx' \
+        \) \
+        ! -path '*/node_modules/*' \
+        ! -path '*/dist/*' \
+        ! -path '*/build/*' \
+        ! -path '*/coverage/*' \
+        ! -path '*/.next/*' \
+        ! -path '*/.nuxt/*' \
+        ! -path '*/.svelte-kit/*' \
+        -print -quit | grep -q .; then
+        web_root="${candidate_root}"
+        break
+      fi
+    done
+
+    if [[ -z "${web_root}" ]]; then
+      web_root="${first_existing_web_root}"
+    fi
+  fi
+
+  if [[ -z "${web_root}" ]]; then
+    write_skip_tap "${tap_file}" "no web app directory detected"
+    rm -f "${syntax_log}" "${log_file}"
+    return 0
+  fi
+
+  mapfile -t web_source_files < <(
+    find "${web_root}" \
+      -type d \
+      \( \
+      -name node_modules -o \
+      -name dist -o \
+      -name build -o \
+      -name coverage -o \
+      -name .next -o \
+      -name .nuxt -o \
+      -name .svelte-kit \
+      \) -prune -o \
+      -type f \
+      \( \
+      -name '*.html' -o \
+      -name '*.css' -o \
+      -name '*.js' -o \
+      -name '*.mjs' -o \
+      -name '*.cjs' -o \
+      -name '*.ts' -o \
+      -name '*.tsx' -o \
+      -name '*.jsx' \
+      \) -print | LC_ALL=C sort
+  )
+
+  if [[ "${#web_source_files[@]}" -eq 0 ]]; then
+    echo "No web source files found under ${web_root}" >"${log_file}"
+    write_failure_tap "${tap_file}" "web smoke" "No web source files matched." "${log_file}"
+    rm -f "${syntax_log}" "${log_file}"
+    return 1
+  fi
+
+  mapfile -t js_files < <(
+    find "${web_root}" \
+      -type d \
+      \( \
+      -name node_modules -o \
+      -name dist -o \
+      -name build -o \
+      -name coverage -o \
+      -name .next -o \
+      -name .nuxt -o \
+      -name .svelte-kit \
+      \) -prune -o \
+      -type f \
+      \( \
+      -name '*.js' -o \
+      -name '*.mjs' -o \
+      -name '*.cjs' \
+      \) -print | LC_ALL=C sort
+  )
+
+  if [[ "${#js_files[@]}" -eq 0 ]]; then
+    {
+      echo "TAP version 13"
+      echo "1..1"
+      echo "ok 1 - web smoke"
+      echo "  ---"
+      echo "  message: Found ${#web_source_files[@]} web files under ${web_root}; no JS files to syntax-check."
+      echo "  ..."
+    } >"${tap_file}"
+
+    rm -f "${syntax_log}" "${log_file}"
+    return 0
+  fi
+
+  for js_file in "${js_files[@]}"; do
+    if ! node --check "${js_file}" >>"${syntax_log}" 2>&1; then
+      syntax_status=1
+    fi
+  done
+
+  if [[ "${syntax_status}" -ne 0 ]]; then
+    {
+      echo "JavaScript syntax validation failed under ${web_root}"
+      echo "Checked files: ${#js_files[@]}"
+      cat "${syntax_log}"
+    } >"${log_file}"
+    write_failure_tap "${tap_file}" "web smoke syntax" "JavaScript syntax check failed." "${log_file}"
+    rm -f "${syntax_log}" "${log_file}"
+    return 1
+  fi
+
+  {
+    echo "TAP version 13"
+    echo "1..1"
+    echo "ok 1 - web smoke"
+    echo "  ---"
+    echo "  message: Found ${#web_source_files[@]} web files under ${web_root}; syntax-checked ${#js_files[@]} JS files."
+    echo "  ..."
+  } >"${tap_file}"
+
+  rm -f "${syntax_log}" "${log_file}"
+  return 0
 }
 
 run_root() {
@@ -225,41 +416,22 @@ mkdir -p "$(dirname "${TAP_FILE}")"
 set_deterministic_env
 
 status=0
-case "${TARGET}" in
-  root)
-    if run_root "${TAP_FILE}"; then
-      :
-    else
-      status=$?
-    fi
-    ;;
-  proxy-core)
-    if run_proxy_core "${TAP_FILE}"; then
-      :
-    else
-      status=$?
-    fi
-    ;;
-  proxy-agent)
-    if run_proxy_agent "${TAP_FILE}"; then
-      :
-    else
-      status=$?
-    fi
-    ;;
-  proxy-http-client)
-    if run_proxy_http_client "${TAP_FILE}"; then
-      :
-    else
-      status=$?
-    fi
-    ;;
+if case "${TARGET}" in
+  root) run_root "${TAP_FILE}" ;;
+  web-smoke) run_web_smoke "${TAP_FILE}" ;;
+  proxy-core) run_proxy_core "${TAP_FILE}" ;;
+  proxy-agent) run_proxy_agent "${TAP_FILE}" ;;
+  proxy-http-client) run_proxy_http_client "${TAP_FILE}" ;;
   *)
     echo "Unknown target: ${TARGET}" >&2
     usage
     exit 2
     ;;
-esac
+esac; then
+  status=0
+else
+  status=$?
+fi
 
 if [[ "${status}" -eq 0 ]]; then
   echo "[PASS] ${TARGET} -> ${TAP_FILE}"

@@ -28,6 +28,7 @@
     "ci:test": "npm run test:all && npm run verify:consumer-smoke",
     "ci:all": "npm run ci:check && npm run ci:build && npm run ci:test",
     "test:ci:all": "scripts/ci-test-all.sh",
+    "test:ci:web-smoke": "scripts/ci-test-target.sh web-smoke",
     "bench:connect": "node --import tsx scripts/perf/connect-latency.ts",
     "bench:list": "node --import tsx scripts/perf/list-sessions-roundtrip.ts",
     "bench:input": "node --import tsx scripts/perf/input-ack-roundtrip.ts"

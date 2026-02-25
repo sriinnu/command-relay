@@ -23,6 +23,35 @@ If you previously used `pnpm ... exec tsx .../mcp-entry.ts`, switch to the comma
 
 Run Codex/Claude inside `tmux` so CommandRelay can discover and control sessions reliably.
 
+## Web App Route Usage (Current Runtime)
+
+The gateway is an HTTP + WebSocket server with a small route surface:
+
+1. Health check is exact path `GET /health`.
+2. Static web app hosting (default on) canonicalizes `GET /` and `GET /app` to `/app/` (`308`), then serves content from `GET /app/` and `GET /app/<path>` using `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` by default).
+3. Missing static assets/directories and non-matching HTTP routes return `404` (`{ "error": "not_found" }`).
+4. Terminal protocol channel is `ws://<host>:<port>/ws`.
+5. WebSocket upgrade path must be exact `/ws`.
+
+## Web App Auth Token Handling
+
+1. `COMMANDRELAY_AUTH_TOKEN` is required when binding non-loopback hosts, optional on loopback.
+2. On connect, read `hello.payload.requiresAuth`.
+3. If auth is required, send `auth` with `payload.token` before any other command.
+4. Non-`auth` messages before successful auth return `error.code=auth_required`.
+5. If auth is not required (`requiresAuth=false`), the connection is already in open mode.
+6. Auth success emits `auth_ok` (`mode=token` or `mode=open`).
+7. Auth is protocol-message based; do not use HTTP `Authorization` headers for `/ws`.
+
+## Web Keyboard Workflow (Input Semantics)
+
+1. Send text through `input.payload.data`; there is no separate keycode event type.
+2. Include `\n` to execute command lines; bridge translates newline boundaries to Enter (`C-m`).
+3. Multi-line payloads are sent line-by-line in order.
+4. `input` is valid only after `enable_input` and for panes already attached by that client.
+5. If another client owns the pane write lane, the server returns `error.code=input_lane_conflict` with owner metadata.
+6. Takeover requires `input.payload.override=true` (or `takeOwnership=true`) and `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=true`.
+
 ## Remote-Control Capability Status (2026-02-25)
 
 1. Gateway controlled-input path is ready: `enable_input`, `input`, `disable_input`, and kill-switch enforcement are implemented and test-covered.
@@ -169,9 +198,11 @@ Use this when two or more clients/tabs may attach to the same pane.
 
 1. Attach from all clients as needed, but allow only one writer client to run `enable_input`.
 2. Keep observer tabs read-only by not calling `enable_input` (or calling `disable_input` after diagnostics).
-3. For handoff, current writer first calls `disable_input` and confirms `policy_update.inputEnabled=false`; only then should the next writer call `enable_input`.
-4. If command collisions are suspected, restart bridge with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable exactly one writer.
-5. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
+3. First successful `input` claims that pane's write lane for the writer client; other clients get `error.code=input_lane_conflict`.
+4. For handoff, current writer calls `disable_input` and then `detach` or `disconnect`; next writer calls `enable_input` and sends first `input`.
+5. If you want to block forced takeovers, run with `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off`.
+6. If command collisions are suspected, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable one writer.
+7. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
 
 ## iOS Live Environment
 

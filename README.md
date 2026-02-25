@@ -122,7 +122,7 @@ G -> U : session_list
 U -> G : attach(pane_id)
 G -> T : capture + subscribe pane
 T -> G : replay buffer (last N lines)
-G -> U : pane_snapshot + stream_start
+G -> U : ack(action=attach) + output(snapshot/delta)
 
 4) Send Input (bi-directional control)
 U -> G : input(pane_id, "git status\n")
@@ -133,7 +133,7 @@ T -> G : pane_output
 G -> U : output event
 
 5) Idle / Resume
-U -> G : reconnect(last_event_id)
+U -> G : attach(pane_id,lastSeq)
 G -> U : replay missed events + heartbeat schedule
 ```
 
@@ -229,12 +229,43 @@ ws://127.0.0.1:8787/ws
 Important env vars:
 
 1. `COMMANDRELAY_AUTH_TOKEN` - optional static auth token.
-2. `COMMANDRELAY_AUDIT_LOG` - optional JSONL path for audit events.
-3. `COMMANDRELAY_MAX_INPUT_BYTES` - input payload guardrail.
-4. `COMMANDRELAY_MAX_MSG_PER_MIN` - per-client message rate limit.
-5. `COMMANDRELAY_MAX_INPUT_PER_MIN` - per-client input rate limit.
-6. `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (or legacy `COMMANDRELAY_STRICT_V1`) - strict WebSocket envelope parsing toggle (`true` by default).
-7. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - proxy settings consumed by proxy packages and control-plane client paths; startup currently parses/logs these settings.
+2. `COMMANDRELAY_APP_STATIC_ENABLED` - enable/disable static web app hosting (`true` by default).
+3. `COMMANDRELAY_APP_STATIC_DIR` - static web app directory root (`apps/web` by default).
+4. `COMMANDRELAY_AUDIT_LOG` - optional JSONL path for audit events.
+5. `COMMANDRELAY_INPUT_KILL_SWITCH` - global input disable switch.
+6. `COMMANDRELAY_ALLOW_INPUT_OVERRIDE` - allow/disallow pane ownership takeover.
+7. `COMMANDRELAY_MAX_INPUT_BYTES` - input payload guardrail.
+8. `COMMANDRELAY_MAX_MSG_PER_MIN` - per-client message rate limit.
+9. `COMMANDRELAY_MAX_INPUT_PER_MIN` - per-client input rate limit.
+10. `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (or legacy `COMMANDRELAY_STRICT_V1`) - strict WebSocket envelope parsing toggle (`true` by default).
+11. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - proxy settings consumed by proxy packages and control-plane client paths; startup currently parses/logs these settings.
+
+## Web App Usage (Current Runtime)
+
+Route surface exposed by `src/server/bridge-server.ts`:
+
+1. `GET /health` (exact path) returns JSON status payload.
+2. When `COMMANDRELAY_APP_STATIC_ENABLED=true` (default), `GET /` and `GET /app` return `308` to `/app/`, and static files are served on `GET /app/` and `GET /app/<path>` from `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` default).
+3. Path traversal and missing static targets return `404` with `{ "error": "not_found" }`.
+4. Non-matching HTTP routes return `404` with `{ "error": "not_found" }`.
+5. WebSocket upgrade is accepted only on exact path `/ws`; non-`/ws` upgrades are rejected.
+
+Auth token handling:
+
+1. On connect, server emits `hello` with `requiresAuth` and `clientId`.
+2. If `requiresAuth=true`, client must send `auth` with `payload.token` before non-`auth` messages.
+3. If `requiresAuth=false` (open mode), the client is already authenticated.
+4. Before successful auth (token mode), non-`auth` requests are rejected with `error.code=auth_required`.
+5. Success returns `auth_ok` (`mode=token`); invalid token returns `auth_error` (`code=invalid_token`).
+6. Token auth is protocol-message based; the bridge does not use HTTP `Authorization` headers for `/ws`.
+
+Keyboard/input workflow (web UI or any client):
+
+1. Commands are sent via `input.payload.data` (string).
+2. `\n` is treated as Enter; bridge sends `C-m` between newline-separated segments.
+3. Input is accepted only after `enable_input`, and only for panes attached by that same client.
+4. Input lane ownership is per WebSocket client (`clientId`); non-owner input gets `error.code=input_lane_conflict`.
+5. Ownership takeover requires `input.payload.override=true` (or `takeOwnership=true`) and `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=true`; see [`docs/security.md`](docs/security.md).
 
 ## Security Model
 
