@@ -1,6 +1,9 @@
 # @commandrelay/proxy-core
 
-Core TypeScript utilities for loading proxy settings from environment variables and resolving per-target proxy routing.
+![proxy-core brand mark](./docs/assets/proxy-core-brand.svg)
+
+Transport-agnostic proxy resolution primitives for Node.js and TypeScript.
+Use this package as the stable core in `proxy-*` package families across repos.
 
 ## Install
 
@@ -8,24 +11,23 @@ Core TypeScript utilities for loading proxy settings from environment variables 
 npm install @commandrelay/proxy-core
 ```
 
-## Runtime support
+## Runtime
 
 - Node.js `>=18`
 - npm `>=9`
-- ESM package (`"type": "module"`)
+- ESM only (`"type": "module"`)
 
-## Version support policy
+## Reuse Model (`proxy-*` style)
 
-- Current line: `0.1.x`
-- While this package is pre-`1.0`, prefer pinning minor versions for production (`~0.1.0`) to avoid unexpected breaking changes.
+Keep `proxy-core` focused on policy decisions and build protocol/framework adapters in sibling packages:
 
-## Export surface
+- `proxy-core`: parse env and decide whether a target should use a proxy URL
+- `proxy-undici` / `proxy-fetch` / `proxy-axios`: map the decision to client-specific options
+- `proxy-cli` (optional): diagnostics and runtime inspection
 
-- `@commandrelay/proxy-core` (root API)
-- `@commandrelay/proxy-core/package.json` (metadata only)
-- Deep imports such as `@commandrelay/proxy-core/dist/*` are intentionally unsupported.
+This keeps shared behavior consistent while allowing each adapter package to evolve independently.
 
-## Usage
+## Quick Start
 
 ```ts
 import {
@@ -35,94 +37,40 @@ import {
 } from "@commandrelay/proxy-core";
 
 const settings = loadProxySettings(process.env);
-
 const controlPlaneProxy = resolveProxyForUrl("https://api.example.com/v1", settings);
 const telemetryProxy = resolveProxyForUrl(new URL("http://telemetry.example.com"), settings);
+const oneShotProxy = resolveProxyForUrlFromEnv("https://edge.example.com");
 
-// Convenience one-shot helper:
-const proxyFromEnv = resolveProxyForUrlFromEnv("https://edge.example.com");
-
-console.log({ controlPlaneProxy, telemetryProxy, proxyFromEnv });
+console.log({ controlPlaneProxy, telemetryProxy, oneShotProxy });
 ```
 
-### JavaScript (ESM) usage
-
-```js
-import { loadProxySettings, resolveProxyForUrl } from "@commandrelay/proxy-core";
-
-const settings = loadProxySettings(process.env);
-const proxyUrl = resolveProxyForUrl("https://example.com", settings);
-
-console.log(proxyUrl);
-```
-
-### `NO_PROXY` matching
-
-```ts
-import { parseNoProxy, shouldBypassProxy } from "@commandrelay/proxy-core";
-
-const rules = parseNoProxy("*.internal.local,localhost:8080,[::1],10.0.0.5");
-const bypass = shouldBypassProxy(new URL("https://api.internal.local"), rules);
-
-console.log({ bypass }); // true
-```
-
-## API
-
-```ts
-type ProxyEnvironment = Readonly<Record<string, string | undefined>>;
-
-interface NoProxyRule {
-  host: string;
-  port: number | null;
-  matchSubdomains: boolean;
-}
-
-interface ProxySettings {
-  httpProxy: string | null;
-  httpsProxy: string | null;
-  allProxy: string | null;
-  noProxy: NoProxyRule[];
-}
-```
+## API Surface
 
 - `loadProxySettings(env?: ProxyEnvironment): ProxySettings`
 - `resolveProxyForUrl(target: string | URL, settings: ProxySettings): string | null`
 - `resolveProxyForUrlFromEnv(target: string | URL, env?: ProxyEnvironment): string | null`
-- `shouldBypassProxy(target: URL, rules: readonly NoProxyRule[]): boolean`
 - `parseNoProxy(raw: string): NoProxyRule[]`
+- `shouldBypassProxy(target: URL, rules: readonly NoProxyRule[]): boolean`
 
-## Error handling example
+Export policy:
 
-`proxy-core` does not export custom error classes. Invalid target URLs throw `TypeError` from URL parsing.
+- `@commandrelay/proxy-core` (root API)
+- `@commandrelay/proxy-core/package.json` (metadata)
+- No deep imports (`dist/*`) for compatibility stability
 
-```ts
-import { loadProxySettings, resolveProxyForUrl } from "@commandrelay/proxy-core";
+## Security and Compatibility Notes
 
-const settings = loadProxySettings();
+- Lowercase env vars win over uppercase (`http_proxy` over `HTTP_PROXY`)
+- In CGI-like environments (`REQUEST_METHOD` set), uppercase `HTTP_PROXY` is ignored
+- Invalid proxy URLs are sanitized to `null`
+- Invalid `NO_PROXY` tokens are dropped
+- Invalid target input throws `TypeError` via URL parsing
 
-try {
-  resolveProxyForUrl("::not-a-url::", settings);
-} catch (error) {
-  if (error instanceof TypeError) {
-    console.error("Invalid target URL", error.message);
-  } else {
-    throw error;
-  }
-}
-```
+## Versioning
 
-## Security notes
+- Current line: `0.1.x`
+- Until `1.0`, pin minor versions in production (for example `~0.1.0`)
 
-- Lowercase env vars win over uppercase (`http_proxy` over `HTTP_PROXY`).
-- In CGI-like environments (`REQUEST_METHOD` set), uppercase `HTTP_PROXY` is ignored.
-- Invalid or unsupported proxy URLs are sanitized to `null` instead of being used.
-- Supported proxy schemes: `http`, `https`, `socks`, `socks4`, `socks4a`, `socks5`, `socks5h`, `pac+http`, `pac+https`, `pac+file`, `pac+data`.
-- Invalid `NO_PROXY` tokens are dropped safely.
-- Avoid logging proxy URLs that include credentials.
+## Integration Notes
 
-## Performance notes
-
-- Parse settings once (`loadProxySettings`) and reuse the resulting `ProxySettings`.
-- Reuse parsed `NO_PROXY` rules rather than reparsing per request.
-- Pass `URL` objects when already available to avoid repeated URL parsing.
+See [NOTES.md](./NOTES.md) for external integration guidelines and adapter conventions.

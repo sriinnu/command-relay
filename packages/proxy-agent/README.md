@@ -1,6 +1,12 @@
 # @commandrelay/proxy-agent
 
-Protocol-aware proxy agent factory for Node.js HTTP clients. Supports `http`, `https`, `socks*`, and `pac+*` proxy URLs with bounded agent caching.
+![proxy-agent brand](./docs/assets/proxy-agent-brand.svg)
+
+Protocol-aware proxy agent factory for Node.js clients that accept `http.Agent`/`https.Agent`.
+
+- Supports `http`, `https`, `socks*`, and `pac+*` proxy URLs
+- Resolves routing from standard proxy env vars (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`)
+- Reuses agents with bounded cache for low overhead across repeated requests
 
 ## Install
 
@@ -8,68 +14,71 @@ Protocol-aware proxy agent factory for Node.js HTTP clients. Supports `http`, `h
 npm install @commandrelay/proxy-agent
 ```
 
-## Runtime support
+## Runtime
 
 - Node.js `>=18`
 - npm `>=9`
 - ESM package (`"type": "module"`)
 
-## Version support policy
+## External Reuse
 
-- Current line: `0.1.x`
-- `@commandrelay/proxy-agent` depends on `@commandrelay/proxy-core`.
-- For production in pre-`1.0`, keep `proxy-agent` and `proxy-core` on the same minor line (example: `0.1.x` with `0.1.x`).
+This package is designed for proxy-agent style consumers: libraries/services that need a per-target Node agent.
 
-## Export surface
+Integration note: [NOTES.md](./NOTES.md)
 
-- `@commandrelay/proxy-agent` (root API)
-- `@commandrelay/proxy-agent/package.json` (metadata only)
-- Deep imports such as `@commandrelay/proxy-agent/dist/*` are intentionally unsupported.
-
-## Usage
+### Generic adapter for agent-based HTTP clients
 
 ```ts
-import https from "node:https";
 import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
 
-const factory = new ProxyAgentFactory({
-  env: process.env,
-  maxCacheEntries: 256
-});
+const factory = new ProxyAgentFactory({ env: process.env, maxCacheEntries: 256 });
 
-const target = "https://api.example.com/data";
-const { agent, viaProxy, proxyUrl, fromCache } = factory.resolve(target);
-
-const req = https.request(target, { method: "GET", agent: agent ?? undefined }, (res) => {
-  console.log("status", res.statusCode, { viaProxy, proxyUrl, fromCache });
-});
-
-req.on("error", console.error);
-req.end();
+export function resolveAgent(target: string | URL) {
+  const { agent } = factory.resolve(target);
+  return agent ?? undefined;
+}
 ```
 
-### JavaScript (ESM) usage
+### Axios example
 
-```js
+```ts
+import axios from "axios";
 import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
 
 const factory = new ProxyAgentFactory();
-const { agent, viaProxy, proxyUrl } = factory.resolve("https://example.com");
+const target = "https://api.example.com/data";
+const { agent } = factory.resolve(target);
 
-console.log({ hasAgent: Boolean(agent), viaProxy, proxyUrl });
+const response = await axios.get(target, {
+  proxy: false,
+  httpAgent: agent ?? undefined,
+  httpsAgent: agent ?? undefined
+});
+
+console.log(response.status);
 ```
 
-### One-off agent creation
+### Got example
 
 ```ts
-import { createProxyAgent } from "@commandrelay/proxy-agent";
+import got from "got";
+import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
 
-const agent = createProxyAgent("socks5://127.0.0.1:1080", "https:");
+const factory = new ProxyAgentFactory();
+const target = "https://api.example.com/data";
+const { agent } = factory.resolve(target);
+
+const body = await got(target, {
+  agent: {
+    http: agent ?? undefined,
+    https: agent ?? undefined
+  }
+}).text();
+
+console.log(body.length);
 ```
 
 ## API
-
-Root package exports:
 
 ```ts
 interface ProxyAgentResolution {
@@ -97,6 +106,8 @@ class ProxyAgentFactory {
 }
 ```
 
+Also exported:
+
 - `createProxyAgent(proxyUrl: string, targetProtocol: string): Agent`
 - `loadProxySettings(env?: ProxyEnvironment): ProxySettings`
 - `resolveProxyForUrl(target: string | URL, settings: ProxySettings): string | null`
@@ -104,44 +115,18 @@ class ProxyAgentFactory {
 - `parseNoProxy(raw: string): NoProxyRule[]`
 - Types: `NoProxyRule`, `ProxyEnvironment`, `ProxySettings`, `ProxyAgentFactoryOptions`, `ProxyAgentResolution`
 
-## Error handling example
+## Security and Ops
 
-The root package does not export factory-specific error classes; handle by `TypeError` and message codes.
+- Lowercase env vars override uppercase counterparts
+- In CGI-like environments (`REQUEST_METHOD` set), uppercase `HTTP_PROXY` is ignored
+- `NO_PROXY` supports domain/host rules, wildcard-style entries, IPv4/IPv6, and optional ports
+- Do not log proxy URLs containing credentials
+- PAC URLs are executable policy; only use trusted PAC sources
 
-```ts
-import { ProxyAgentFactory, createProxyAgent } from "@commandrelay/proxy-agent";
+## Performance
 
-try {
-  createProxyAgent("ftp://proxy.local:21", "https:");
-} catch (error) {
-  if (error instanceof Error && error.message.startsWith("unsupported_proxy_protocol:")) {
-    console.error("Proxy URL protocol is unsupported");
-  }
-}
-
-const factory = new ProxyAgentFactory();
-try {
-  factory.resolve("::not-a-url::");
-} catch (error) {
-  if (error instanceof TypeError && error.message === "invalid_target_url") {
-    console.error("Target URL is invalid");
-  }
-}
-```
-
-## Security notes
-
-- Lowercase env vars override uppercase counterparts.
-- Uppercase `HTTP_PROXY` is ignored in CGI-like contexts (`REQUEST_METHOD` present).
-- `NO_PROXY` supports host/domain rules, wildcard-style entries, IPv4/IPv6, and optional ports.
-- Invalid proxy env values are sanitized and ignored.
-- Treat PAC URLs as executable policy and limit PAC source trust boundaries.
-- Do not log proxy URLs with embedded credentials.
-
-## Performance notes
-
-- `ProxyAgentFactory` uses an LRU-style cache keyed by `proxyUrl|targetProtocol`.
-- Default cache size is `256`; invalid `maxCacheEntries` values fall back to this default.
-- Set `maxCacheEntries: 0` to disable caching.
-- Reuse one factory per process/service and call `reloadFromEnvironment()` or `updateSettings()` when proxy configuration rotates.
-- Call `destroy()`/`dispose()` on shutdown to close cached proxy agents.
+- Default cache size is `256`
+- Set `maxCacheEntries: 0` to disable caching
+- Reuse one long-lived `ProxyAgentFactory` per process/service
+- Call `reloadFromEnvironment()` when proxy env settings rotate
+- Call `destroy()`/`dispose()` on shutdown to close cached agents

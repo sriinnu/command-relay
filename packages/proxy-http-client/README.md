@@ -1,6 +1,10 @@
 # @commandrelay/proxy-http-client
 
-Proxy-aware JSON HTTP client for Node.js with strict protocol checks, timeout/abort controls, and typed errors.
+<p align="left">
+  <img src="./docs/assets/proxy-http-client-brand.svg" width="88" height="88" alt="Proxy HTTP Client brand mark" />
+</p>
+
+Proxy-aware JSON HTTP client for Node.js services and CLIs. Designed for reusable app-level integrations with strict protocol checks, timeout and abort controls, response size limits, and typed errors.
 
 ## Install
 
@@ -14,7 +18,25 @@ npm install @commandrelay/proxy-http-client
 - npm `>=9`
 - ESM package (`"type": "module"`)
 
-## Usage
+## Version support policy
+
+- Current line: `0.1.x`
+- While pre-`1.0`, pin minor versions in production (`~0.1.0`) to reduce unexpected breakage.
+
+## Export surface
+
+- `@commandrelay/proxy-http-client` (root API)
+- `@commandrelay/proxy-http-client/package.json` (metadata only)
+- Deep imports such as `@commandrelay/proxy-http-client/dist/*` are intentionally unsupported.
+
+## External Reuse
+
+- Keep this package at your app boundary (`/infra/http` or similar), not inside business logic.
+- Set `timeoutMs` and `maxResponseBytes` per upstream SLA and payload profile.
+- Convert library errors into app-specific domain errors at one place.
+- For rollout guidance, use [NOTES.md](./NOTES.md).
+
+## Quick Start
 
 ```ts
 import { requestJson } from "@commandrelay/proxy-http-client";
@@ -28,10 +50,28 @@ const response = await requestJson<HealthResponse>("https://api.example.com/heal
   timeoutMs: 5_000
 });
 
-console.log(response.status, response.body);
+console.log(response.status, response.body?.ok);
 ```
 
-### With proxy resolution (`@commandrelay/proxy-agent`)
+## Integration Patterns
+
+### 1) App-scoped API client wrapper
+
+```ts
+import { requestJson } from "@commandrelay/proxy-http-client";
+
+type User = { id: string; email: string };
+
+export async function getUserById(baseUrl: string, id: string): Promise<User | null> {
+  const result = await requestJson<User>(`${baseUrl}/users/${id}`, {
+    timeoutMs: 3_000,
+    maxResponseBytes: 256_000
+  });
+  return result.body;
+}
+```
+
+### 2) Proxy-aware requests (`@commandrelay/proxy-agent`)
 
 ```ts
 import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
@@ -45,16 +85,36 @@ const proxyResolver: ProxyAgentResolver = {
   }
 };
 
-const result = await requestJson<{ id: string }>("https://api.example.com/users/123", {
+await requestJson("https://api.example.com/metrics", {
   method: "GET",
   proxyResolver,
   timeoutMs: 8_000
 });
-
-console.log(result.body?.id);
 ```
 
-## API
+### 3) Boundary error mapping
+
+```ts
+import {
+  HttpStatusError,
+  RequestTimeoutError,
+  ResponseSizeLimitError,
+  requestJson
+} from "@commandrelay/proxy-http-client";
+
+export async function fetchProfile(userId: string) {
+  try {
+    return await requestJson(`https://api.example.com/profiles/${userId}`);
+  } catch (error) {
+    if (error instanceof RequestTimeoutError) throw new Error("upstream_timeout");
+    if (error instanceof ResponseSizeLimitError) throw new Error("upstream_payload_too_large");
+    if (error instanceof HttpStatusError) throw new Error(`upstream_http_${error.status}`);
+    throw error;
+  }
+}
+```
+
+## API Summary
 
 ```ts
 async function requestJson<TBody = unknown>(
@@ -93,49 +153,15 @@ Exported error classes:
 - `JsonParseError`
 - `ResponseSizeLimitError`
 
-## Error handling example
+## Security and Ops Notes
 
-```ts
-import {
-  HttpStatusError,
-  JsonParseError,
-  ProxyResolutionError,
-  ResponseSizeLimitError,
-  RequestTimeoutError,
-  requestJson
-} from "@commandrelay/proxy-http-client";
+- Only `http:` and `https:` URLs are accepted; unsupported protocols throw `UnsupportedProtocolError`.
+- Request bodies are always JSON-serialized when `body` is provided.
+- Default response size cap is `1 MiB` to bound memory use.
+- Proxy resolver failures are wrapped into `ProxyResolutionError` with a `cause`.
+- Avoid logging raw payloads when handling `HttpStatusError` or `JsonParseError`.
 
-try {
-  await requestJson("https://api.example.com/data", { timeoutMs: 1_500 });
-} catch (error) {
-  if (error instanceof RequestTimeoutError) {
-    console.error("Timeout", error.timeoutMs, error.target);
-  } else if (error instanceof HttpStatusError) {
-    console.error("HTTP failure", error.status, error.body);
-  } else if (error instanceof JsonParseError) {
-    console.error("Response was not valid JSON", error.rawBody);
-  } else if (error instanceof ResponseSizeLimitError) {
-    console.error("Response payload too large", error.maxBytes, error.receivedBytes);
-  } else if (error instanceof ProxyResolutionError) {
-    console.error("Proxy resolution failed for", error.target);
-  } else {
-    throw error;
-  }
-}
-```
+## Docs and Assets
 
-## Security notes
-
-- Only `http:` and `https:` request URLs are accepted; `ws:`/`wss:` are rejected.
-- Request body is always JSON-serialized when `body` is provided.
-- Response body size is capped to `1 MiB` by default to limit memory growth on oversized payloads.
-- Proxy resolver failures are wrapped as `ProxyResolutionError` with `cause`.
-- Avoid logging sensitive payloads or raw response bodies in production logs.
-
-## Performance notes
-
-- Default timeout is `8000ms`; tune per endpoint SLA.
-- Default response size cap is `1048576` bytes; increase `maxResponseBytes` for known large payloads.
-- Reuse a long-lived proxy resolver (for example `ProxyAgentFactory`) to maximize agent/cache reuse.
-- Set `throwOnHttpError: false` for hot paths that prefer branch handling over exception control flow.
-- Inject `transport` only for tests or specialized runtime adapters.
+- [Integration note](./NOTES.md)
+- [Brand SVG](./docs/assets/proxy-http-client-brand.svg)
