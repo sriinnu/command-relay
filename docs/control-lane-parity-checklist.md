@@ -15,7 +15,7 @@ Scope:
 Weekly checkpoint expectation:
 1. Every `P0` row has green automated coverage.
 2. Every `P0` row has at least one fresh manual run note (iOS + web).
-3. Any `Gap` row is tracked in `TODO.md` and `docs/roadmap-native.md`.
+3. Any `Gap` row is tracked in `docs/TODO.md` and `docs/roadmap-native.md`.
 
 ## Automated Test Commands
 

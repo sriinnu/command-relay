@@ -30,7 +30,7 @@ Use this skill when requests involve any of:
 ## Standard Workflow
 
 1. **Load context**
-   - Read `README.md`, `TODO.md`, `AGENTS.md`.
+   - Read `README.md`, `docs/TODO.md`, `AGENTS.md`.
    - Check key docs: `docs/protocol-v1.md`, `docs/security.md`, `docs/operations.md`.
 2. **Plan in parallel**
    - Split into narrow work streams and spawn agents with clear file ownership.
@@ -101,7 +101,7 @@ A task is done only when all are true:
 ## High-Signal References
 
 1. `README.md`
-2. `TODO.md`
+2. `docs/TODO.md`
 3. `docs/protocol-v1.md`
 4. `docs/security.md`
 5. `docs/operations.md`
