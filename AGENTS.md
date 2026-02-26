@@ -3,10 +3,11 @@
 These rules are mandatory for all code changes in this project.
 
 # How codex must perform
-- spawn agents as needed
+- permanent rule: always spawn agents for substantial tasks when work is parallelizable.
 - use chitragupta mcp - as a good agentic assistant.
+- permanent rule: use Chitragupta MCP agentic delegation tools in each substantial cycle.
 - use worktress outside of the repo workspace - multiple worktrees for agents. (distilled code instead of full copy of the codebase - as long as you know what to do and how to do, you can have a copy of the the agents.md or claude.md)
-- always use Chitragupta as a co-orchestrator agent, run periodic stress/health checks on his agentic capabilities, and report any failures or regressions immediately.
+- permanent rule: always run Chitragupta co-orchestrator checks in each substantial cycle; report failures or regressions immediately.
 - branch workflow: before creating a new branch, push current work via PR, merge to `main`, then create the next branch from latest `origin/main`.
 
 ## Distilled Context Orchestration Policy (Cost + Leakage)

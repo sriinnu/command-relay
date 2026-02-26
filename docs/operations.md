@@ -111,10 +111,10 @@ Operational notes:
 2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
 3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
 
-## Distilled Capsule + Brief Operations
+## Distilled Capsule + Brief + Dispatch Operations
 
-Use capsule + brief generation to reduce token cost and prevent context leakage.
-CLI commands: `npm run capsule:build --` (capsule JSON) and `npm run capsule:brief --` (brief from capsule).
+Use capsule + brief + dispatch generation to reduce token cost and prevent context leakage.
+CLI commands: `npm run capsule:build --` (capsule JSON), `npm run capsule:brief --` (brief from capsule), and `npm run capsule:dispatch --` (dispatch payload from brief).
 
 Policy:
 
@@ -154,9 +154,20 @@ npm run capsule:brief -- \
   --path docs/README.md \
   --path skills/termina-orchestrator/SKILL.md \
   --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md
+
+npm run capsule:dispatch -- \
+  --brief /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md \
+  --task "Update docs distilled workflow section and skill references" \
+  --owner docs-brief-owner \
+  --path docs/operations.md \
+  --path docs/README.md \
+  --path skills/termina-orchestrator/SKILL.md \
+  --agent-type worker \
+  --instruction "You are not alone in the codebase; respect owned file scope." \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.dispatch.json
 ```
 
-`capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload.
+`capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload; `capsule:dispatch` packages the brief for agent handoff.
 
 ## Missing `tsx` Recovery
 

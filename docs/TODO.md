@@ -131,6 +131,7 @@ Owner scope: iOS first, Android second, web fallback last.
 - [x] Author iOS/web parity checklist for control-lane flows and map each item to an automated/manual test (`docs/control-lane-parity-checklist.md`, completed 2026-02-25).
 - [x] Add two gateway fixture scenarios for lane conflict + explicit takeover (iOS writer -> web takeover, web writer -> iOS takeover) (`src/server/bridge-server.policy.test.ts`, completed 2026-02-25).
 - [x] Document distilled capsule-to-brief wiring (`npm run capsule:build --` -> `npm run capsule:brief --`) in operations/docs/skill guidance (`docs/operations.md`, `docs/README.md`, `skills/termina-orchestrator/SKILL.md`, completed 2026-02-26).
+- [x] Document distilled capsule-to-dispatch wiring (`npm run capsule:build --` -> `npm run capsule:brief --` -> `npm run capsule:dispatch --`) in operations/docs/skill guidance (`docs/operations.md`, `docs/README.md`, `skills/termina-orchestrator/SKILL.md`, completed 2026-02-26).
 
 ## Weekly Cross-Platform Checkpoint Runbook
 

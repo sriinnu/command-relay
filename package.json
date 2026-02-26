@@ -12,6 +12,7 @@
     "dev": "tsx watch src/index.ts",
     "capsule:build": "node --import tsx scripts/orchestration/build-task-capsule.ts",
     "capsule:brief": "node --import tsx scripts/orchestration/build-agent-brief.ts",
+    "capsule:dispatch": "node --import tsx scripts/orchestration/build-agent-dispatch.ts",
     "check": "npm run check:root && npm run check:orchestration",
     "check:root": "tsc --noEmit",
     "check:orchestration": "tsc --noEmit -p tsconfig.orchestration.json",
