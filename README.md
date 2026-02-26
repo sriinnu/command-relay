@@ -1,212 +1,113 @@
-# CommandRelay
+# CommandRelay (Termina)
 
-CommandRelay is a secure, bi-directional remote terminal bridge for long-running AI coding sessions.
+<p align="left">
+  <img src="docs/brand/commandrelay-logo.svg" alt="CommandRelay logo" width="104" height="104" />
+</p>
 
-Use it to remotely observe and control terminal sessions running on your home machine (Mac first), including Codex, Claude, and shell workflows.
+CommandRelay is a secure, bi-directional terminal control gateway for long-running coding sessions.
 
-> **One-line:** Secure remote `tmux` bridge for streaming and controlling long-running AI terminal sessions.
-> **Short description:** TypeScript/Node.js gateway with WebSocket streaming, replay, audit logs, and read-only-by-default guarded input.
+It lets you monitor and control home-machine terminal sessions (tmux and ghostty/cmux runtime) from remote clients, with replay, guarded input, and auditability.
 
-## Table of Contents
+## Why This Exists
 
-1. [Vision](#vision)
-2. [Product Principles](#product-principles)
-3. [Naming Strategy](#naming-strategy)
-4. [System Architecture](#system-architecture)
-5. [ASCII Dataflow Diagram](#ascii-dataflow-diagram)
-6. [ASCII Sequence Diagram](#ascii-sequence-diagram)
-7. [ASCII State Diagram](#ascii-state-diagram)
-8. [Core Capabilities](#core-capabilities)
-9. [Security Model](#security-model)
-10. [Networking Decision](#networking-decision)
-11. [Technical Scope and Roadmap](#technical-scope-and-roadmap)
-12. [Documentation](#documentation)
-13. [Status](#status)
-14. [License](#license)
+Long AI coding sessions run for hours while you are away from your main machine.
 
-## Vision
+CommandRelay gives you one control surface to:
 
-CommandRelay bridges idle-time gaps and distance.
+1. See active terminal sessions.
+2. Reattach after disconnects.
+3. Send commands safely when needed.
+4. Keep read-only mode as default.
 
-During long windows where your home terminals remain active, you should be able to:
+## What You Get
 
-1. Open a browser or app from anywhere.
-2. View all active sessions in one place.
-3. Send commands safely with low latency.
-4. Recover context after disconnects or long idle periods.
+1. WebSocket event protocol with strict envelope validation.
+2. Replay-aware terminal output streaming (`streamSeq` + `attach(lastSeq)`).
+3. Guarded input flow: `enable_input` -> `input` -> `disable_input`.
+4. Kill switch and lane-ownership controls.
+5. Runtime backend multiplexer (`tmux`, `cmux`) with backend-aware pane/session routing.
+6. Proxy package ecosystem for reusable outbound proxy behavior.
 
-## Product Principles
+## Architecture
 
-1. Reliability over novelty.
-2. Secure-by-default remote control.
-3. Low operational burden.
-4. Cross-platform direction with adapter-based backend.
-5. Public-facing clarity with internal naming depth.
-
-## Naming Strategy
-
-CommandRelay uses dual naming:
-
-1. Internal code names: Vedic/Sanskrit identifiers for modules and services.
-2. Public aliases: clear English names for docs, APIs, and UI.
-
-| Internal Name | Public Alias |
-| --- | --- |
-| `Setu` | Relay Bridge |
-| `Dvara` | Gateway |
-| `Akasha` | Event Bus |
-| `Smriti` | Session Memory |
-| `Raksha` | Security Layer |
-
-Rule: public interfaces default to English aliases.
-
-## System Architecture
-
-Primary stack:
-
-1. Session runtime: `tmux` on Mac/Linux/WSL.
-2. Bridge daemon: local service on the home machine.
-3. Transport: WebSocket for real-time stream + input.
-4. Client: `xterm.js` web UI, later Electron wrapper.
-5. Access network: Tailscale private mesh.
-
-## ASCII Dataflow Diagram
+### Runtime Topology
 
 ```text
-+---------------------+                            +------------------------------+
-| Remote Browser/App  |                            | Home Machine (MacBook)       |
-| - xterm.js UI       |                            |                              |
-| - Session list      |   Encrypted Private Link   |  +------------------------+  |
-| - Command input     | <------------------------> |  | CommandRelay Gateway   |  |
-+----------+----------+      (Tailscale/WireGuard) |  | - Auth / ACL           |  |
-           |                                       |  | - Session Router       |  |
-           | WebSocket (events)                    |  | - Replay Buffer        |  |
-           v                                       |  +-----------+------------+  |
-+---------------------+                            |              |               |
-| JSON Event Channel  |                            |              |               |
-| input/output/ack    |                            |      +-------v--------+      |
-+---------------------+                            |      | tmux Adapter    |      |
-                                                   |      | - list panes    |      |
-                                                   |      | - capture pane  |      |
-                                                   |      | - send keys     |      |
-                                                   |      +-------+--------+      |
-                                                   |              |               |
-                                                   |      +-------v--------+      |
-                                                   |      | tmux Server     |      |
-                                                   |      | sessions/windows|      |
-                                                   |      | panes (agents)  |      |
-                                                   |      +-----------------+      |
-                                                   +------------------------------+
+Remote Client (web/iOS/android/macos)
+            |
+            |  WS (/ws)
+            v
++-----------------------------------+
+| CommandRelay Gateway (Node/TS)    |
+| - Auth / policy / limits          |
+| - Replay + output stream engine   |
+| - Input lane arbitration          |
++----------------+------------------+
+                 |
+                 | Runtime multiplexer
+                 v
+     +-------------------+-------------------+
+     |                                       |
++----+------------------+        +-----------+-----------+
+| tmux backend adapter  |        | cmux backend adapter  |
+| pane ids: %1, %2 ...  |        | pane ids: surface-*   |
++-----------------------+        +-----------------------+
 ```
 
-## ASCII Sequence Diagram
+### Event Flow (Condensed)
 
 ```text
-Actors:
-  U = User Client (Browser/Electron)
-  G = CommandRelay Gateway
-  T = tmux Adapter
-  M = tmux Pane (Codex/Claude Shell)
-
-1) Connect and Authenticate
-U -> G : WS connect + auth token
-G -> U : auth_ok + capability set (view/input)
-
-2) Discover Sessions
-U -> G : list_sessions
-G -> T : query sessions/windows/panes
-T -> G : session inventory
-G -> U : session_list
-
-3) Attach and Stream
-U -> G : attach(pane_id)
-G -> T : capture + subscribe pane
-T -> G : replay buffer (last N lines)
-G -> U : ack(action=attach) + output(snapshot/delta)
-
-4) Send Input (bi-directional control)
-U -> G : input(pane_id, "git status\n")
-G -> T : send-keys pane_id
-T -> M : keystrokes delivered
-M -> T : output lines
-T -> G : pane_output
-G -> U : output event
-
-5) Idle / Resume
-U -> G : attach(pane_id,lastSeq)
-G -> U : replay missed events + heartbeat schedule
+Client -> hello/auth -> list_sessions -> attach(paneId,lastSeq)
+Server -> session_list -> output(snapshot/delta, streamSeq)
+Client -> enable_input -> input -> disable_input
+Server -> ack/error + policy_update
 ```
 
-## ASCII State Diagram
+### Safety State Model
 
 ```text
-Legend:
-  [] = state
-  --> = transition
-
-[DISCONNECTED]
-  --> connect_request --> [CONNECTING]
-
-[CONNECTING]
-  --> auth_ok ---------> [AUTHENTICATED_READ_ONLY]
-  --> auth_fail -------> [TERMINATED]
-  --> timeout ---------> [DISCONNECTED]
-
-[AUTHENTICATED_READ_ONLY]
-  --> attach_pane -----> [STREAMING_READ_ONLY]
-  --> enable_input ----> [AUTHENTICATED_INPUT_ENABLED]
-
-[AUTHENTICATED_INPUT_ENABLED]
-  --> attach_pane -----> [STREAMING_INPUT_ENABLED]
-  --> disable_input ---> [AUTHENTICATED_READ_ONLY]
-
-[STREAMING_READ_ONLY]
-  --> enable_input ----> [STREAMING_INPUT_ENABLED]
-  --> socket_drop ------> [DISCONNECTED]
-
-[STREAMING_INPUT_ENABLED]
-  --> idle_threshold ---> [IDLE_CONNECTED]
-  --> disable_input ----> [STREAMING_READ_ONLY]
-  --> socket_drop ------> [DISCONNECTED]
-
-[IDLE_CONNECTED]
-  --> output_event -----> [STREAMING_INPUT_ENABLED]
-  --> socket_drop ------> [DISCONNECTED]
-
-[Any Active State]
-  --> admin_kill -------> [TERMINATED]
+DISCONNECTED
+  -> AUTHENTICATED_READ_ONLY
+  -> STREAMING_READ_ONLY
+  -> STREAMING_INPUT_ENABLED (explicit only)
+  -> READ_ONLY (disable_input / kill switch / disconnect)
 ```
 
-## Core Capabilities
+## Runtime Backends (tmux + ghostty/cmux)
 
-1. Multi-session view of active terminal panes.
-2. Real-time output streaming.
-3. Bi-directional command/input channel.
-4. Reconnect with replay buffer after idle gaps.
-5. Session-level read-only and input-enabled modes.
-6. Audit trail for remote commands and target panes.
+Configure runtime backends with:
 
-## Bridge Runtime (Implemented)
+```bash
+COMMANDRELAY_RUNTIME_BACKENDS=tmux
+# or
+COMMANDRELAY_RUNTIME_BACKENDS=tmux,cmux
+```
 
-The `tmux` core bridge engine is implemented in TypeScript and runs with `tsx` on Node.js `>=22`.
+Optional cmux command override:
 
-Code paths:
+```bash
+COMMANDRELAY_CMUX_COMMAND=/opt/homebrew/bin/cmux
+```
 
-1. `src/tmux/tmux-adapter.ts` - tmux discovery, pane capture, and input dispatch.
-2. `src/bridge/bridge-engine.ts` - polling stream engine with replay-by-sequence.
-3. `src/server/bridge-server.ts` - HTTP + WebSocket server with auth, limits, and audit hooks.
+Notes:
 
-Current runtime and package baseline:
+1. Default backend set is `tmux`.
+2. In multi-backend mode, pane IDs are backend-namespaced (`tmux:%1`, `cmux:surface-1`).
+3. Startup logs availability per backend.
+4. Startup fails only when all configured backends are unavailable in non-tmux-only mode.
 
-1. Runtime: Node.js `>=22` with ESM (`"type": "module"`).
-2. TypeScript toolchain: `tsx` for run/dev and `typescript` for static checks.
-3. Transport: `ws` for gateway WebSocket connectivity.
-4. Outbound proxy package model: `@commandrelay/proxy-core`, `@commandrelay/proxy-agent`, `@commandrelay/proxy-http-client`.
-5. Proxy package internals use: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
-6. Startup currently parses proxy env and initializes a proxy factory for diagnostics; control-plane outbound wiring remains module-level (`src/control-plane/control-plane-client.ts`).
-7. Planned ecosystem split: iOS (Swift) first, Android (Kotlin) second, web fallback last.
+## Security Model
 
-Run locally:
+CommandRelay is secure-by-default:
+
+1. Read-only mode on connect.
+2. Explicit input enable required.
+3. Global kill switch available.
+4. Per-client input rate limits and max payload limits.
+5. Pane ownership arbitration to prevent silent concurrent writers.
+6. Audit logging support for auth/input/policy events.
+
+## Quick Start
 
 ```bash
 npm install
@@ -214,157 +115,97 @@ npm run check
 npm start
 ```
 
-Health endpoint:
+Default endpoints:
 
-```text
-GET /health
-```
+1. Health: `GET http://127.0.0.1:8787/health`
+2. Web app (if enabled): `http://127.0.0.1:8787/app/`
+3. WebSocket: `ws://127.0.0.1:8787/ws`
 
-WebSocket endpoint:
+## Core Environment Variables
 
-```text
-ws://127.0.0.1:8787/ws
-```
+| Variable | Purpose |
+| --- | --- |
+| `COMMANDRELAY_AUTH_TOKEN` | Token auth for non-loopback binds |
+| `COMMANDRELAY_RUNTIME_BACKENDS` | Runtime backend list (`tmux,cmux`) |
+| `COMMANDRELAY_CMUX_COMMAND` | cmux executable/path override |
+| `COMMANDRELAY_INPUT_KILL_SWITCH` | Global input disable switch |
+| `COMMANDRELAY_ALLOW_INPUT_OVERRIDE` | Allow explicit pane ownership takeover |
+| `COMMANDRELAY_MAX_INPUT_BYTES` | Max input payload bytes |
+| `COMMANDRELAY_MAX_MSG_PER_MIN` | Per-client message rate limit |
+| `COMMANDRELAY_MAX_INPUT_PER_MIN` | Per-client input rate limit |
+| `COMMANDRELAY_STRICT_PROTOCOL_PARSING` | Strict envelope parsing toggle |
+| `COMMANDRELAY_APP_STATIC_ENABLED` | Enable/disable static web app hosting |
+| `COMMANDRELAY_APP_STATIC_DIR` | Static app root |
+| `COMMANDRELAY_AUDIT_LOG` | Audit JSONL path |
+| `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY` | Outbound proxy settings |
 
-Important env vars:
+## Protocol and Behavior
 
-1. `COMMANDRELAY_AUTH_TOKEN` - optional static auth token.
-2. `COMMANDRELAY_APP_STATIC_ENABLED` - enable/disable static web app hosting (`true` by default).
-3. `COMMANDRELAY_APP_STATIC_DIR` - static web app directory root (`apps/web` by default).
-4. `COMMANDRELAY_AUDIT_LOG` - optional JSONL path for audit events.
-5. `COMMANDRELAY_INPUT_KILL_SWITCH` - global input disable switch.
-6. `COMMANDRELAY_ALLOW_INPUT_OVERRIDE` - allow/disallow pane ownership takeover.
-7. `COMMANDRELAY_MAX_INPUT_BYTES` - input payload guardrail.
-8. `COMMANDRELAY_MAX_MSG_PER_MIN` - per-client message rate limit.
-9. `COMMANDRELAY_MAX_INPUT_PER_MIN` - per-client input rate limit.
-10. `COMMANDRELAY_STRICT_PROTOCOL_PARSING` (or legacy `COMMANDRELAY_STRICT_V1`) - strict WebSocket envelope parsing toggle (`true` by default).
-11. `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` - proxy settings consumed by proxy packages and control-plane client paths; startup currently parses/logs these settings.
+Primary protocol docs:
 
-## Web App Usage (Current Runtime)
+1. `docs/protocol-v1.md` (normative contract)
+2. `docs/protocol.md` (operator-facing summary)
+3. `docs/security.md` (threat model + controls)
 
-Route surface exposed by `src/server/bridge-server.ts`:
+`list_sessions` behavior in multi-backend mode:
 
-1. `GET /health` (exact path) returns JSON status payload.
-2. When `COMMANDRELAY_APP_STATIC_ENABLED=true` (default), `GET /` and `GET /app` return `308` to `/app/`, and static files are served on `GET /app/` and `GET /app/<path>` from `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` default).
-3. Path traversal and missing static targets return `404` with `{ "error": "not_found" }`.
-4. Non-matching HTTP routes return `404` with `{ "error": "not_found" }`.
-5. WebSocket upgrade is accepted only on exact path `/ws`; non-`/ws` upgrades are rejected.
+1. `payload.panes[]` include backend-aware pane ids.
+2. `payload.sessions[]` are grouped by `(backendId, sessionName)` to avoid cross-backend session-name collisions.
 
-Auth token handling:
+## Validation
 
-1. On connect, server emits `hello` with `requiresAuth` and `clientId`.
-2. If `requiresAuth=true`, client must send `auth` with `payload.token` before non-`auth` messages.
-3. If `requiresAuth=false` (open mode), the client is already authenticated.
-4. Before successful auth (token mode), non-`auth` requests are rejected with `error.code=auth_required`.
-5. Success returns `auth_ok` (`mode=token`); invalid token returns `auth_error` (`code=invalid_token`).
-6. Token auth is protocol-message based; the bridge does not use HTTP `Authorization` headers for `/ws`.
-
-Keyboard/input workflow (web UI or any client):
-
-1. Commands are sent via `input.payload.data` (string).
-2. `\n` is treated as Enter; bridge sends `C-m` between newline-separated segments.
-3. Input is accepted only after `enable_input`, and only for panes attached by that same client.
-4. Input lane ownership is per WebSocket client (`clientId`); non-owner input gets `error.code=input_lane_conflict`.
-5. Ownership takeover requires `input.payload.override=true` (or `takeOwnership=true`) and `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=true`; see [`docs/security.md`](docs/security.md).
-
-## Security Model
-
-Baseline controls:
-
-1. Read-only by default.
-2. Explicit input enable per session.
-3. Authenticated clients only.
-4. Authorization policy by session/pane.
-5. Rate limits and payload size limits.
-6. Auditable input events and admin actions.
-7. Emergency global input disable switch.
-
-## Remote Control Reliability & Safety Notes
-
-Implementation notes and primary references for tmux control mode, WebSocket heartbeat handling, and lease/locking-based input safety are documented in:
-
-- [`docs/architecture.md`](docs/architecture.md)
-
-## Networking Decision
-
-Preferred: Tailscale private mesh.
-
-1. No static public IP requirement.
-2. End-to-end encrypted access.
-3. Reduced exposure and lower ops complexity.
-
-Public ingress should only be considered when private mesh is impossible.
-
-## Technical Scope and Roadmap
-
-### Phase 1
-
-1. `tmux` session discovery.
-2. Output stream + replay buffer.
-3. Input send path (`send-keys`).
-4. Basic auth + read-only toggle.
-
-### Phase 2
-
-1. Rich session dashboard UI.
-2. ACL policy controls.
-3. Audit and operational metrics.
-4. Launchd-managed production runtime.
-
-### Phase 3
-
-1. Electron desktop wrapper.
-2. Windows native adapter via ConPTY.
-3. Mobile-friendly read-only mode.
-
-## Mac Nightly Validation (Tonight)
-
-Run these commands in this exact order from Terminal on your Mac:
+Use these for repeatable validation (not date-bound):
 
 ```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-npm ci
-npm run check
+npm run check:root
+npm run test:root
+npm run ci:all
+```
+
+Targeted protocol/runtime checks:
+
+```bash
 node --import tsx --test src/protocol.conformance.test.ts
 node --import tsx --test src/server/ws-contract-matrix.test.ts
 node --import tsx --test src/server/bridge-server.policy.test.ts
-node --import tsx --test src/server/startup-validation.test.ts
-node --import tsx -e 'import { parseMessage } from "./src/protocol.ts"; const raw = JSON.stringify({ v: 1, type: "unknown_future_type", timestamp: 1_771_934_131_735, payload: {} }); console.log("STRICT_OFF", JSON.stringify(parseMessage(raw))); console.log("STRICT_ON", JSON.stringify(parseMessage(raw, { strictV1: true })));'
 ```
 
-Expected test footer for each `node --test` command:
+## Project Structure
 
 ```text
-# pass 1
-# fail 0
+src/
+  bridge/        replay + delta streaming engine
+  server/        ws/http gateway, policies, contract tests
+  runtime/       runtime mux + cmux adapter
+  tmux/          tmux adapter
+  net/           proxy routing and agent factory adapters
+packages/
+  proxy-core/
+  proxy-agent/
+  proxy-http-client/
+docs/
+  protocol, security, operations, roadmap, proxy ecosystem
+apps/
+  ios/, android/, web/
 ```
 
-Expected strict toggle output:
+## Documentation Map
 
-```text
-STRICT_OFF {"ok":true,...}
-STRICT_ON {"ok":false,"error":"unsupported_type"}
-```
+1. `docs/README.md` - full docs index
+2. `docs/getting-started.md` - setup and runbook
+3. `docs/operations.md` - operations and runtime handling
+4. `docs/roadmap-native.md` - iOS/Android/macos/web rollout
+5. `docs/proxy-ecosystem-roadmap.md` - proxy package expansion
 
-Use [`docs/getting-started.md`](docs/getting-started.md) for the full nightly checklist with per-step validation notes.
+## Project Status
 
-## Documentation
+The core TypeScript gateway is implemented, tested, and production-oriented for the tmux/cmux runtime path.
 
-See [`docs/README.md`](docs/README.md) for all user and contributor documentation.
+Active work continues on:
 
-Native-first planning and execution files:
-
-1. [`TODO.md`](TODO.md)
-2. [`docs/roadmap-native.md`](docs/roadmap-native.md)
-3. [`docs/ios-swift-architecture.md`](docs/ios-swift-architecture.md)
-4. [`docs/android-architecture.md`](docs/android-architecture.md)
-5. [`docs/proxy/package-model.md`](docs/proxy/package-model.md)
-6. [`docs/architecture/proxy-runtime-integration.md`](docs/architecture/proxy-runtime-integration.md)
-7. [`docs/proxy/security-performance.md`](docs/proxy/security-performance.md)
-
-## Status
-
-TypeScript bridge runtime is implemented and test-covered; native client milestones are tracked in the roadmap.
+1. Native client parity and UX hardening.
+2. Multi-runtime and control-lane reliability.
+3. Externalized `@commandrelay` / `@termina` proxy package line.
 
 ## License
 

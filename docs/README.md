@@ -20,7 +20,7 @@ Local MCP note:
 2. Contributor: read [Architecture](architecture.md), then [Protocol](protocol.md).
 3. Operator: read [Operations](operations.md) and [Security](security.md).
 4. Mobile builder: read [Getting Started](getting-started.md) for `M0ProtocolMockClient`, then [iOS Swift Architecture](ios-swift-architecture.md) and [Android Architecture](android-architecture.md).
-5. Planner: read [Native Roadmap](roadmap-native.md) and root [TODO](../TODO.md).
+5. Planner: read [Native Roadmap](roadmap-native.md) and [Execution TODO](TODO.md).
 
 ## Current Execution Baselines
 
@@ -43,3 +43,4 @@ Local MCP note:
 11. [control-lane-parity-checklist.md](control-lane-parity-checklist.md)
 12. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
 13. [research-next-opportunities.md](research-next-opportunities.md)
+14. [TODO.md](TODO.md)

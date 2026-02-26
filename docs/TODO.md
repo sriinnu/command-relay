@@ -140,7 +140,7 @@ Owner scope: iOS first, Android second, web fallback last.
 - [x] Weekly artifact to track in git:
   `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`
 - [ ] Post-sync tracking rule:
-  checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `TODO.md`.
+  checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `docs/TODO.md`.
 
 ## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-25)
 
