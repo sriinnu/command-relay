@@ -37,10 +37,10 @@ The following matrix maps the user-requested package family and next candidates.
 | `pac-resolver` | PAC resolution runtime | external dependency | P2 |
 | `proxy-agent` | auto protocol resolver | external dependency + compatibility target | P1 |
 | `proxy` | generic proxy utility surface | `@termina/proxy-runtime` candidate | P2 |
-| `cli-proxy` | operator CLI for proxy diagnostics | `@termina/cli-proxy` | P1 |
+| `cli-proxy` | operator CLI for proxy diagnostics (internal ready) | `@termina/cli-proxy` | P1 |
 | `ssh-proxy` | SSH tunnel proxy transport | `@termina/proxy-ssh` | P3 |
-| `@termina/proxy-undici` | Undici dispatcher adapter | internal new package | P1 |
-| `@termina/proxy-fetch` | Fetch adapter | internal new package | P1 |
+| `@termina/proxy-undici` | Undici dispatcher adapter (internal ready) | internal new package | P1 |
+| `@termina/proxy-fetch` | Fetch adapter (internal ready) | internal new package | P1 |
 | `@termina/proxy-got` | Got adapter | internal new package | P2 |
 | `@termina/proxy-axios` | Axios adapter | internal new package | P2 |
 
@@ -50,14 +50,31 @@ Priority scale:
 - `P2`: useful adapter/runtime expansion after P1.
 - `P3`: exploratory/advanced.
 
+## P1 Progress Snapshot (2026-02-26)
+
+1. `@termina/proxy-undici`: complete and internally ready.
+2. `@termina/cli-proxy`: complete and internally ready.
+3. `@termina/proxy-fetch`: complete and internally ready.
+4. `P2` can proceed (`proxy-axios`, `proxy-got`) once publish/release gates are cleared.
+
+## Package Discovery and Use Strategy
+
+1. Start with `@commandrelay/proxy-core` for environment parsing and route decisions.
+2. Add only one adapter layer per caller runtime:
+   - Node agent clients: `@commandrelay/proxy-agent`
+   - Undici clients: `@termina/proxy-undici`
+   - Fetch clients: `@termina/proxy-fetch`
+   - Operator diagnostics CLI: `@termina/cli-proxy`
+3. Use `@commandrelay/proxy-http-client` only when you need the guarded JSON boundary (typed errors, timeouts, body limits).
+4. Keep integrations on root exports only and avoid stacking multiple adapter packages in the same call path.
+
 ## Proposed Build Order
 
 1. Stabilize current 3-package line (`proxy-core`, `proxy-agent`, `proxy-http-client`) and publish `0.1.x`.
-2. Add `@termina/cli-proxy` diagnostics package (env dump, route explain, test target command).
-3. Add `@termina/proxy-undici` and `@termina/proxy-fetch` as first adapter line.
-4. Add `@termina/proxy-axios` and `@termina/proxy-got` based on adoption demand.
-5. Add optional `@termina/proxy-runtime` (refresh hooks, metrics, structured diagnostics).
-6. Evaluate `@termina/proxy-ssh` feasibility after runtime telemetry and threat model review.
+2. Keep `@termina/proxy-undici` as the completed reference adapter for P1.
+3. Start P2 adapters: `@termina/proxy-axios` and `@termina/proxy-got` based on adoption demand.
+4. Add optional `@termina/proxy-runtime` (refresh hooks, metrics, structured diagnostics).
+5. Evaluate `@termina/proxy-ssh` feasibility after runtime telemetry and threat model review.
 
 ## Security and Hardening Baseline
 

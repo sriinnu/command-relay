@@ -241,10 +241,11 @@ Reference roadmap: `docs/proxy-ecosystem-roadmap.md`.
 
 - [x] Harden current package line for external use (`@commandrelay/proxy-core`, `@commandrelay/proxy-agent`, `@commandrelay/proxy-http-client`) with reusable docs/assets/examples.
 - [ ] Publish/validate adapter ecosystem package plan and naming contract (`@termina/proxy-*`).
-- [ ] P1 package wave:
-  - `@termina/cli-proxy`
+- [ ] P1 package wave (active):
+  - [x] `@termina/cli-proxy` (`packages/cli-proxy`, diagnostics CLI + JSON/human modes + tests/docs/assets completed on 2026-02-26)
   - [x] `@termina/proxy-undici` (`packages/proxy-undici`, check/build/test + docs/assets/examples complete on 2026-02-26)
-  - `@termina/proxy-fetch`
+  - [x] `@termina/proxy-fetch` (`packages/proxy-fetch`, fetch adapter + JSON/timeout/size guards + tests/docs/assets completed on 2026-02-26)
+- [x] P1 exit criteria: `@termina/cli-proxy` + `@termina/proxy-fetch` both pass check/build/test and include README + NOTES + SVG branding assets.
 - [ ] P2 package wave:
   - `@termina/proxy-axios`
   - `@termina/proxy-got`

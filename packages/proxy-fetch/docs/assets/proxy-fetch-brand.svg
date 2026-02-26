@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Proxy Fetch Brand Mark</title>
+  <desc id="desc">Shielded network nodes connected by a routed path.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A3042" />
+      <stop offset="100%" stop-color="#0F6E7B" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" />
+  <path d="M64 24l28 10v23c0 20-12 37-28 47-16-10-28-27-28-47V34l28-10z" fill="#D8F4F7" opacity="0.94" />
+  <circle cx="48" cy="58" r="8" fill="#0A3042" />
+  <circle cx="80" cy="58" r="8" fill="#0A3042" />
+  <circle cx="64" cy="82" r="8" fill="#0A3042" />
+  <path d="M54 58h20M52 63l10 14M76 63l-10 14" stroke="#0A3042" stroke-width="4" stroke-linecap="round" fill="none" />
+</svg>
