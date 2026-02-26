@@ -12,10 +12,10 @@ on:
           - dry-run
           - publish
       package_selector:
-        description: "Wildcard filter for full package names"
+        description: "Comma-separated wildcard filters for package names"
         required: false
         type: string
-        default: "@commandrelay/proxy-*"
+        default: "@commandrelay/proxy-*,@termina/proxy-*"
       dist_tag:
         description: "npm dist-tag"
         required: false
@@ -51,6 +51,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Select proxy packages
         id: select
         shell: bash
@@ -69,7 +74,7 @@ jobs:
           set -euo pipefail
 
           run_mode="dry-run"
-          selector="@commandrelay/proxy-*"
+          selector="@commandrelay/proxy-*,@termina/proxy-*"
           dist_tag="latest"
 
           if [[ "$EVENT_NAME" == "release" ]]; then
@@ -88,7 +93,7 @@ jobs:
             fi
 
             run_mode="publish"
-            selector="@commandrelay/proxy-*"
+            selector="@commandrelay/proxy-*,@termina/proxy-*"
             dist_tag="latest"
 
             if [[ "$RELEASE_PRERELEASE" == "true" ]]; then
@@ -131,19 +136,29 @@ jobs:
           const fs = require('node:fs');
           const path = require('node:path');
 
-          const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*';
+          const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*,@termina/proxy-*';
           const packagesDir = path.resolve('packages');
 
           const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
-          const selectorRegex = new RegExp(
-            '^' +
-              selector
-                .split('*')
-                .map((part) => part.split('?').map(escapeRegExp).join('.'))
-                .join('.*') +
-              '$'
+          const selectorPatterns = selector
+            .split(',')
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0);
+          const selectorRegexes = selectorPatterns.map(
+            (pattern) =>
+              new RegExp(
+                '^' +
+                  pattern
+                    .split('*')
+                    .map((part) => part.split('?').map(escapeRegExp).join('.'))
+                    .join('.*') +
+                  '$'
+              )
           );
-          const packageNameRegex = /^@commandrelay\/proxy-[a-z0-9][a-z0-9-]*$/;
+          if (selectorRegexes.length === 0) {
+            throw new Error(`No valid selector patterns found in "${selector}"`);
+          }
+          const packageNameRegex = /^@[^/]+\/proxy-[a-z0-9][a-z0-9-]*$/;
 
           const selected = [];
           if (fs.existsSync(packagesDir)) {
@@ -172,7 +187,7 @@ jobs:
                 continue;
               }
 
-              if (!selectorRegex.test(pkg.name)) {
+              if (!selectorRegexes.some((regex) => regex.test(pkg.name))) {
                 continue;
               }
 

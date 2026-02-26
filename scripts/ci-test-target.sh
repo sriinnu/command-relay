@@ -11,9 +11,10 @@ Usage: scripts/ci-test-target.sh <target> [tap_file]
 Targets:
   root
   web-smoke
-  proxy-core
-  proxy-agent
-  proxy-http-client
+  package:<package-dir>
+  proxy-core (legacy alias for package:proxy-core)
+  proxy-agent (legacy alias for package:proxy-agent)
+  proxy-http-client (legacy alias for package:proxy-http-client)
 
 Optional environment variables:
   WEB_SMOKE_DIR   Relative or absolute path to the web app root for web-smoke target.
@@ -59,6 +60,32 @@ write_skip_tap() {
     echo "TAP version 13"
     echo "1..0 # SKIP ${reason}"
   } >"${tap_file}"
+}
+
+package_has_script() {
+  local package_json="$1"
+  local script_name="$2"
+
+  node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const scripts = pkg.scripts ?? {};
+process.exit(Object.prototype.hasOwnProperty.call(scripts, process.argv[2]) ? 0 : 1);
+' "${package_json}" "${script_name}"
+}
+
+read_package_name() {
+  local package_json="$1"
+
+  node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (typeof pkg.name === "string" && pkg.name.length > 0) {
+  process.stdout.write(pkg.name);
+  process.exit(0);
+}
+process.stdout.write("unknown-package");
+' "${package_json}"
 }
 
 run_node_tap() {
@@ -278,125 +305,68 @@ run_root() {
     "${test_files[@]}"
 }
 
-run_proxy_core() {
+run_package_test() {
   local tap_file="$1"
-  local pkg_dir="${REPO_ROOT}/packages/proxy-core"
-  local -a test_files=()
+  local package_dir_name="$2"
+  local pkg_dir="${REPO_ROOT}/packages/${package_dir_name}"
+  local package_json="${pkg_dir}/package.json"
+  local package_name
   local log_file
   log_file="$(mktemp)"
 
-  mapfile -t test_files < <(
-    cd "${pkg_dir}"
-    find test -type f -name '*.test.ts' | LC_ALL=C sort
-  )
-
-  if [[ "${#test_files[@]}" -eq 0 ]]; then
-    echo "No TypeScript tests found in ${pkg_dir}/test" >"${log_file}"
-    write_failure_tap "${tap_file}" "proxy-core tests" "No test files matched." "${log_file}"
+  if [[ ! "${package_dir_name}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+    echo "Invalid package directory selector: ${package_dir_name}" >"${log_file}"
+    write_failure_tap "${tap_file}" "package tests" "Invalid package selector." "${log_file}"
     rm -f "${log_file}"
     return 1
   fi
 
-  rm -f "${log_file}"
-  run_node_tap \
-    "${pkg_dir}" \
-    "${tap_file}" \
-    --test \
-    --import tsx \
-    --test-reporter=tap \
-    --test-concurrency=1 \
-    "${test_files[@]}"
-}
-
-run_proxy_agent() {
-  local tap_file="$1"
-  local pkg_dir="${REPO_ROOT}/packages/proxy-agent"
-  local -a test_files=()
-  local log_file
-  log_file="$(mktemp)"
-
-  mapfile -t test_files < <(
-    cd "${pkg_dir}"
-    find test -type f -name '*.test.ts' | LC_ALL=C sort
-  )
-
-  if [[ "${#test_files[@]}" -eq 0 ]]; then
-    echo "No TypeScript tests found in ${pkg_dir}/test" >"${log_file}"
-    write_failure_tap "${tap_file}" "proxy-agent tests" "No test files matched." "${log_file}"
+  if [[ ! -f "${package_json}" ]]; then
+    echo "Missing package.json: ${package_json}" >"${log_file}"
+    write_failure_tap "${tap_file}" "package tests" "Package definition not found." "${log_file}"
     rm -f "${log_file}"
     return 1
   fi
 
-  rm -f "${log_file}"
-  run_node_tap \
-    "${pkg_dir}" \
-    "${tap_file}" \
-    --test \
-    --import tsx \
-    --test-reporter=tap \
-    --test-concurrency=1 \
-    "${test_files[@]}"
-}
+  package_name="$(read_package_name "${package_json}")"
 
-run_proxy_http_client() {
-  local tap_file="$1"
-  local pkg_dir="${REPO_ROOT}/packages/proxy-http-client"
-  local build_dir="${pkg_dir}/.test-dist"
-  local tsc_bin="${REPO_ROOT}/node_modules/.bin/tsc"
-  local compile_log
-  local log_file
-  local -a compiled_tests=()
-  local status=0
-  compile_log="$(mktemp)"
-  log_file="$(mktemp)"
-
-  if [[ ! -x "${tsc_bin}" ]]; then
-    echo "TypeScript compiler not found at ${tsc_bin}" >"${log_file}"
-    write_failure_tap "${tap_file}" "proxy-http-client compile" "Compiler not available." "${log_file}"
-    rm -f "${compile_log}" "${log_file}"
-    rm -rf "${build_dir}"
-    return 1
+  if ! package_has_script "${package_json}" "test"; then
+    write_skip_tap "${tap_file}" "${package_name} does not define a test script"
+    rm -f "${log_file}"
+    return 0
   fi
 
-  rm -rf "${build_dir}"
-  if ! (
-    cd "${pkg_dir}"
-    "${tsc_bin}" -p tsconfig.json --noEmit false --outDir .test-dist
-  ) >"${compile_log}" 2>&1; then
-    write_failure_tap "${tap_file}" "proxy-http-client compile" "TypeScript compile failed." "${compile_log}"
-    rm -f "${compile_log}" "${log_file}"
-    rm -rf "${build_dir}"
-    return 1
-  fi
-
-  mapfile -t compiled_tests < <(
-    cd "${pkg_dir}"
-    find .test-dist/test -type f -name '*.test.js' | LC_ALL=C sort
-  )
-
-  if [[ "${#compiled_tests[@]}" -eq 0 ]]; then
-    echo "No compiled test files found under ${build_dir}/test" >"${log_file}"
-    write_failure_tap "${tap_file}" "proxy-http-client tests" "No compiled tests matched." "${log_file}"
-    rm -f "${compile_log}" "${log_file}"
-    rm -rf "${build_dir}"
-    return 1
-  fi
-
-  if run_node_tap \
-    "${pkg_dir}" \
-    "${tap_file}" \
-    --test \
-    --test-reporter=tap \
-    --test-concurrency=1 \
-    "${compiled_tests[@]}"; then
-    status=0
+  if (cd "${pkg_dir}" && npm run test) >"${log_file}" 2>&1; then
+    {
+      echo "TAP version 13"
+      echo "1..1"
+      echo "ok 1 - ${package_name} tests"
+      echo "  ---"
+      echo "  message: npm run test passed in packages/${package_dir_name}"
+      echo "  ..."
+    } >"${tap_file}"
+    rm -f "${log_file}"
+    return 0
   else
-    status=$?
+    write_failure_tap "${tap_file}" "${package_name} tests" "npm run test failed." "${log_file}"
+    rm -f "${log_file}"
+    return 1
   fi
+}
 
-  rm -f "${compile_log}" "${log_file}"
-  rm -rf "${build_dir}"
-  return "${status}"
+normalize_target() {
+  local target="$1"
+
+  case "${target}" in
+    proxy-core|proxy-agent|proxy-http-client)
+      printf 'package:%s\n' "${target}"
+      return 0
+      ;;
+    *)
+      printf '%s\n' "${target}"
+      return 0
+      ;;
+  esac
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -409,8 +379,10 @@ if [[ -z "${TARGET}" ]]; then
   usage
   exit 2
 fi
+TARGET="$(normalize_target "${TARGET}")"
+TARGET_FILE_ID="${TARGET//:/-}"
 
-TAP_FILE="${2:-${REPO_ROOT}/.ci-artifacts/tap/${TARGET}.tap}"
+TAP_FILE="${2:-${REPO_ROOT}/.ci-artifacts/tap/${TARGET_FILE_ID}.tap}"
 mkdir -p "$(dirname "${TAP_FILE}")"
 
 set_deterministic_env
@@ -419,9 +391,9 @@ status=0
 if case "${TARGET}" in
   root) run_root "${TAP_FILE}" ;;
   web-smoke) run_web_smoke "${TAP_FILE}" ;;
-  proxy-core) run_proxy_core "${TAP_FILE}" ;;
-  proxy-agent) run_proxy_agent "${TAP_FILE}" ;;
-  proxy-http-client) run_proxy_http_client "${TAP_FILE}" ;;
+  package:*)
+    run_package_test "${TAP_FILE}" "${TARGET#package:}"
+    ;;
   *)
     echo "Unknown target: ${TARGET}" >&2
     usage
