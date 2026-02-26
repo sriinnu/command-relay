@@ -185,8 +185,8 @@ export async function startBridgeServer(deps) {
     telemetry.recordConnectLatency(Date.now() - connectStartedAtMs);
     socket.on("message", async (raw) => {
       const requestStartedAtMs = Date.now();
-      if (!messageLimiter.allow(client.id)) {
-        send(client.socket, envelope("error", { code: "rate_limited" }));
+      const messageRate = messageLimiter.consume(client.id); if (!messageRate.allowed) {
+        send(client.socket, envelope("error", { code: "rate_limited", retryAfterMs: messageRate.retryAfterMs, limit: messageRate.limit, windowMs: messageRate.windowMs }));
         return;
       }
       const parsed = parseIncomingClientMessage(raw.toString(), config.strictProtocolParsing);
@@ -379,8 +379,9 @@ export async function handleClientMessage(ctx) {
       return;
     }
     case "input": {
-      if (!inputLimiter.allow(client.id)) {
-        send(client.socket, envelope("error", { code: "input_rate_limited" }, requestId));
+      const inputRate = inputLimiter.consume(client.id);
+      if (!inputRate.allowed) {
+        send(client.socket, envelope("error", { code: "input_rate_limited", retryAfterMs: inputRate.retryAfterMs, limit: inputRate.limit, windowMs: inputRate.windowMs }, requestId));
         return;
       }
       if (
@@ -402,8 +403,9 @@ export async function handleClientMessage(ctx) {
         send(client.socket, envelope("error", { code: "pane_not_attached" }, requestId));
         return;
       }
-      if (Buffer.byteLength(data, "utf8") > config.maxInputBytes) {
-        send(client.socket, envelope("error", { code: "input_too_large" }, requestId));
+      const inputBytes = Buffer.byteLength(data, "utf8");
+      if (inputBytes > config.maxInputBytes) {
+        send(client.socket, envelope("error", { code: "input_too_large", maxInputBytes: config.maxInputBytes, receivedBytes: inputBytes }, requestId));
         return;
       }
       const overrideRequested = parseOptionalBoolean(payload.override) === true || parseOptionalBoolean(payload.takeOwnership) === true;
@@ -419,7 +421,7 @@ export async function handleClientMessage(ctx) {
         clientId: client.id,
         details: {
           paneId,
-          bytes: Buffer.byteLength(data, "utf8"),
+          bytes: inputBytes,
           sha256: createHash("sha256").update(data).digest("hex"),
           overrideRequested,
           laneOverridden: claimResult?.ok ? claimResult.overridden : false

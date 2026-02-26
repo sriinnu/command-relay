@@ -49,7 +49,7 @@ Owner scope: iOS first, Android second, web fallback last.
 
 - [x] Implement explicit `enable_input` UX with clear risk gate.
 - [x] Implement input send/ack path with timeout/error handling.
-- [ ] Add safeguards: per-command length limits, rate limit feedback, kill switch handling.
+- [x] Add safeguards: per-command length limits, rate limit feedback, kill switch handling (`input_too_large` + `input_rate_limited` payload metadata, 2026-02-26).
 - [ ] Add audit event surfacing for sent commands.
 - [ ] Exit criteria met:
 - [ ] Read-only mode remains default on every reconnect.
