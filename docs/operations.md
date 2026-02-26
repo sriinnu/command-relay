@@ -20,6 +20,18 @@ Runtime backend selection is controlled by `COMMANDRELAY_RUNTIME_BACKENDS`:
 3. Supported backend values: `tmux`, `cmux`
 4. In multi-backend mode, pane IDs are backend-namespaced (for example `tmux:%1`, `cmux:<pane-id>`). tmux-only mode keeps existing tmux pane IDs.
 
+`cmux` executable override:
+
+1. `COMMANDRELAY_CMUX_COMMAND` sets the command/path used for the cmux backend.
+2. Default is `cmux`; whitespace-only values fall back to `cmux`.
+
+Startup availability behavior:
+
+1. Bridge startup probes each configured backend and logs per-backend availability.
+2. Unavailable backends are logged as warnings.
+3. Startup fails only when every configured backend is unavailable and runtime mode is not tmux-only.
+4. tmux-only startup behavior is unchanged.
+
 ## Web App Runtime Surface and Checks
 
 Implemented gateway routes:

@@ -47,8 +47,32 @@ export class RuntimeMultiplexer {
    * @returns True when any backend is available.
    */
   async isAvailable(): Promise<boolean> {
-    const availability = await Promise.all(this.backends.map((backend) => this.safeIsAvailable(backend)));
-    return availability.some(Boolean);
+    const availabilityByBackend = await this.checkBackendAvailability();
+    return Object.values(availabilityByBackend).some(Boolean);
+  }
+
+  /**
+   * Returns runtime backend ids in configured order.
+   *
+   * @returns Ordered backend ids.
+   */
+  getBackendIds(): string[] {
+    return this.backends.map((backend) => backend.backendId);
+  }
+
+  /**
+   * Checks availability for each backend without throwing.
+   *
+   * @returns Backend availability keyed by backend id.
+   */
+  async checkBackendAvailability(): Promise<Record<string, boolean>> {
+    const checks = await Promise.all(
+      this.backends.map(async (backend): Promise<readonly [string, boolean]> => [
+        backend.backendId,
+        await this.safeIsAvailable(backend)
+      ])
+    );
+    return Object.fromEntries(checks);
   }
 
   /**
@@ -57,16 +81,19 @@ export class RuntimeMultiplexer {
    * @returns Aggregated pane metadata.
    */
   async listPanes(): Promise<RuntimePane[]> {
+    const availabilityByBackend = await this.checkBackendAvailability();
     const paneGroups = await Promise.all(
       this.backends.map(async (backend): Promise<RuntimePane[]> => {
-        if (!(await this.safeIsAvailable(backend))) return [];
+        if (!availabilityByBackend[backend.backendId]) return [];
 
         const panes = await backend.listPanes();
         if (!this.shouldNamespacePaneIds) return panes;
 
         return panes.map((pane) => ({
           ...pane,
-          paneId: this.buildNamespacedPaneId(backend.backendId, pane.paneId)
+          paneId: this.buildNamespacedPaneId(backend.backendId, pane.paneId),
+          backendId: backend.backendId,
+          rawPaneId: pane.paneId
         }));
       })
     );

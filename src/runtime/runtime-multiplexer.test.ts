@@ -102,8 +102,8 @@ test("multiple backends namespace pane ids and route by backend prefix", async (
   await mux.sendInput("tmux:%1", "ls -la");
 
   assert.deepEqual(panes, [
-    { paneId: "tmux:%1", sessionName: "main" },
-    { paneId: "screen:0.1", sessionName: "ops" }
+    { paneId: "tmux:%1", sessionName: "main", backendId: "tmux", rawPaneId: "%1" },
+    { paneId: "screen:0.1", sessionName: "ops", backendId: "screen", rawPaneId: "0.1" }
   ]);
   assert.equal(capture, "screen:0.1:15");
   assert.deepEqual(screen.calls.capturePane, [{ paneId: "0.1", lines: 15 }]);
@@ -125,7 +125,7 @@ test("multiple backends require namespaced pane ids for routed operations", asyn
   );
 });
 
-test("availability is true when any backend is available and list skips unavailable backends", async () => {
+test("backend introspection returns ids and safe availability map", async () => {
   const failing = createBackendHarness({ backendId: "failing", throwOnIsAvailable: true });
   const offline = createBackendHarness({ backendId: "offline", available: false });
   const online = createBackendHarness({
@@ -138,10 +138,23 @@ test("availability is true when any backend is available and list skips unavaila
     backends: [failing.backend, offline.backend, online.backend]
   });
 
+  assert.deepEqual(mux.getBackendIds(), ["failing", "offline", "online"]);
+  assert.deepEqual(await mux.checkBackendAvailability(), {
+    failing: false,
+    offline: false,
+    online: true
+  });
   assert.equal(await mux.isAvailable(), true);
   const panes = await mux.listPanes();
 
-  assert.deepEqual(panes, [{ paneId: "online:pane-1", sessionName: "prod" }]);
+  assert.deepEqual(panes, [
+    {
+      paneId: "online:pane-1",
+      sessionName: "prod",
+      backendId: "online",
+      rawPaneId: "pane-1"
+    }
+  ]);
   assert.equal(failing.calls.listPanes, 0);
   assert.equal(offline.calls.listPanes, 0);
   assert.equal(online.calls.listPanes, 1);

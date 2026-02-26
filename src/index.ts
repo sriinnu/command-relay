@@ -19,27 +19,109 @@ interface RuntimeAdapter {
   sendInput: (paneId: string, rawInput: string) => Promise<void>;
 }
 
+interface RuntimeBackendAvailability {
+  backendId: RuntimeBackendId;
+  available: boolean;
+}
+
 /**
- * Creates the selected runtime adapter set from configured backends.
+ * Creates runtime backend adapters from configured backend ids.
  *
  * @param runtimeBackends Ordered backend list from config.
- * @returns Adapter used by the bridge runtime.
+ * @param cmuxCommand Configured cmux executable/command.
+ * @returns Runtime backend adapters with stable identifiers.
  */
-async function createRuntimeAdapter(runtimeBackends: RuntimeBackendId[]): Promise<RuntimeAdapter> {
+function createRuntimeBackends(
+  runtimeBackends: RuntimeBackendId[],
+  cmuxCommand: string
+): RuntimeBackendContract[] {
   const adapters: RuntimeBackendContract[] = [];
   for (const backend of runtimeBackends) {
     if (backend === "tmux") {
       adapters.push(wrapRuntimeBackend(backend, new TmuxAdapter()));
       continue;
     }
-    adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter()));
+    adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter({ cmuxCommand })));
   }
+  return adapters;
+}
 
-  if (runtimeBackends.length === 1 && runtimeBackends[0] === "tmux") {
+/**
+ * Creates the selected runtime adapter set from configured backends.
+ *
+ * @param runtimeBackends Ordered backend list from config.
+ * @param adapters Runtime backend adapters.
+ * @returns Adapter used by the bridge runtime.
+ */
+function createRuntimeAdapter(
+  runtimeBackends: RuntimeBackendId[],
+  adapters: RuntimeBackendContract[]
+): RuntimeAdapter {
+  if (isTmuxOnly(runtimeBackends)) {
     return adapters[0];
   }
 
   return new RuntimeMultiplexer({ backends: adapters });
+}
+
+/**
+ * Checks availability of each configured runtime backend.
+ *
+ * @param adapters Runtime backend adapters.
+ * @returns Availability status for each backend.
+ */
+async function checkRuntimeBackendAvailability(
+  adapters: RuntimeBackendContract[]
+): Promise<RuntimeBackendAvailability[]> {
+  return await Promise.all(
+    adapters.map(async (adapter) => ({
+      backendId: adapter.backendId as RuntimeBackendId,
+      available: await safeIsBackendAvailable(adapter)
+    }))
+  );
+}
+
+/**
+ * Checks runtime backend availability without throwing.
+ *
+ * @param adapter Runtime backend adapter.
+ * @returns True when backend is reachable.
+ */
+async function safeIsBackendAvailable(adapter: RuntimeBackendContract): Promise<boolean> {
+  try {
+    return await adapter.isAvailable();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Logs startup availability state for every configured backend.
+ *
+ * @param availability Availability rows.
+ * @returns Number of available backends.
+ */
+function logRuntimeBackendAvailability(availability: RuntimeBackendAvailability[]): number {
+  let availableCount = 0;
+  for (const backend of availability) {
+    if (backend.available) {
+      availableCount += 1;
+      console.info(`[bridge] runtime backend available: ${backend.backendId}`);
+      continue;
+    }
+    console.warn(`[bridge] runtime backend unavailable: ${backend.backendId}`);
+  }
+  return availableCount;
+}
+
+/**
+ * Checks if runtime configuration is legacy tmux-only mode.
+ *
+ * @param runtimeBackends Ordered backend ids from config.
+ * @returns True when runtime is configured with tmux only.
+ */
+function isTmuxOnly(runtimeBackends: RuntimeBackendId[]): boolean {
+  return runtimeBackends.length === 1 && runtimeBackends[0] === "tmux";
 }
 
 /**
@@ -81,7 +163,16 @@ async function main() {
   }
   console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 
-  const runtimeAdapter = await createRuntimeAdapter(config.runtimeBackends);
+  const runtimeBackends = createRuntimeBackends(config.runtimeBackends, config.cmuxCommand);
+  const backendAvailability = await checkRuntimeBackendAvailability(runtimeBackends);
+  const availableBackends = logRuntimeBackendAvailability(backendAvailability);
+  if (availableBackends === 0 && !isTmuxOnly(config.runtimeBackends)) {
+    throw new Error(
+      `No configured runtime backends are available (${config.runtimeBackends.join(",")})`
+    );
+  }
+
+  const runtimeAdapter = createRuntimeAdapter(config.runtimeBackends, runtimeBackends);
   const proxySettings = loadProxySettings();
   const proxyFactory = new ProxyAgentFactory({ settings: proxySettings });
 

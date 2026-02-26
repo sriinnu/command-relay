@@ -33,6 +33,9 @@ COMMANDRELAY_RUNTIME_BACKENDS=tmux
 
 # Multi-backend:
 COMMANDRELAY_RUNTIME_BACKENDS=tmux,cmux
+
+# Optional cmux executable override (default: cmux):
+COMMANDRELAY_CMUX_COMMAND=/opt/homebrew/bin/cmux
 ```
 
 Notes:
@@ -40,6 +43,9 @@ Notes:
 1. Default is `tmux`.
 2. Supported values are `tmux` and `cmux`.
 3. In multi-backend mode, pane IDs are namespaced by backend (for example `tmux:%1`, `cmux:<pane-id>`). In tmux-only mode, existing tmux pane IDs remain unchanged.
+4. `COMMANDRELAY_CMUX_COMMAND` is trimmed at startup; blank values fall back to `cmux`.
+5. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
+6. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
 
 ## Web App Route Usage (Current Runtime)
 

@@ -29,6 +29,19 @@ test("defaults runtime backend list to tmux", () => {
   assert.deepEqual(config.runtimeBackends, ["tmux"]);
 });
 
+test("defaults cmux command to cmux", () => {
+  const config = loadConfig({});
+  assert.equal(config.cmuxCommand, "cmux");
+});
+
+test("parses and trims cmux command env value", () => {
+  const custom = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "  /opt/bin/cmux  " });
+  const blank = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "   " });
+
+  assert.equal(custom.cmuxCommand, "/opt/bin/cmux");
+  assert.equal(blank.cmuxCommand, "cmux");
+});
+
 test("parses, normalizes, and deduplicates runtime backend list", () => {
   const config = loadConfig({
     COMMANDRELAY_RUNTIME_BACKENDS: " tmux , cmux,tmux "

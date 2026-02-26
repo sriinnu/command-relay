@@ -5,6 +5,7 @@
 /** Runtime bridge configuration values. */
 export interface BridgeConfig {
   runtimeBackends: RuntimeBackend[];
+  cmuxCommand: string;
   host: string;
   port: number;
   strictProtocolParsing: boolean;
@@ -169,6 +170,7 @@ function isLoopbackHost(host: string): boolean {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   return {
     runtimeBackends: parseRuntimeBackendsEnv(env.COMMANDRELAY_RUNTIME_BACKENDS),
+    cmuxCommand: parseStringEnv(env.COMMANDRELAY_CMUX_COMMAND, "cmux"),
     host: env.COMMANDRELAY_HOST || "127.0.0.1",
     port: parseIntEnv(env.COMMANDRELAY_PORT, 8787, { min: 1, max: 65535 }),
     strictProtocolParsing: parseBooleanEnvWithAlias(
