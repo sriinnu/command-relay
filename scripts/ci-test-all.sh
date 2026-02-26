@@ -12,9 +12,7 @@ Usage: scripts/ci-test-all.sh [tap_output_dir]
 Runs deterministic TAP test execution for:
   root
   web-smoke
-  proxy-core
-  proxy-agent
-  proxy-http-client
+  package:<dir> (auto-discovered under packages/* with a `test` script)
 USAGE
 }
 
@@ -47,14 +45,47 @@ mkdir -p "${TAP_OUTPUT_DIR}"
 targets=(
   "root"
   "web-smoke"
-  "proxy-core"
-  "proxy-agent"
-  "proxy-http-client"
 )
+mapfile -t package_targets < <(
+  node <<'NODE'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const packagesDir = path.resolve(process.cwd(), "packages");
+if (!fs.existsSync(packagesDir)) {
+  process.exit(0);
+}
+
+const entries = fs
+  .readdirSync(packagesDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+for (const entry of entries) {
+  const packageJsonPath = path.join(packagesDir, entry, "package.json");
+  if (!fs.existsSync(packageJsonPath)) {
+    continue;
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  const scripts = pkg?.scripts ?? {};
+  if (!Object.prototype.hasOwnProperty.call(scripts, "test")) {
+    continue;
+  }
+
+  process.stdout.write(`package:${entry}\n`);
+}
+NODE
+)
+
+if [[ "${#package_targets[@]}" -gt 0 ]]; then
+  targets+=("${package_targets[@]}")
+fi
 
 status=0
 for target in "${targets[@]}"; do
-  tap_file="${TAP_OUTPUT_DIR}/${target}.tap"
+  tap_file="${TAP_OUTPUT_DIR}/${target//:/-}.tap"
   rm -f "${tap_file}"
   if ! "${TARGET_RUNNER}" "${target}" "${tap_file}"; then
     status=1

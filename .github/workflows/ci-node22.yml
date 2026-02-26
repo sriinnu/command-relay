@@ -31,17 +31,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check gates (root + packages/*)
+      - name: Check gates (root + package scripts)
         shell: bash
         run: |
           set -euo pipefail
-
-          npm run check
-
-          for pkg in packages/*; do
-            [ -f "$pkg/package.json" ] || continue
-            npm --prefix "$pkg" run check
-          done
+          npm run check:all
 
       - name: Perf script CLI sanity (--help)
         shell: bash
@@ -61,49 +55,9 @@ jobs:
       - name: Test gates with TAP logs
         shell: bash
         run: |
-          set +e
+          set -euo pipefail
           mkdir -p artifacts/tap
-          status=0
-
-          run_scope_tests() {
-            local scope="$1"
-            local test_glob="$2"
-            local tap_file="$3"
-            local -a tests=()
-
-            if [ "$scope" = "root" ]; then
-              shopt -s globstar
-              mapfile -t tests < <(compgen -G "$test_glob" | sort)
-              shopt -u globstar
-            else
-              local test_root="$test_glob"
-              if [ ! -d "$test_root" ]; then
-                printf 'TAP version 13\n1..0 # SKIP no test directory for %s\n' "$scope" > "$tap_file"
-                return 0
-              fi
-              mapfile -t tests < <(find "$test_root" -type f -name '*.test.ts' | sort)
-            fi
-
-            if [ "${#tests[@]}" -eq 0 ]; then
-              printf 'TAP version 13\n1..0 # SKIP no tests found for %s\n' "$scope" > "$tap_file"
-              return 0
-            fi
-
-            node --import tsx --test \
-              --test-reporter=tap \
-              --test-reporter-destination="$tap_file" \
-              "${tests[@]}"
-          }
-
-          run_scope_tests "root" "src/**/*.test.ts" "artifacts/tap/root.tap" || status=1
-
-          for pkg in packages/*; do
-            [ -f "$pkg/package.json" ] || continue
-            pkg_name="$(basename "$pkg")"
-            run_scope_tests "$pkg_name" "$pkg/test" "artifacts/tap/${pkg_name}.tap" || status=1
-          done
-
-          exit "$status"
+          scripts/ci-test-all.sh artifacts/tap
 
       - name: Upload TAP artifacts
         if: always()
@@ -126,11 +80,19 @@ jobs:
       - name: Detect Swift package/toolchain
         id: detect
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
           pkg_dir="apps/ios/M0ProtocolMockClient"
 
           if [ ! -f "${pkg_dir}/Package.swift" ]; then
+            if [[ "${EVENT_NAME}" == "push" && "${REF_NAME}" == "${DEFAULT_BRANCH}" ]]; then
+              echo "::error::Expected Swift package not found in ${pkg_dir} on default branch."
+              exit 1
+            fi
             echo "should_run=false" >> "$GITHUB_OUTPUT"
             echo "reason=Package.swift not found in ${pkg_dir}" >> "$GITHUB_OUTPUT"
             exit 0
