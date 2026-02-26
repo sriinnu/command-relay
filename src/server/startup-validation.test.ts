@@ -24,6 +24,25 @@ test("defaults strict protocol parsing on and supports legacy toggle alias", () 
   assert.equal(strictOffAlias.strictProtocolParsing, false);
 });
 
+test("defaults runtime backend list to tmux", () => {
+  const config = loadConfig({});
+  assert.deepEqual(config.runtimeBackends, ["tmux"]);
+});
+
+test("parses, normalizes, and deduplicates runtime backend list", () => {
+  const config = loadConfig({
+    COMMANDRELAY_RUNTIME_BACKENDS: " tmux , cmux,tmux "
+  });
+  assert.deepEqual(config.runtimeBackends, ["tmux", "cmux"]);
+});
+
+test("rejects unsupported runtime backend values", () => {
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_RUNTIME_BACKENDS: "tmux,screen" }),
+    /COMMANDRELAY_RUNTIME_BACKENDS/
+  );
+});
+
 test("rejects invalid global input kill switch values", () => {
   assert.throws(
     () => loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "sometimes" }),

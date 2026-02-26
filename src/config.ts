@@ -4,6 +4,7 @@
 
 /** Runtime bridge configuration values. */
 export interface BridgeConfig {
+  runtimeBackends: RuntimeBackend[];
   host: string;
   port: number;
   strictProtocolParsing: boolean;
@@ -21,6 +22,13 @@ export interface BridgeConfig {
   authToken: string | null;
   auditLogPath: string | null;
 }
+
+const SUPPORTED_RUNTIME_BACKENDS = ["tmux", "cmux"] as const;
+
+/**
+ * Supported backend identifiers for runtime pane operations.
+ */
+export type RuntimeBackend = (typeof SUPPORTED_RUNTIME_BACKENDS)[number];
 
 interface NumericBounds {
   min?: number;
@@ -111,6 +119,39 @@ function parseStringEnv(raw: string | undefined, fallback: string): string {
 }
 
 /**
+ * Parses the backend list for runtime pane operations.
+ *
+ * @param raw Raw env value.
+ * @returns Ordered runtime backend list with duplicates removed.
+ */
+function parseRuntimeBackendsEnv(raw: string | undefined): RuntimeBackend[] {
+  if (!raw || !raw.trim()) return ["tmux"];
+
+  const selected = raw
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (selected.length === 0) return ["tmux"];
+
+  const deduped: RuntimeBackend[] = [];
+  const seen = new Set<RuntimeBackend>();
+  for (const backend of selected) {
+    if (!SUPPORTED_RUNTIME_BACKENDS.includes(backend as RuntimeBackend)) {
+      throw new Error(
+        `COMMANDRELAY_RUNTIME_BACKENDS contains unsupported backend "${backend}" (supported: ${SUPPORTED_RUNTIME_BACKENDS.join(",")})`
+      );
+    }
+    const runtimeBackend = backend as RuntimeBackend;
+    if (seen.has(runtimeBackend)) continue;
+    seen.add(runtimeBackend);
+    deduped.push(runtimeBackend);
+  }
+
+  return deduped.length > 0 ? deduped : ["tmux"];
+}
+
+/**
  * Checks whether the host is loopback-only.
  *
  * @param host Hostname or address.
@@ -127,6 +168,7 @@ function isLoopbackHost(host: string): boolean {
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   return {
+    runtimeBackends: parseRuntimeBackendsEnv(env.COMMANDRELAY_RUNTIME_BACKENDS),
     host: env.COMMANDRELAY_HOST || "127.0.0.1",
     port: parseIntEnv(env.COMMANDRELAY_PORT, 8787, { min: 1, max: 65535 }),
     strictProtocolParsing: parseBooleanEnvWithAlias(

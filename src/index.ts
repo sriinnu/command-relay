@@ -3,11 +3,64 @@
  */
 
 import process from "node:process";
-import { loadConfig, validateStartupConfig } from "./config.js";
+import { loadConfig, type RuntimeBackend as RuntimeBackendId, validateStartupConfig } from "./config.js";
 import { TmuxAdapter } from "./tmux/tmux-adapter.js";
+import { CmuxAdapter } from "./runtime/cmux-adapter.js";
+import { RuntimeMultiplexer } from "./runtime/runtime-multiplexer.js";
+import type { RuntimeBackend as RuntimeBackendContract } from "./runtime/runtime-backend.js";
 import { startBridgeServer } from "./server/bridge-server.js";
 import { loadProxySettings } from "./net/proxy-router.js";
 import { ProxyAgentFactory } from "./net/proxy-agent-factory.js";
+
+interface RuntimeAdapter {
+  isAvailable: () => Promise<boolean>;
+  listPanes: () => Promise<unknown[]>;
+  capturePane: (paneId: string, lines: number) => Promise<string>;
+  sendInput: (paneId: string, rawInput: string) => Promise<void>;
+}
+
+/**
+ * Creates the selected runtime adapter set from configured backends.
+ *
+ * @param runtimeBackends Ordered backend list from config.
+ * @returns Adapter used by the bridge runtime.
+ */
+async function createRuntimeAdapter(runtimeBackends: RuntimeBackendId[]): Promise<RuntimeAdapter> {
+  const adapters: RuntimeBackendContract[] = [];
+  for (const backend of runtimeBackends) {
+    if (backend === "tmux") {
+      adapters.push(wrapRuntimeBackend(backend, new TmuxAdapter()));
+      continue;
+    }
+    adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter()));
+  }
+
+  if (runtimeBackends.length === 1 && runtimeBackends[0] === "tmux") {
+    return adapters[0];
+  }
+
+  return new RuntimeMultiplexer({ backends: adapters });
+}
+
+/**
+ * Wraps a runtime adapter with a stable backend identifier.
+ *
+ * @param backendId Backend identifier from config.
+ * @param adapter Runtime adapter implementation.
+ * @returns Adapter with backend metadata for multiplexing.
+ */
+function wrapRuntimeBackend(
+  backendId: RuntimeBackendId,
+  adapter: RuntimeAdapter
+): RuntimeBackendContract {
+  return {
+    backendId,
+    isAvailable: async () => await adapter.isAvailable(),
+    listPanes: async () => (await adapter.listPanes()) as any,
+    capturePane: async (paneId: string, lines: number) => await adapter.capturePane(paneId, lines),
+    sendInput: async (paneId: string, rawInput: string) => await adapter.sendInput(paneId, rawInput)
+  };
+}
 
 /**
  * Boots the CommandRelay bridge runtime.
@@ -26,8 +79,9 @@ async function main() {
   } else {
     console.info("[bridge] static app hosting disabled");
   }
+  console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 
-  const tmux = new TmuxAdapter();
+  const runtimeAdapter = await createRuntimeAdapter(config.runtimeBackends);
   const proxySettings = loadProxySettings();
   const proxyFactory = new ProxyAgentFactory({ settings: proxySettings });
 
@@ -38,7 +92,7 @@ async function main() {
 
   const runtime = await startBridgeServer({
     config,
-    tmux,
+    tmux: runtimeAdapter,
     logger: console
   });
 

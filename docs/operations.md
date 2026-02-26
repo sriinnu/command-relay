@@ -13,6 +13,13 @@ Proxy-aware outbound behavior is supported through standard env vars:
 3. `ALL_PROXY`
 4. `NO_PROXY`
 
+Runtime backend selection is controlled by `COMMANDRELAY_RUNTIME_BACKENDS`:
+
+1. Default: `tmux`
+2. Multi-backend example: `tmux,cmux`
+3. Supported backend values: `tmux`, `cmux`
+4. In multi-backend mode, pane IDs are backend-namespaced (for example `tmux:%1`, `cmux:<pane-id>`). tmux-only mode keeps existing tmux pane IDs.
+
 ## Web App Runtime Surface and Checks
 
 Implemented gateway routes:

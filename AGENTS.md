@@ -5,6 +5,8 @@ These rules are mandatory for all code changes in this project.
 # How codex must perform
 - spawn agents as needed
 - use chitragupta mcp - as a good agentic assistant.
+- use worktress outside of the repo workspace - multiple worktrees for agents. (distilled code instead of full copy of the codebase - as long as you know what to do and how to do, you can have a copy of the the agents.md or claude.md)
+- always use Chitragupta as a co-orchestrator agent, run periodic stress/health checks on his agentic capabilities, and report any failures or regressions immediately.
 
 ## Engineering Guardrails
 
@@ -17,4 +19,3 @@ These rules are mandatory for all code changes in this project.
    - accessible semantics, focus states, and keyboard usability
    - consistent visual language across screens
 5. Typescript - strict typing where possible.
-

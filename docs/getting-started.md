@@ -23,6 +23,24 @@ If you previously used `pnpm ... exec tsx .../mcp-entry.ts`, switch to the comma
 
 Run Codex/Claude inside `tmux` so CommandRelay can discover and control sessions reliably.
 
+## Runtime Backend Selection
+
+Use `COMMANDRELAY_RUNTIME_BACKENDS` to select runtime backends (comma-separated).
+
+```bash
+# Default when unset:
+COMMANDRELAY_RUNTIME_BACKENDS=tmux
+
+# Multi-backend:
+COMMANDRELAY_RUNTIME_BACKENDS=tmux,cmux
+```
+
+Notes:
+
+1. Default is `tmux`.
+2. Supported values are `tmux` and `cmux`.
+3. In multi-backend mode, pane IDs are namespaced by backend (for example `tmux:%1`, `cmux:<pane-id>`). In tmux-only mode, existing tmux pane IDs remain unchanged.
+
 ## Web App Route Usage (Current Runtime)
 
 The gateway is an HTTP + WebSocket server with a small route surface:
