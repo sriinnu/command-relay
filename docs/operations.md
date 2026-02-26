@@ -111,10 +111,10 @@ Operational notes:
 2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
 3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
 
-## Distilled Task-Capsule Operations
+## Distilled Capsule + Brief Operations
 
-Use task capsules to reduce token cost and prevent context leakage.
-CLI command: `npm run capsule:build --` (backed by `scripts/orchestration/build-task-capsule.ts`).
+Use capsule + brief generation to reduce token cost and prevent context leakage.
+CLI commands: `npm run capsule:build --` (capsule JSON) and `npm run capsule:brief --` (brief from capsule).
 
 Policy:
 
@@ -124,25 +124,39 @@ Policy:
 4. Redact secrets before dispatch.
 5. Scope each agent to owned files.
 
-Command examples:
+Flow:
+
+1. Build a task capsule from goal, ownership, and scoped snippets.
+2. Generate an execution brief from the capsule file.
+3. Dispatch only the capsule/brief payload to the assigned agent owner.
+
+Concrete command example:
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-npm run capsule:build -- --help
-
 npm run capsule:build -- \
-  --goal "Implement docs policy wiring for distilled context workflow" \
-  --owner docs-policy \
+  --goal "Document capsule brief wiring in operations, docs index, and skill guide" \
+  --owner docs-brief-owner \
   --path skills/termina-orchestrator/SKILL.md \
+  --path docs/README.md \
   --path docs/operations.md \
-  --accept "Replace stale task-capsule script references" \
-  --accept "Keep command examples aligned with CLI flags" \
-  --risk "Over-broad context can leak unrelated code" \
-  --snippet docs/operations.md:114:146 \
-  --out /tmp/docs-policy.capsule.json
+  --accept "Document capsule:brief full flow after capsule build" \
+  --accept "Keep examples concise and path-accurate" \
+  --risk "Over-broad snippets can leak unrelated context" \
+  --snippet docs/operations.md:114:155 \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.capsule.json
+
+npm run capsule:brief -- \
+  --capsule /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.capsule.json \
+  --task "Update docs distilled workflow section and skill references" \
+  --owner docs-brief-owner \
+  --path docs/operations.md \
+  --path docs/README.md \
+  --path skills/termina-orchestrator/SKILL.md \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md
 ```
 
-The CLI builds a capsule JSON file only; completion status is tracked by the orchestrator.
+`capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload.
 
 ## Missing `tsx` Recovery
 

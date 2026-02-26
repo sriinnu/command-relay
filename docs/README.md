@@ -12,7 +12,7 @@ This folder contains project documentation for users, contributors, and operator
 3. Close agents fast when complete or stalled; relaunch with narrower scope when needed.
 4. Redact secrets from all capsules/prompts/logs (tokens, keys, credentials, raw `.env` values).
 5. Scope work by owned files only to avoid overlap and accidental leakage.
-6. Command examples for `task-capsule` live in [operations.md](operations.md).
+6. Command examples for `capsule:build` and `capsule:brief` live in [operations.md](operations.md).
 
 ## Runtime Snapshot
 

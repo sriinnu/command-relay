@@ -52,10 +52,10 @@ Use this skill when requests involve any of:
    - Commit cohesive units with explicit scope.
    - Push to current feature branch and report exact commit IDs.
 
-## Task Capsule CLI (Distilled Context)
+## Capsule + Brief CLI (Distilled Context)
 
-Use the task-capsule CLI to keep orchestration deterministic and low-leakage.
-Command path: `npm run capsule:build --`.
+Use capsule build + brief generation to keep orchestration deterministic and low-leakage.
+Command paths: `npm run capsule:build --` then `npm run capsule:brief --`.
 
 ```bash
 npm run capsule:build -- --help
@@ -65,9 +65,17 @@ npm run capsule:build -- \
   --owner docs-policy \
   --path skills/termina-orchestrator/SKILL.md \
   --path docs/operations.md \
-  --accept "Replace stale task-capsule script references" \
+  --accept "Replace stale capsule/brief script references" \
   --risk "Over-broad context increases leakage risk" \
   --out /tmp/docs-policy.capsule.json
+
+npm run capsule:brief -- \
+  --capsule /tmp/docs-policy.capsule.json \
+  --task "Update distilled context docs policy" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --out /tmp/docs-policy.brief.md
 ```
 
 ## Chitragupta Co-Orchestrator Runbook
