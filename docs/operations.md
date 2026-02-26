@@ -111,6 +111,39 @@ Operational notes:
 2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
 3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
 
+## Distilled Task-Capsule Operations
+
+Use task capsules to reduce token cost and prevent context leakage.
+CLI command: `npm run capsule:build --` (backed by `scripts/orchestration/build-task-capsule.ts`).
+
+Policy:
+
+1. Deterministic first (`task`, `owned files`, `expected output`).
+2. Minimal context capsule only.
+3. Close agents quickly after completion/stall.
+4. Redact secrets before dispatch.
+5. Scope each agent to owned files.
+
+Command examples:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run capsule:build -- --help
+
+npm run capsule:build -- \
+  --goal "Implement docs policy wiring for distilled context workflow" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --accept "Replace stale task-capsule script references" \
+  --accept "Keep command examples aligned with CLI flags" \
+  --risk "Over-broad context can leak unrelated code" \
+  --snippet docs/operations.md:114:146 \
+  --out /tmp/docs-policy.capsule.json
+```
+
+The CLI builds a capsule JSON file only; completion status is tracked by the orchestrator.
+
 ## Missing `tsx` Recovery
 
 Use this exact sequence to restore agentic capability:

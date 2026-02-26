@@ -9,6 +9,14 @@ These rules are mandatory for all code changes in this project.
 - always use Chitragupta as a co-orchestrator agent, run periodic stress/health checks on his agentic capabilities, and report any failures or regressions immediately.
 - branch workflow: before creating a new branch, push current work via PR, merge to `main`, then create the next branch from latest `origin/main`.
 
+## Distilled Context Orchestration Policy (Cost + Leakage)
+
+1. Deterministic first: each agent gets explicit task verb, owned files, and expected output format.
+2. Minimal task capsules only: send the smallest context needed (target snippets/interfaces), never broad repo dumps.
+3. Close agents fast: terminate agents immediately on completion or stall; relaunch with narrower scope if needed.
+4. Redact secrets always: never place secret values (`.env`, keys, tokens, credentials) in capsules, prompts, or logs.
+5. Scope by owned files: agents edit only assigned files; avoid overlap unless there is an explicit handoff owner.
+
 ## Engineering Guardrails
 
 1. No source file may exceed `450` lines of code.

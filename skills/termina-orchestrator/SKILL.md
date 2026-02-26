@@ -26,6 +26,12 @@ Use this skill when requests involve any of:
    - strict TypeScript style where practical
 3. Do not copy third-party code directly; learn patterns and implement first-party equivalents.
 4. Preserve read-only-by-default remote input policy unless explicitly changed by user direction.
+5. Enforce distilled context orchestration policy:
+   - deterministic first (explicit task + owned files + output shape)
+   - minimal context capsules only
+   - close agents fast when done/stalled
+   - redact secrets in all capsule payloads
+   - strict file-ownership scope per agent
 
 ## Standard Workflow
 
@@ -45,6 +51,24 @@ Use this skill when requests involve any of:
 5. **Push**
    - Commit cohesive units with explicit scope.
    - Push to current feature branch and report exact commit IDs.
+
+## Task Capsule CLI (Distilled Context)
+
+Use the task-capsule CLI to keep orchestration deterministic and low-leakage.
+Command path: `npm run capsule:build --`.
+
+```bash
+npm run capsule:build -- --help
+
+npm run capsule:build -- \
+  --goal "Update distilled context docs policy" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --accept "Replace stale task-capsule script references" \
+  --risk "Over-broad context increases leakage risk" \
+  --out /tmp/docs-policy.capsule.json
+```
 
 ## Chitragupta Co-Orchestrator Runbook
 

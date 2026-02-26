@@ -5,6 +5,15 @@ This folder contains project documentation for users, contributors, and operator
 > **Docs summary:** Architecture, protocol, operations, and native roadmap docs for the CommandRelay TypeScript gateway.
 > **Freshness policy:** keep `/docs` evergreen; record date-stamped execution evidence in `scripts/checkpoints/runs/*.md`.
 
+## Distilled Context Workflow (Cost + Leakage)
+
+1. Deterministic first: define exact task, owned files, and expected output before spawning agents.
+2. Use minimal task capsules: include only required snippets/interfaces, not broad repository context.
+3. Close agents fast when complete or stalled; relaunch with narrower scope when needed.
+4. Redact secrets from all capsules/prompts/logs (tokens, keys, credentials, raw `.env` values).
+5. Scope work by owned files only to avoid overlap and accidental leakage.
+6. Command examples for `task-capsule` live in [operations.md](operations.md).
+
 ## Runtime Snapshot
 
 1. Gateway runtime: TypeScript on Node.js `>=22` (`tsx` execution, `tsc --noEmit` checks).
