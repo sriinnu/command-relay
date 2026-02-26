@@ -4,6 +4,7 @@ node_modules/
 # Local agent/runtime state
 .claude/
 .chitragupta/
+.npmrc
 .mcp.json
 CLAUDE.md
 
