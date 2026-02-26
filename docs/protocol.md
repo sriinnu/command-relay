@@ -43,6 +43,9 @@ CommandRelay uses JSON envelopes over WebSocket, with a small HTTP surface for h
 6. `ack` / `error`
 7. `heartbeat_ack`
 
+`session_list` note:
+1. In multi-backend mode (`tmux,cmux`), grouped session rows may include optional `backendId`.
+
 ## Auth Behavior
 
 1. `hello.payload.requiresAuth=true` means the client must send `auth` before other commands.

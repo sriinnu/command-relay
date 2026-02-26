@@ -29,26 +29,33 @@ export function sendEnvelope(
  */
 export function groupSessionsByName(
   panes: Array<Record<string, unknown>>
-): Array<{ sessionName: string; paneIds: string[] }> {
-  const grouped = new Map<string, string[]>();
+): Array<{ sessionName: string; paneIds: string[]; backendId?: string }> {
+  const grouped = new Map<
+    string,
+    { sessionName: string; paneIds: string[]; backendId?: string }
+  >();
   for (const pane of panes) {
     const sessionName = typeof pane.sessionName === "string" ? pane.sessionName : "unknown";
     const paneId = typeof pane.paneId === "string" ? pane.paneId : "";
+    const backendId = typeof pane.backendId === "string" ? pane.backendId : "";
     if (!paneId) continue;
 
-    const sessionPaneIds = grouped.get(sessionName);
-    if (sessionPaneIds) {
-      sessionPaneIds.push(paneId);
+    // Backend-aware key avoids collisions when tmux/cmux share the same session name.
+    const bucketKey = `${backendId}:${sessionName}`;
+    const sessionBucket = grouped.get(bucketKey);
+    if (sessionBucket) {
+      sessionBucket.paneIds.push(paneId);
       continue;
     }
 
-    grouped.set(sessionName, [paneId]);
+    grouped.set(bucketKey, {
+      sessionName,
+      paneIds: [paneId],
+      ...(backendId ? { backendId } : {})
+    });
   }
 
-  return Array.from(grouped.entries()).map(([sessionName, paneIds]) => ({
-    sessionName,
-    paneIds
-  }));
+  return Array.from(grouped.values());
 }
 
 /**

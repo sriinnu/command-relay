@@ -110,6 +110,7 @@ Behavior:
 
 1. `list_sessions` has no required payload fields.
 2. Response `session_list` includes `payload.panes` and grouped `payload.sessions`.
+3. In multi-backend runtime mode (`tmux,cmux`), each `payload.sessions[]` row can include optional `backendId` and is grouped by `(backendId, sessionName)`.
 
 ### 3.4 `attach` (`C->S`)
 
