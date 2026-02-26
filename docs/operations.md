@@ -111,9 +111,9 @@ Operational notes:
 2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
 3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
 
-## Missing `tsx` Recovery (Tonight Path: 2026-02-25)
+## Missing `tsx` Recovery
 
-Use this exact sequence to restore agentic capability tonight:
+Use this exact sequence to restore agentic capability:
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta
@@ -151,9 +151,9 @@ Coverage baseline:
 
 Use this suite as the protocol gate before merging schema changes.
 
-## Batch Outcomes Snapshot (2026-02-25)
+## Validation Scope Snapshot
 
-Tonight's validation scope for the iOS controlled-input baseline is:
+Validation scope for the iOS controlled-input baseline:
 
 1. App shell artifact set in `apps/ios/CommandRelay` (`AppRootView`, `AuthGateView`, `SessionListView`, `ReadOnlyStreamView`).
 2. Domain/transport contracts in `CommandRelayKit` (`AuthSessionServicing`, `SessionListServicing`, `ReadOnlyStreamServicing`, `ControlledInputServicing`, `RelayTransportClient`).
@@ -176,7 +176,7 @@ Behavior:
 2. `COMMANDRELAY_WS_URL` absent -> app remains on stub services.
 3. Input remains opt-in in UI: `enable_input` is explicit, `disable_input` is available, and `input` is guarded by policy state.
 
-## Tonight on Mac (Exact iOS Spike Command Pack - 2026-02-25)
+## iOS Spike Validation Command Pack
 
 Run in this exact order:
 
@@ -237,7 +237,7 @@ Kill-switch toggle guidance (runtime config sanity):
 COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
 ```
 
-## Controlled-Input Operator Runbook (Tonight - 2026-02-25)
+## Controlled-Input Operator Runbook
 
 This runbook verifies:
 

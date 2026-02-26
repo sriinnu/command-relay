@@ -1,6 +1,6 @@
 # CommandRelay Native-First Roadmap
 
-Last updated: 2026-02-25
+Last reviewed: 2026-02-26
 Execution order: iOS Swift app -> Android app -> web fallback.
 
 ## Goal
@@ -25,7 +25,7 @@ Dependencies:
 1. Gateway event schema ownership and review workflow.
 2. Tailscale connectivity available in dev and staging.
 
-Status snapshot (2026-02-24):
+Status snapshot:
 - [x] Protocol `v1` contract published with required events (`docs/protocol-v1.md`).
 - [x] Replay and ordering rules documented (`streamSeq`, `attach(lastSeq)` replay behavior).
 - [x] Read-only default, explicit input enable, and global kill switch enforcement are implemented and tested.
@@ -65,7 +65,7 @@ Dependencies:
 1. Gateway audit pipeline.
 2. Policy update events and real-time enforcement.
 
-Status snapshot (2026-02-25):
+Status snapshot:
 - [x] Gateway controlled-input policy path is implemented and covered by contract/policy tests.
 - [x] iOS controlled-input UX + transport baseline is implemented; Mac runtime validation is pending.
 - [x] Current gateway semantics documented: pane-level input ownership arbitration with controlled takeover path.
@@ -161,18 +161,13 @@ Mitigation: enforce milestone gates; block web work before M4 exit.
 6. Concurrent input from multiple clients on same pane.
 Mitigation: server-side pane ownership arbitration + operator handoff runbook (disable -> enable) + kill-switch emergency fallback.
 
-## Immediate Next Actions (Next 10 Working Days)
+## Immediate Next Actions (Rolling)
 
-1. Freeze and publish protocol `v1` schema and examples.
-2. Implement gateway conformance tests for required events.
-3. Start iOS spike: auth + session list + attach + output stream. (Completed 2026-02-25)
-4. Define iOS UX copy for input safety and confirmation states.
-5. Set SLOs for connect time, replay catch-up time, and input ack latency.
-6. Run and commit the first scripted weekly cross-platform checkpoint artifact. (Completed 2026-02-25)
-7. Publish web control-lane user flow addendum in protocol docs with conflict/takeover handling. (Completed 2026-02-25)
-8. Draft macOS menu bar companion spec with lane state model and quick-action constraints. (Completed 2026-02-25, see `docs/macos-menu-bar-control-lane-spec.md`)
-9. Build iOS/web parity checklist for control-lane flows and map each row to tests/fixtures. (Completed 2026-02-25, see `docs/control-lane-parity-checklist.md`)
-10. Add cross-client fixture scenarios for iOS-writer/web-takeover and web-writer/iOS-takeover. (Completed 2026-02-25, see `src/server/bridge-server.policy.test.ts`)
+1. Close remaining M0 exit criteria (`7-day iOS mock-client schema drift burn-in`).
+2. Complete M1 accessibility baseline (labels, focus order, dynamic text).
+3. Add M1 telemetry (`connect latency`, `reconnect count`, `stream lag`).
+4. Finalize SLO targets for reconnect, replay catch-up, and input ack latency.
+5. Keep `docs/TODO.md` and weekly checkpoint artifacts synchronized after each milestone review.
 
 ## Weekly Cross-Platform Checkpoint Workflow
 
@@ -184,7 +179,7 @@ Mitigation: server-side pane ownership arbitration + operator handoff runbook (d
 5. Commit the checkpoint note in the same change that updates roadmap/TODO decisions for that week.
 6. Use checkpoint ID format `YYYY-Www-YYYY-MM-DD` as the source-of-truth reference in review notes.
 
-## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-25)
+## Mac Validation Acceptance Checklist
 
 - [ ] Node 22 is active on the Mac validation host (`node -v` reports `v22.x`).
 - [ ] Root typecheck gate passes (`npm run check`).
