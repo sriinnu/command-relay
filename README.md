@@ -183,6 +183,7 @@ packages/
   proxy-core/
   proxy-agent/
   proxy-http-client/
+  proxy-undici/
 docs/
   protocol, security, operations, roadmap, proxy ecosystem
 apps/

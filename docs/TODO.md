@@ -243,7 +243,7 @@ Reference roadmap: `docs/proxy-ecosystem-roadmap.md`.
 - [ ] Publish/validate adapter ecosystem package plan and naming contract (`@termina/proxy-*`).
 - [ ] P1 package wave:
   - `@termina/cli-proxy`
-  - `@termina/proxy-undici`
+  - [x] `@termina/proxy-undici` (`packages/proxy-undici`, check/build/test + docs/assets/examples complete on 2026-02-26)
   - `@termina/proxy-fetch`
 - [ ] P2 package wave:
   - `@termina/proxy-axios`

@@ -1,6 +1,6 @@
 # Proxy Ecosystem Roadmap
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 
 This roadmap expands `@commandrelay/proxy-*` for external reuse in other projects (`termina/*`, proxy-agents-style stacks, service SDKs).
 
@@ -18,6 +18,7 @@ This roadmap expands `@commandrelay/proxy-*` for external reuse in other project
 | `@commandrelay/proxy-core` | Ready | Env parsing + routing decision (`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`). |
 | `@commandrelay/proxy-agent` | Ready | Node agent resolution for `http/https/socks/pac` with cache + lifecycle controls. |
 | `@commandrelay/proxy-http-client` | Ready | JSON HTTP boundary with timeouts, size guards, typed errors, and proxy resolver support. |
+| `@termina/proxy-undici` | Ready (internal) | Undici dispatcher resolution for HTTP/HTTPS targets with cache + lifecycle controls. |
 
 ## Ecosystem Expansion Matrix
 
