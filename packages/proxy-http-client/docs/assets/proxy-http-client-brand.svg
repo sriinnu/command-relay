@@ -1,0 +1,22 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Proxy HTTP Client Brand</title>
+  <desc id="desc">Hexagonal badge with gateway arrows and brackets representing proxy-routed JSON requests.</desc>
+  <defs>
+    <linearGradient id="bg" x1="30" y1="20" x2="226" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A2239"/>
+      <stop offset="1" stop-color="#114B5F"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="58" y1="60" x2="198" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4CC9F0"/>
+      <stop offset="1" stop-color="#80ED99"/>
+    </linearGradient>
+  </defs>
+  <path d="M128 16L225 72V184L128 240L31 184V72L128 16Z" fill="url(#bg)"/>
+  <path d="M128 31L212 79V177L128 225L44 177V79L128 31Z" stroke="white" stroke-opacity="0.16" stroke-width="2"/>
+  <rect x="58" y="60" width="140" height="136" rx="22" fill="url(#accent)"/>
+  <path d="M94 92L75 128L94 164" stroke="#0A2239" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M162 92L181 128L162 164" stroke="#0A2239" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 138H152" stroke="#0A2239" stroke-width="11" stroke-linecap="round"/>
+  <path d="M128 100V156" stroke="#0A2239" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="128" cy="128" r="47" stroke="#0A2239" stroke-opacity="0.22" stroke-width="3"/>
+</svg>

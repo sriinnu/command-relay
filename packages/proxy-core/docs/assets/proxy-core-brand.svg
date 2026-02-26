@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
+  <title id="title">proxy-core brand mark</title>
+  <desc id="desc">A routed network glyph paired with proxy-core wordmark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1b2a"/>
+      <stop offset="1" stop-color="#1b263b"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4cc9f0"/>
+      <stop offset="1" stop-color="#90e0ef"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="240" rx="24" fill="url(#bg)"/>
+  <g transform="translate(38 34)">
+    <rect x="0" y="0" width="172" height="172" rx="24" fill="#0b1320" stroke="#2b3a55" stroke-width="3"/>
+    <circle cx="44" cy="44" r="13" fill="#90e0ef"/>
+    <circle cx="128" cy="44" r="13" fill="#90e0ef"/>
+    <circle cx="44" cy="128" r="13" fill="#90e0ef"/>
+    <circle cx="128" cy="128" r="13" fill="#90e0ef"/>
+    <path d="M57 44h58m-71 84h84M44 57v58M128 57v58" stroke="#4cc9f0" stroke-width="8" stroke-linecap="round"/>
+    <path d="M57 128c22-16 42-25 58-25 16 0 36 9 58 25" stroke="url(#pulse)" stroke-width="8" fill="none" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(242 90)">
+    <text x="0" y="0" fill="#e6edf7" font-size="52" font-weight="700" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">proxy-core</text>
+    <text x="2" y="38" fill="#90e0ef" font-size="20" font-weight="500" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.08em">ROUTE WITH CONFIDENCE</text>
+  </g>
+</svg>

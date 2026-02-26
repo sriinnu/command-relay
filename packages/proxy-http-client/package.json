@@ -1,0 +1,56 @@
+{
+  "name": "@commandrelay/proxy-http-client",
+  "version": "0.1.0",
+  "description": "Proxy-aware JSON HTTP client with timeout controls",
+  "keywords": [
+    "commandrelay",
+    "http-client",
+    "json",
+    "proxy",
+    "nodejs",
+    "typescript"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/proxy-http-client"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "tsc -p tsconfig.json --noEmit false --outDir .test-dist && node --test .test-dist/test/*.test.js && node -e \"require('node:fs').rmSync('.test-dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
+  <title id="title">proxy-agent brand</title>
+  <desc id="desc">A shield and route motif representing secure, protocol-aware proxy routing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1220" />
+      <stop offset="100%" stop-color="#1F2A44" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B8A6" />
+      <stop offset="100%" stop-color="#0EA5E9" />
+    </linearGradient>
+  </defs>
+
+  <rect width="640" height="240" rx="24" fill="url(#bg)" />
+
+  <g transform="translate(48 36)">
+    <path
+      d="M72 0l72 24v54c0 58-40 102-72 126C40 180 0 136 0 78V24L72 0z"
+      fill="#0F172A"
+      stroke="#334155"
+      stroke-width="4"
+    />
+    <path
+      d="M72 24l48 16v38c0 42-28 76-48 94-20-18-48-52-48-94V40l48-16z"
+      fill="url(#accent)"
+      opacity="0.2"
+    />
+    <circle cx="44" cy="74" r="9" fill="#E2E8F0" />
+    <circle cx="100" cy="98" r="9" fill="#E2E8F0" />
+    <circle cx="68" cy="138" r="9" fill="#E2E8F0" />
+    <path d="M44 74h36M80 80l20 18M64 132l30-28" stroke="#E2E8F0" stroke-width="6" stroke-linecap="round" />
+  </g>
+
+  <g transform="translate(220 82)">
+    <text x="0" y="0" fill="#F8FAFC" font-size="44" font-family="Segoe UI, Arial, sans-serif" font-weight="700">proxy-agent</text>
+    <text x="0" y="38" fill="#94A3B8" font-size="18" font-family="Segoe UI, Arial, sans-serif">
+      Protocol-aware Node.js proxy agent factory
+    </text>
+  </g>
+</svg>

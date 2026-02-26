@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+RUN_PHASE_SCRIPT="${SCRIPT_DIR}/run-phase.sh"
+
+PACKAGE_DIRS=(
+  "packages/proxy-core"
+  "packages/proxy-agent"
+  "packages/proxy-http-client"
+)
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+require_command() {
+  local command_name="$1"
+  if ! command -v "${command_name}" >/dev/null 2>&1; then
+    echo "Missing required command: ${command_name}" >&2
+    exit 1
+  fi
+}
+
+read_package_name() {
+  local package_json="$1"
+  node -e '
+const fs = require("node:fs");
+const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (typeof pkg.name !== "string" || pkg.name.length === 0) {
+  throw new Error(`Missing package name in ${process.argv[1]}`);
+}
+process.stdout.write(pkg.name);
+' "${package_json}"
+}
+
+read_pack_filename() {
+  node -e '
+const fs = require("node:fs");
+const input = fs.readFileSync(0, "utf8").trim();
+const start = input.indexOf("[");
+if (start < 0) {
+  throw new Error(`npm pack did not return JSON: ${input}`);
+}
+const parsed = JSON.parse(input.slice(start));
+if (!Array.isArray(parsed) || parsed.length !== 1) {
+  throw new Error("Unexpected npm pack JSON payload");
+}
+const filename = parsed[0]?.filename;
+if (typeof filename !== "string" || filename.length === 0) {
+  throw new Error("Missing npm pack filename");
+}
+process.stdout.write(filename);
+'
+}
+
+extract_packed_package() {
+  local package_name="$1"
+  local tarball_path="$2"
+  local package_scope="${package_name%%/*}"
+  local package_basename="${package_name##*/}"
+  local destination_dir
+
+  if [[ "${package_name}" == @*/* ]]; then
+    destination_dir="${CONSUMER_DIR}/node_modules/${package_scope}/${package_basename}"
+  else
+    destination_dir="${CONSUMER_DIR}/node_modules/${package_name}"
+  fi
+
+  mkdir -p "${destination_dir}"
+  tar -xzf "${tarball_path}" -C "${destination_dir}" --strip-components=1
+}
+
+write_consumer_smoke_files() {
+  cat > "${CONSUMER_DIR}/package.json" <<'JSON'
+{
+  "name": "consumer-smoke-temp",
+  "private": true,
+  "type": "module"
+}
+JSON
+
+  cat > "${CONSUMER_DIR}/consumer-smoke.mjs" <<'JS'
+import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import {
+  loadProxySettings as loadCoreProxySettings,
+  resolveProxyForUrl as resolveCoreProxyForUrl
+} from "@commandrelay/proxy-core";
+import {
+  ProxyAgentFactory,
+  loadProxySettings as loadAgentProxySettings,
+  resolveProxyForUrl as resolveAgentProxyForUrl
+} from "@commandrelay/proxy-agent";
+import { requestJson } from "@commandrelay/proxy-http-client";
+
+const coreSettings = loadCoreProxySettings({
+  http_proxy: "http://proxy.local:8080",
+  https_proxy: "http://secure-proxy.local",
+  no_proxy: "internal.local"
+});
+assert.equal(
+  resolveCoreProxyForUrl("https://public.local", coreSettings),
+  "http://secure-proxy.local/"
+);
+assert.equal(resolveCoreProxyForUrl("https://api.internal.local", coreSettings), null);
+
+const agentSettings = loadAgentProxySettings({
+  http_proxy: "http://proxy.local:8080",
+  no_proxy: "internal.local"
+});
+const proxiedFactory = new ProxyAgentFactory({ settings: agentSettings, maxCacheEntries: 16 });
+const firstProxyResolution = proxiedFactory.resolve("http://public.local");
+assert.equal(firstProxyResolution.viaProxy, true);
+assert.equal(firstProxyResolution.proxyUrl, "http://proxy.local:8080/");
+assert.ok(firstProxyResolution.agent);
+
+const cachedProxyResolution = proxiedFactory.resolve("http://another.public.local");
+assert.equal(cachedProxyResolution.fromCache, true);
+assert.equal(cachedProxyResolution.agent, firstProxyResolution.agent);
+assert.equal(resolveAgentProxyForUrl("http://api.internal.local", agentSettings), null);
+assert.equal(proxiedFactory.resolve("http://api.internal.local").viaProxy, false);
+
+const directFactory = new ProxyAgentFactory({
+  settings: {
+    httpProxy: null,
+    httpsProxy: null,
+    allProxy: null,
+    noProxy: []
+  }
+});
+
+class FakeClientRequest extends EventEmitter {
+  constructor(onEnd) {
+    super();
+    this.onEnd = onEnd;
+    this.bodyChunks = [];
+  }
+
+  write(chunk) {
+    this.bodyChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+    return true;
+  }
+
+  end(chunk) {
+    if (chunk !== undefined) {
+      this.write(chunk);
+    }
+    this.onEnd(this);
+  }
+
+  destroy(error) {
+    if (error) {
+      this.emit("error", error);
+    }
+    return this;
+  }
+
+  bodyText() {
+    return Buffer.concat(this.bodyChunks).toString("utf8");
+  }
+}
+
+let capturedRequest = null;
+const createRequest = (_options, callback) => {
+  const request = new FakeClientRequest((finalizedRequest) => {
+    capturedRequest = finalizedRequest;
+    const response = new EventEmitter();
+    response.statusCode = 200;
+    response.headers = { "content-type": "application/json" };
+    callback(response);
+    response.emit("data", Buffer.from(JSON.stringify({ ok: true })));
+    response.emit("end");
+  });
+  return request;
+};
+
+const transport = {
+  httpRequest: createRequest,
+  httpsRequest: createRequest
+};
+
+const response = await requestJson("http://consumer-smoke.local/health", {
+  method: "POST",
+  body: { ping: true },
+  proxyResolver: directFactory,
+  timeoutMs: 3_000,
+  transport
+});
+assert.equal(response.status, 200);
+assert.deepEqual(response.body, { ok: true });
+assert.ok(capturedRequest);
+assert.equal(capturedRequest.bodyText(), '{"ping":true}');
+
+console.log("consumer smoke verification passed");
+JS
+}
+
+require_command "node"
+require_command "npm"
+require_command "tar"
+
+TMP_ROOT="$(mktemp -d "${REPO_ROOT}/.consumer-smoke.XXXXXX")"
+PACK_DIR="${TMP_ROOT}/packs"
+CONSUMER_DIR="${TMP_ROOT}/consumer"
+PACKED_LIST_FILE="${TMP_ROOT}/packed-modules.txt"
+mkdir -p "${PACK_DIR}" "${CONSUMER_DIR}"
+
+cleanup() {
+  rm -rf "${TMP_ROOT}"
+}
+trap cleanup EXIT
+
+export NPM_CONFIG_CACHE="${TMP_ROOT}/.npm-cache"
+export npm_config_audit="false"
+export npm_config_fund="false"
+export npm_config_update_notifier="false"
+
+log "Building package artifacts"
+"${RUN_PHASE_SCRIPT}" build
+
+for package_dir in "${PACKAGE_DIRS[@]}"; do
+  package_json="${REPO_ROOT}/${package_dir}/package.json"
+  if [[ ! -f "${package_json}" ]]; then
+    echo "Missing package.json: ${package_json}" >&2
+    exit 1
+  fi
+
+  package_name="$(read_package_name "${package_json}")"
+  log "Packing ${package_name}"
+  pack_output="$(
+    cd "${REPO_ROOT}/${package_dir}"
+    npm pack --json --silent --pack-destination "${PACK_DIR}"
+  )"
+  filename="$(printf '%s' "${pack_output}" | read_pack_filename)"
+  tarball_path="${PACK_DIR}/${filename}"
+
+  if [[ ! -f "${tarball_path}" ]]; then
+    echo "Packed artifact missing: ${tarball_path}" >&2
+    exit 1
+  fi
+
+  printf '%s\t%s\n' "${package_name}" "${tarball_path}" >> "${PACKED_LIST_FILE}"
+done
+
+mkdir -p "${CONSUMER_DIR}/node_modules"
+while IFS=$'\t' read -r package_name tarball_path; do
+  extract_packed_package "${package_name}" "${tarball_path}"
+done < "${PACKED_LIST_FILE}"
+
+write_consumer_smoke_files
+
+log "Running temporary consumer smoke checks"
+(
+  cd "${CONSUMER_DIR}"
+  node consumer-smoke.mjs
+)
+
+log "Consumer smoke verification completed"

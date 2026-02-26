@@ -1,0 +1,52 @@
+{
+  "name": "commandrelay-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "description": "CommandRelay tmux bridge core engine",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "check": "npm run check:root",
+    "check:root": "tsc --noEmit",
+    "check:packages": "scripts/packages/run-phase.sh check",
+    "check:all": "scripts/packages/run-phase.sh check --include-root --root-script check:root",
+    "build": "npm run build:all",
+    "build:packages": "scripts/packages/run-phase.sh build",
+    "build:all": "npm run build:packages",
+    "test": "npm run test:root",
+    "test:root": "node --import tsx --test src/**/*.test.ts",
+    "test:packages": "scripts/packages/run-phase.sh test",
+    "test:all": "scripts/packages/run-phase.sh test --include-root --root-script test:root",
+    "verify:consumer-smoke": "scripts/packages/verify-consumer-smoke.sh",
+    "ci:packages": "npm run check:packages && npm run build:packages && npm run test:packages && npm run verify:consumer-smoke",
+    "ci:check": "npm run check:all",
+    "ci:build": "npm run build:all",
+    "ci:test": "npm run test:all && npm run verify:consumer-smoke",
+    "ci:all": "npm run ci:check && npm run ci:build && npm run ci:test",
+    "test:ci:all": "scripts/ci-test-all.sh",
+    "test:ci:web-smoke": "scripts/ci-test-target.sh web-smoke",
+    "bench:connect": "node --import tsx scripts/perf/connect-latency.ts",
+    "bench:list": "node --import tsx scripts/perf/list-sessions-roundtrip.ts",
+    "bench:input": "node --import tsx scripts/perf/input-ack-roundtrip.ts"
+  },
+  "dependencies": {
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "pac-proxy-agent": "^7.2.0",
+    "socks-proxy-agent": "^8.0.5",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

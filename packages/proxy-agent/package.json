@@ -1,0 +1,63 @@
+{
+  "name": "@commandrelay/proxy-agent",
+  "version": "0.1.0",
+  "description": "Protocol-aware proxy agent factory for http/https/socks/pac targets",
+  "keywords": [
+    "commandrelay",
+    "proxy",
+    "proxy-agent",
+    "http-proxy",
+    "socks-proxy",
+    "typescript"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/proxy-agent"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "test": "node --import tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@commandrelay/proxy-core": "^0.1.0",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "pac-proxy-agent": "^7.2.0",
+    "socks-proxy-agent": "^8.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CommandRelay Control</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="shell">
+    <header class="panel topbar" aria-label="Connection controls">
+      <div class="topbar-heading">
+        <h1>CommandRelay Control</h1>
+        <p>Operational terminal control with replay-safe reconnect and policy-guarded input.</p>
+      </div>
+      <div class="status-row" role="status" aria-live="polite" aria-atomic="true">
+        <span class="badge" id="connection-badge" data-state="disconnected" aria-label="Connection disconnected">Disconnected</span>
+        <span class="status-text" id="status-text">Waiting for connection.</span>
+      </div>
+      <form id="connection-form" class="connection-form">
+        <label for="ws-url">WebSocket URL</label>
+        <input id="ws-url" name="ws-url" type="url" inputmode="url" required>
+        <label for="auth-token">Auth Token</label>
+        <input id="auth-token" name="auth-token" type="password" autocomplete="off" placeholder="Optional for open mode">
+        <label class="inline-check" for="auto-reconnect">
+          <input id="auto-reconnect" type="checkbox" checked>
+          Auto reconnect
+        </label>
+        <div class="button-row">
+          <button id="connect-btn" type="submit" accesskey="c" aria-keyshortcuts="Alt+Shift+C">Connect</button>
+          <button id="disconnect-btn" type="button" accesskey="d" aria-keyshortcuts="Alt+Shift+D">Disconnect</button>
+          <button id="refresh-sessions-btn" type="button" aria-controls="sessions-list sessions-meta" accesskey="r" aria-keyshortcuts="Alt+Shift+R">Refresh Sessions</button>
+          <button id="clear-output-btn" type="button" aria-controls="output-log" accesskey="l" aria-keyshortcuts="Alt+Shift+L">Clear Output</button>
+        </div>
+      </form>
+    </header>
+
+    <main id="main-content" class="layout">
+      <section class="panel sessions-panel" aria-labelledby="sessions-title">
+        <div class="section-heading">
+          <h2 id="sessions-title">Sessions</h2>
+          <p id="sessions-meta" role="status" aria-live="polite" aria-atomic="true">No session data yet.</p>
+        </div>
+        <ul id="sessions-list" class="sessions-list" role="list" aria-describedby="sessions-meta"></ul>
+      </section>
+
+      <section class="panel stream-panel" aria-labelledby="stream-title">
+        <div class="section-heading stream-heading">
+          <div>
+            <h2 id="stream-title">Live Pane Stream</h2>
+            <p id="active-pane-label" role="status" aria-live="polite">Not attached to a pane.</p>
+          </div>
+          <div class="button-row compact">
+            <button id="enable-input-btn" type="button" accesskey="e">Enable Input</button>
+            <button id="disable-input-btn" type="button" accesskey="x">Disable Input</button>
+          </div>
+        </div>
+
+        <pre id="output-log" class="output-log" role="log" aria-live="polite" aria-relevant="additions text" tabindex="0"></pre>
+
+        <form id="command-form" class="command-form">
+          <label for="command-input">Command Lane</label>
+          <textarea id="command-input" rows="3" aria-describedby="command-help" aria-keyshortcuts="Enter Shift+Enter" placeholder="Type a command. Press Enter to send, Shift+Enter for newline."></textarea>
+          <p id="command-help" class="field-help">Keyboard: <kbd>Enter</kbd> sends, <kbd>Shift</kbd>+<kbd>Enter</kbd> inserts a newline. Access keys: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> connects, <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> refreshes sessions.</p>
+          <div class="command-controls">
+            <label class="inline-check" for="append-newline">
+              <input id="append-newline" type="checkbox" checked>
+              Append newline
+            </label>
+            <label class="inline-check" for="override-lane">
+              <input id="override-lane" type="checkbox">
+              Override lane ownership
+            </label>
+            <button id="send-command-btn" type="submit" accesskey="s" aria-keyshortcuts="Alt+Shift+S">Send</button>
+          </div>
+        </form>
+
+        <ol id="command-history" class="command-history" aria-label="Command send history"></ol>
+      </section>
+    </main>
+  </div>
+
+  <section id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false" aria-label="Status notifications"></section>
+</body>
+</html>

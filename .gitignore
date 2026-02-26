@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Local agent/runtime state
+.claude/
+.mcp.json
+CLAUDE.md
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+tmp/
+.tmp/
+.ci-artifacts/
+
+# Generated package artifacts (build output; never commit)
+packages/*/dist/
+packages/*/.test-dist/
+
+# iOS generated artifacts
+apps/ios/CommandRelay/**/*.xcodeproj/
+apps/ios/CommandRelay/**/xcuserdata/
+apps/ios/CommandRelay/**/DerivedData/

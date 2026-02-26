@@ -1,0 +1,130 @@
+/**
+ * @file Replay-focused unit tests for bridge engine reconnect behavior.
+ */
+
+import assert from "node:assert/strict";
+import test from "node:test";
+import { BridgeEngine, type BridgePaneEvent } from "./bridge-engine.js";
+
+interface CapturePaneMock {
+  calls: Array<{ paneId: string; lines: number }>;
+  capturePane: (paneId: string, lines: number) => Promise<string>;
+}
+
+interface RecordedOutput {
+  clientId: string;
+  event: BridgePaneEvent;
+}
+
+/**
+ * Creates a deterministic capturePane mock from queued snapshots.
+ *
+ * @param outputs Ordered pane outputs returned on each call.
+ * @returns Capture mock and call records.
+ */
+function createCapturePaneMock(outputs: string[]): CapturePaneMock {
+  const queue = [...outputs];
+  const calls: Array<{ paneId: string; lines: number }> = [];
+
+  return {
+    calls,
+    async capturePane(paneId: string, lines: number): Promise<string> {
+      calls.push({ paneId, lines });
+      const next = queue.shift();
+      if (next === undefined) {
+        throw new Error("capturePane called with an empty output queue");
+      }
+      return next;
+    }
+  };
+}
+
+/**
+ * Asserts that sequence numbers are strictly increasing.
+ *
+ * @param seqs Sequence list to validate.
+ */
+function assertStrictlyIncreasing(seqs: number[]): void {
+  for (let i = 1; i < seqs.length; i += 1) {
+    assert.ok(seqs[i] > seqs[i - 1], `expected strictly increasing replay seqs, got ${seqs}`);
+  }
+}
+
+test("attach(lastSeq) replays only missing events with no duplicates", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const capture = createCapturePaneMock(["a", "ab", "abc", "abcd"]);
+  const outputEvents: RecordedOutput[] = [];
+
+  const engine = new BridgeEngine({
+    tmux: { capturePane: capture.capturePane },
+    replayLines: 80,
+    pollIntervalMs: 25,
+    maxHistoryEvents: 20,
+    onOutput: (clientId, event) => outputEvents.push({ clientId, event }),
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("seed-client", "%1");
+  await engine.pollOnce();
+  await engine.pollOnce();
+  await engine.pollOnce();
+
+  await engine.attach("reconnect-client", "%1", 2);
+
+  const replayed = outputEvents
+    .filter((entry) => entry.clientId === "reconnect-client")
+    .map((entry) => entry.event);
+
+  assert.deepEqual(replayed.map((event) => event.streamSeq), [3, 4]);
+  assert.deepEqual(replayed.map((event) => event.chunk), ["c", "d"]);
+  assert.ok(replayed.every((event) => event.streamSeq > 2));
+  assert.equal(new Set(replayed.map((event) => event.streamSeq)).size, replayed.length);
+  assertStrictlyIncreasing(replayed.map((event) => event.streamSeq));
+});
+
+test("replay output stays ordered even if watcher history storage is out-of-order", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const capture = createCapturePaneMock(["x", "xy", "xyz", "xyzz"]);
+  const outputEvents: RecordedOutput[] = [];
+
+  const engine = new BridgeEngine({
+    tmux: { capturePane: capture.capturePane },
+    replayLines: 80,
+    pollIntervalMs: 25,
+    maxHistoryEvents: 20,
+    onOutput: (clientId, event) => outputEvents.push({ clientId, event }),
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("seed-client", "%9");
+  await engine.pollOnce();
+  await engine.pollOnce();
+  await engine.pollOnce();
+
+  const panes = (
+    engine as unknown as {
+      panes: Map<string, { history: BridgePaneEvent[] }>;
+    }
+  ).panes;
+  const watcher = panes.get("%9");
+  assert.ok(watcher);
+  assert.equal(watcher.history.length, 4);
+
+  // Emulate a corrupted internal ordering and verify replay re-sorts by seq.
+  watcher.history = [watcher.history[3], watcher.history[1], watcher.history[2], watcher.history[0]];
+
+  await engine.attach("reconnect-client", "%9", 1);
+  const replayed = outputEvents
+    .filter((entry) => entry.clientId === "reconnect-client")
+    .map((entry) => entry.event);
+  const seqs = replayed.map((event) => event.streamSeq);
+
+  assert.deepEqual(seqs, [2, 3, 4]);
+  assert.ok(replayed.every((event) => event.streamSeq > 1));
+  assert.equal(new Set(seqs).size, seqs.length);
+  assertStrictlyIncreasing(seqs);
+});

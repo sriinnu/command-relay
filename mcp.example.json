@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "chitragupta": {
+      "command": "/absolute/path/to/terminal/scripts/chitragupta/start-mcp.sh",
+      "args": [
+        "--chitragupta-dir",
+        "/absolute/path/to/chitragupta",
+        "--project",
+        "/absolute/path/to/terminal",
+        "--name",
+        "terminal"
+      ],
+      "env": {
+        "CHITRAGUPTA_MCP_AGENT": "true",
+        "CHITRAGUPTA_MCP_PROJECT": "/absolute/path/to/terminal",
+        "CHITRAGUPTA_MCP_NAME": "terminal"
+      }
+    }
+  }
+}
