@@ -83,11 +83,54 @@ export type PaneInputClaimResult =
     overrideAllowed: boolean;
   };
 
+const DEFAULT_PANE_INPUT_LEASE_DURATION_MS = 30_000;
+
+interface PaneInputOwnerLease {
+  clientId: string;
+  expiresAtMs: number;
+}
+
+/**
+ * Configures pane input ownership arbitration lease behavior.
+ */
+export interface PaneInputOwnershipArbiterConfig {
+  /**
+   * Ownership lease duration in milliseconds.
+   * Invalid values fall back to a safe default.
+   */
+  leaseDurationMs?: number;
+
+  /**
+   * Clock source for deterministic tests.
+   */
+  now?: () => number;
+}
+
+function resolveLeaseDurationMs(leaseDurationMs: number | undefined): number {
+  if (typeof leaseDurationMs !== "number") return DEFAULT_PANE_INPUT_LEASE_DURATION_MS;
+  if (!Number.isFinite(leaseDurationMs) || leaseDurationMs <= 0) {
+    return DEFAULT_PANE_INPUT_LEASE_DURATION_MS;
+  }
+  return leaseDurationMs;
+}
+
 /**
  * Tracks pane input ownership for multi-client arbitration.
  */
 export class PaneInputOwnershipArbiter {
-  private readonly paneOwners = new Map<string, string>();
+  private readonly paneOwners = new Map<string, PaneInputOwnerLease>();
+  private readonly leaseDurationMs: number;
+  private readonly now: () => number;
+
+  /**
+   * Creates a lane ownership arbiter with optional lease controls.
+   *
+   * @param config Optional lease configuration.
+   */
+  constructor(config?: PaneInputOwnershipArbiterConfig) {
+    this.leaseDurationMs = resolveLeaseDurationMs(config?.leaseDurationMs);
+    this.now = config?.now ?? Date.now;
+  }
 
   /**
    * Attempts to claim ownership of a pane's input lane.
@@ -104,14 +147,15 @@ export class PaneInputOwnershipArbiter {
     overrideRequested: boolean,
     overrideAllowed: boolean
   ): PaneInputClaimResult {
-    const currentOwner = this.paneOwners.get(paneId);
+    this.expireStaleOwners();
+    const currentOwner = this.paneOwners.get(paneId)?.clientId;
     if (!currentOwner || currentOwner === clientId) {
-      this.paneOwners.set(paneId, clientId);
+      this.setOwner(paneId, clientId);
       return { ok: true, overridden: false };
     }
 
     if (overrideRequested && overrideAllowed) {
-      this.paneOwners.set(paneId, clientId);
+      this.setOwner(paneId, clientId);
       return { ok: true, overridden: true };
     }
 
@@ -130,7 +174,8 @@ export class PaneInputOwnershipArbiter {
    * @returns Nothing.
    */
   releasePaneIfOwnedBy(paneId: string, clientId: string): void {
-    if (this.paneOwners.get(paneId) === clientId) {
+    this.expireStaleOwners();
+    if (this.paneOwners.get(paneId)?.clientId === clientId) {
       this.paneOwners.delete(paneId);
     }
   }
@@ -142,13 +187,29 @@ export class PaneInputOwnershipArbiter {
    * @returns Number of released pane lanes.
    */
   releaseClient(clientId: string): number {
+    this.expireStaleOwners();
     let released = 0;
-    for (const [paneId, ownerClientId] of this.paneOwners.entries()) {
-      if (ownerClientId !== clientId) continue;
+    for (const [paneId, ownerLease] of this.paneOwners.entries()) {
+      if (ownerLease.clientId !== clientId) continue;
       this.paneOwners.delete(paneId);
       released += 1;
     }
     return released;
+  }
+
+  private setOwner(paneId: string, clientId: string): void {
+    this.paneOwners.set(paneId, {
+      clientId,
+      expiresAtMs: this.now() + this.leaseDurationMs
+    });
+  }
+
+  private expireStaleOwners(): void {
+    const nowMs = this.now();
+    for (const [paneId, ownerLease] of this.paneOwners.entries()) {
+      if (ownerLease.expiresAtMs > nowMs) continue;
+      this.paneOwners.delete(paneId);
+    }
   }
 }
 

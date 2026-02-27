@@ -71,3 +71,8 @@ This contract defines runtime and client behavior when CommandRelay is operated 
 3. Built-in SSH key lifecycle management or secret vault behavior.
 4. Shell intent parsing, semantic key translation, or command policy inference.
 5. Zero-downtime guarantees across backend host restarts or tmux daemon crashes.
+
+## Protocol v1 test-plan references
+1. `TP-WS-MATRIX-COMPAT`: align operation compatibility with [Bridge Protocol v1](./protocol-v1.md#11-contract-compatibility-test-plan-references) and enforce via `ws-contract-matrix` assertions.
+2. `TP-WS-MATRIX-RECONNECT`: align reconnect semantics with protocol `attach(lastSeq)` replay expectations and enforce via `ws-contract-matrix` assertions.
+3. `TP-WS-MATRIX-ASSERTIONS`: source-of-truth tests are in `src/server/ws-contract-matrix.test.ts`.

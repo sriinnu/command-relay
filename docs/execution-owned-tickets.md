@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27
+Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -28,50 +28,69 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P0`
-- Status: `todo`
+- Status: `done`
 - File scope:
   - `docs/ssh-transport-contract.md`
   - `docs/protocol-v1.md`
   - `src/server/ws-contract-matrix.test.ts`
   - `src/server/bridge-server.policy.test.ts`
 - Acceptance criteria:
-  - [ ] SSH connect/auth/list/attach/replay/input/ack/error semantics are documented.
-  - [ ] Reconnect behavior with `lastSeq` is explicitly defined.
-  - [ ] Contract docs reference the corresponding conformance test plan/files.
-  - [ ] SSH/WebSocket compatibility notes are captured or linked.
-
+  - [x] SSH connect/auth/list/attach/replay/input/ack/error semantics are documented.
+  - [x] Reconnect behavior with `lastSeq` is explicitly defined.
+  - [x] Contract docs reference the corresponding conformance test plan/files.
+  - [x] SSH/WebSocket compatibility notes are captured or linked.
+- Evidence:
+  - [Operation Contract Matrix](./ssh-transport-contract.md#operation-contract-matrix)
+  - [Explicit reconnect semantics](./ssh-transport-contract.md#explicit-reconnect-semantics)
+  - [Protocol strict/conformance profile](./protocol-v1.md)
+  - [Contract matrix tests](../src/server/ws-contract-matrix.test.ts)
+  - [Reconnect replay e2e tests](../src/server/bridge-server.replay.e2e.test.ts)
 ### CR-P0-003 Start Host-State Authority Implementation Plan
 
 - Owner: `@owner-tbd`
 - Priority: `P0`
-- Status: `todo`
+- Status: `done`
 - File scope:
+  - `docs/architecture/host-state-authority-plan.md`
   - `docs/architecture.md`
   - `src/server/bridge-server.ts`
   - `src/server/bridge-server-utils.ts`
   - `src/server/audit-log.ts`
+  - `src/server/bridge-server.policy.test.ts`
   - `src/server/bridge-server.replay.e2e.test.ts`
 - Acceptance criteria:
-  - [ ] Plan defines host ownership for lane owner, replay offsets, and capability flags.
-  - [ ] Audit schema fields are specified for enable/disable/input/takeover flows.
-  - [ ] Rollout sequence and fallback behavior are documented.
-  - [ ] At least one implementation slice is linked to validating tests.
+  - [x] Plan defines host ownership for lane owner, replay offsets, and capability flags.
+  - [x] Audit schema fields are specified for enable/disable/input/takeover flows.
+  - [x] Rollout sequence and fallback behavior are documented.
+  - [x] At least one implementation slice is linked to validating tests.
+- Evidence:
+  - [Host-state authority plan](./architecture/host-state-authority-plan.md)
+  - [Audit logger implementation](../src/server/audit-log.ts)
+  - [Lane ownership + reconnect read-only policy tests](../src/server/bridge-server.policy.test.ts)
+  - [Replay resume semantics e2e tests](../src/server/bridge-server.replay.e2e.test.ts)
 
 ### CR-P0-004 Expand Proxy Negative Tests for Malformed Env/Config
 
 - Owner: `@owner-tbd`
 - Priority: `P0`
-- Status: `todo`
+- Status: `in_progress`
 - File scope:
   - `src/net/proxy-agent-factory.test.ts`
   - `src/net/proxy-router.test.ts`
   - `src/net/proxy-agent-factory.ts`
   - `docs/proxy-ecosystem-roadmap.md`
 - Acceptance criteria:
-  - [ ] Negative tests cover malformed proxy URLs and invalid auth fragments.
-  - [ ] Negative tests cover `NO_PROXY` edge cases and fallback behavior.
+  - [x] Negative tests cover malformed proxy URLs and invalid auth fragments.
+  - [x] Negative tests cover `NO_PROXY` edge cases and fallback behavior.
   - [ ] PAC failure behavior is asserted and documented.
   - [ ] Test report notes expected vs actual handling for each malformed input class.
+- Evidence:
+  - [Proxy routing malformed env + NO_PROXY tests](../src/net/proxy-router.test.ts)
+  - [Proxy agent malformed credential/fallback tests](../src/net/proxy-agent-factory.test.ts)
+  - [Proxy hardening roadmap intent](./proxy-ecosystem-roadmap.md)
+- Remaining to close:
+  - Add an explicit PAC failure assertion path.
+  - Publish a malformed-input expected-vs-actual test report artifact.
 
 ## P1 Tickets (This week)
 
@@ -79,7 +98,7 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P1`
-- Status: `todo`
+- Status: `done`
 - File scope:
   - `package.json`
   - `src/server/ws-contract-matrix.test.ts`
@@ -90,14 +109,16 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - `src/net/proxy-router.test.ts`
   - `scripts/checkpoints/runs/`
 - Acceptance criteria:
-  - [ ] The following commands run from a clean workspace and results are captured:
+  - [x] The following commands run from a clean workspace and results are captured:
     - `npm run check`
     - `npm test`
     - `npm run test:ci:all`
     - `node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts`
     - `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`
-  - [ ] Output summary is archived in a dated checkpoint artifact.
-  - [ ] Any failures include owner + next action in the artifact.
+  - [x] Output summary is archived in a dated checkpoint artifact.
+  - [x] Any failures include owner + next action in the artifact.
+- Evidence:
+  - [2026-02-27 validation checkpoint](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
 
 ### CR-P1-002 Update Weekly Checkpoint + Mirror Milestone Decisions
 

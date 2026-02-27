@@ -375,3 +375,9 @@ Web Tab A                                  Server                               
 1. Runtime supports strict and compatibility parser modes.
 2. Runtime default is strict parse mode (`COMMANDRELAY_STRICT_PROTOCOL_PARSING=true`), with optional compatibility mode when disabled.
 3. Clients should treat unknown server events as ignorable unless operating in strict test mode.
+
+## 11. Contract Compatibility Test Plan References
+
+1. `TP-WS-MATRIX-COMPAT`: compatibility operation coverage is defined by [SSH transport operation matrix](./ssh-transport-contract.md#operation-contract-matrix).
+2. `TP-WS-MATRIX-RECONNECT`: reconnect-resume coverage is defined by [SSH transport reconnect semantics](./ssh-transport-contract.md#explicit-reconnect-semantics).
+3. `TP-WS-MATRIX-ASSERTIONS`: executable conformance assertions are implemented in `src/server/ws-contract-matrix.test.ts`.

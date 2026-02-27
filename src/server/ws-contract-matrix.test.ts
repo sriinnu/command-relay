@@ -36,24 +36,11 @@ interface GatewayContext {
 }
 
 const STRICT_TS = 1_771_934_131_735;
+const PROTOCOL_V1_DOC = new URL("../../docs/protocol-v1.md", import.meta.url);
 const SSH_TRANSPORT_CONTRACT_DOC = new URL("../../docs/ssh-transport-contract.md", import.meta.url);
-const REQUIRED_REQUEST_ID_TYPES = new Set<ProtocolV1RequiredEventType>([
-  "auth",
-  "list_sessions",
-  "attach",
-  "input",
-  "ack",
-  "error"
-]);
+const CONTRACT_PLAN_REFERENCE_IDS = ["TP-WS-MATRIX-COMPAT", "TP-WS-MATRIX-RECONNECT", "TP-WS-MATRIX-ASSERTIONS"] as const;
+const REQUIRED_REQUEST_ID_TYPES = new Set<ProtocolV1RequiredEventType>(["auth", "list_sessions", "attach", "input", "ack", "error"]);
 
-/**
- * Builds a strict v1 envelope JSON string for parser tests.
- *
- * @param type v1 event type.
- * @param requestId Optional request identifier.
- * @param payload Optional payload value.
- * @returns Strict v1 json envelope.
- */
 function buildStrictRaw(
   type: string,
   requestId?: string,
@@ -68,11 +55,6 @@ function buildStrictRaw(
   });
 }
 
-/**
- * Creates a fake socket and captures sent envelopes.
- *
- * @returns Socket recorder values.
- */
 function createSocketRecorder(): { socket: FakeSocket; sent: SentEnvelope[] } {
   const sent: SentEnvelope[] = [];
   const socket: FakeSocket = {
@@ -86,12 +68,6 @@ function createSocketRecorder(): { socket: FakeSocket; sent: SentEnvelope[] } {
   return { socket, sent };
 }
 
-/**
- * Creates a baseline gateway context for policy transition tests.
- *
- * @param globalInputDisabled Global input kill switch state.
- * @returns Context plus outbound capture records.
- */
 function createGatewayContext(globalInputDisabled: boolean): GatewayContext {
   const { socket, sent } = createSocketRecorder();
   const sentInputs: Array<{ paneId: string; input: string }> = [];
@@ -265,24 +241,35 @@ test("strict parsing matrix accepts runtime extension commands in live strict mo
   assert.equal(parsed.message.requestId, "req-enable");
 });
 
-test("contract matrix keeps compatibility declarations for connect/auth/list/attach/replay/input/ack/error", () => {
-  const doc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
+test("contract matrix keeps compatibility declarations and cross-doc test-plan references", () => {
+  const protocolDoc = readFileSync(PROTOCOL_V1_DOC, "utf8");
+  const sshDoc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
+  const operationSection = sshDoc.split("## Operation Contract Matrix")[1]?.split("## Session and runtime model")[0];
+  assert.ok(operationSection, "missing ssh operation matrix section");
   const requiredTypes = new Set<string>(PROTOCOL_V1_REQUIRED_EVENT_TYPES);
   for (const type of ["auth", "list_sessions", "attach", "input", "ack", "error"]) {
     assert.equal(requiredTypes.has(type), true, `missing required compatibility type ${type}`);
   }
-  for (const token of ["connect", "auth", "list", "attach", "replay", "input", "ack", "error"]) {
-    assert.match(doc, new RegExp("`" + token + "`"));
+  for (const token of ["connect", "auth", "list", "attach", "replay", "input", "ack", "error", "list_sessions", "session_list", "lastSeq"]) {
+    assert.match(operationSection, new RegExp("`" + token + "`"));
   }
-  assert.match(doc, /no standalone `replay` message type/i);
+  assert.match(operationSection, /`streamSeq > lastSeq`/);
+  assert.match(operationSection, /no standalone `replay` message type/i);
+  for (const referenceId of CONTRACT_PLAN_REFERENCE_IDS) {
+    assert.match(protocolDoc, new RegExp("`" + referenceId + "`"));
+    assert.match(sshDoc, new RegExp("`" + referenceId + "`"));
+  }
+  assert.match(protocolDoc, /\(\.\/ssh-transport-contract\.md#/);
+  assert.match(sshDoc, /\(\.\/protocol-v1\.md#/);
 });
 
 test("contract matrix documents reconnect expectations as attach(lastSeq) resume path", () => {
-  const doc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
-  assert.match(doc, /new transport connection and new `hello\.payload\.clientId`/);
-  assert.match(doc, /Client re-runs auth .* before non-auth operations\./);
-  assert.match(doc, /reattaches each pane using `attach` .* `lastSeq` cursor/i);
-  assert.match(doc, /Reconnect never re-enables write mode automatically/i);
+  const sshDoc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
+  const reconnectSection = sshDoc.split("## Explicit reconnect semantics")[1]?.split("## Safety controls")[0];
+  assert.ok(reconnectSection, "missing ssh reconnect semantics section");
+  for (const token of ["`hello.payload.clientId`", "`attach`", "`lastSeq`", "`enable_input`", "before non-auth operations"]) {
+    assert.match(reconnectSection, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("policy transition matrix applies enable -> input -> disable flow", async () => {

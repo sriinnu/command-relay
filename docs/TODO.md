@@ -128,9 +128,9 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - finish proxy API surface audit for v0.1 candidates
   - close negative-test gaps for proxy env parsing/fallback
 - Acceptance criteria:
-  - [ ] SSH contract/spec document merged and referenced by tests.
-  - [ ] At least one automated suite exercises SSH reconnect with `lastSeq` replay.
-  - [ ] Proxy test report includes malformed URL + NO_PROXY + PAC failure cases with expected results.
+  - [x] SSH contract/spec document merged and referenced by tests ([contract](./ssh-transport-contract.md), [matrix test](../src/server/ws-contract-matrix.test.ts)).
+  - [x] At least one automated suite exercises SSH reconnect with `lastSeq` replay ([replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
+  - [ ] Proxy test report includes malformed URL + NO_PROXY + PAC failure cases with expected results (in progress: [proxy router tests](../src/net/proxy-router.test.ts), [proxy factory tests](../src/net/proxy-agent-factory.test.ts)).
 
 ### Milestone W2 (2026-03-09 to 2026-03-15)
 
@@ -179,14 +179,16 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### P0 (Today -> next 48h)
 
-- [ ] Convert this TODO into owned tickets with single owners and explicit file scope.
-- [ ] Land SSH transport contract doc + test plan references.
-- [ ] Start host-state authority implementation plan (lane owner + replay offsets + audit schema).
-- [ ] Execute proxy negative-test expansion for malformed env/config inputs.
+- [x] Convert this TODO into owned tickets with single owners and explicit file scope ([execution board](./execution-owned-tickets.md)).
+- [x] Land SSH transport contract doc + test plan references ([contract](./ssh-transport-contract.md), [protocol references](./protocol-v1.md#11-contract-compatibility-test-plan-references), [contract tests](../src/server/ws-contract-matrix.test.ts)).
+- [x] Start host-state authority implementation plan (lane owner + replay offsets + audit schema) ([plan](./architecture/host-state-authority-plan.md), [policy tests](../src/server/bridge-server.policy.test.ts)).
+- [ ] Execute proxy negative-test expansion for malformed env/config inputs (in progress: [proxy router tests](../src/net/proxy-router.test.ts), [proxy factory tests](../src/net/proxy-agent-factory.test.ts)).
 
 ### P1 (This week)
 
-- [ ] Run and archive core validation suites:
+- Latest checkpoint evidence: [2026-02-27-feat-ssh-exploration-validation-checkpoint.md](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
+
+- [x] Run and archive core validation suites:
   - `npm run check`
   - `npm test`
   - `npm run test:ci:all`
