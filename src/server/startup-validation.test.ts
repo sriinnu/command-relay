@@ -78,3 +78,63 @@ test("accepts loopback host without auth and non-loopback host with auth", () =>
   });
   validateStartupConfig(remoteConfig);
 });
+
+test("defaults transport to ws with ssh-safe defaults", () => {
+  const config = loadConfig({});
+
+  assert.equal(config.transportMode, "ws");
+  assert.equal(config.sshProfileName, "primary");
+  assert.equal(config.sshPort, 22);
+  assert.equal(config.sshStrictHostKeyChecking, true);
+});
+
+test("parses ssh transport mode", () => {
+  const config = loadConfig({ COMMANDRELAY_TRANSPORT_MODE: "ssh" });
+
+  assert.equal(config.transportMode, "ssh");
+});
+
+test("rejects invalid transport mode values", () => {
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_TRANSPORT_MODE: "serial" }),
+    /COMMANDRELAY_TRANSPORT_MODE/
+  );
+});
+
+test("requires ssh target when transport mode is ssh", () => {
+  const config = loadConfig({
+    COMMANDRELAY_TRANSPORT_MODE: "ssh"
+  });
+
+  assert.throws(() => validateStartupConfig(config), /COMMANDRELAY_SSH_TARGET/);
+});
+
+test("accepts ssh transport mode when ssh target is provided", () => {
+  const config = loadConfig({
+    COMMANDRELAY_TRANSPORT_MODE: "ssh",
+    COMMANDRELAY_SSH_TARGET: "relay@example.internal"
+  });
+
+  validateStartupConfig(config);
+});
+
+test("parses ssh port override when value is valid", () => {
+  const config = loadConfig({ COMMANDRELAY_SSH_PORT: "2202" });
+  assert.equal(config.sshPort, 2202);
+});
+
+test("rejects invalid ssh port values", () => {
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_PORT: "0" }), /COMMANDRELAY_SSH_PORT/);
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_PORT: "70000" }), /COMMANDRELAY_SSH_PORT/);
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_PORT: "22.5" }), /COMMANDRELAY_SSH_PORT/);
+});
+
+test("parses strict host key env and rejects invalid values", () => {
+  const disabled = loadConfig({ COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING: "off" });
+  assert.equal(disabled.sshStrictHostKeyChecking, false);
+
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING: "sometimes" }),
+    /COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING/
+  );
+});

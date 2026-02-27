@@ -47,6 +47,30 @@ Notes:
 5. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
 6. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
 
+## SSH Transport Environment
+
+Use these env vars for SSH transport startup:
+
+1. `COMMANDRELAY_TRANSPORT_MODE`: transport mode selector. Allowed values are `ws` (default) and `ssh`.
+2. `COMMANDRELAY_SSH_PROFILE`: SSH profile name. Defaults to `primary`; blank values fall back to `primary`.
+3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
+4. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
+5. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
+
+Current status: `COMMANDRELAY_TRANSPORT_MODE=ssh` is wired and validated at startup, but SSH runtime execution is not implemented yet. Startup exits after validation with an explicit not-implemented error.
+
+Copy-paste startup example (`ssh` mode):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_TRANSPORT_MODE=ssh \
+COMMANDRELAY_SSH_PROFILE=primary \
+COMMANDRELAY_SSH_TARGET=relay@example.internal \
+COMMANDRELAY_SSH_PORT=22 \
+COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true \
+npm run start
+```
+
 ## Web App Route Usage (Current Runtime)
 
 The gateway is an HTTP + WebSocket server with a small route surface:

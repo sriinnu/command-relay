@@ -85,7 +85,20 @@ npm run check
 npm start
 ```
 
-Default local endpoints:
+Optional SSH startup wiring (remote profile orchestration contract):
+
+```bash
+export COMMANDRELAY_TRANSPORT_MODE=ssh
+export COMMANDRELAY_SSH_PROFILE=primary
+export COMMANDRELAY_SSH_TARGET="dev@relay-host"
+export COMMANDRELAY_SSH_PORT=22
+export COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true
+npm start
+```
+
+Current runtime data path remains the WS server (`/ws`) with tmux backends. SSH mode currently adds startup wiring and target-contract validation for remote profile orchestration, then exits with a not-implemented runtime error.
+
+Default local endpoints (current runtime path):
 
 1. `GET http://127.0.0.1:8787/health`
 2. `http://127.0.0.1:8787/app/` (when static app hosting is enabled)
@@ -98,6 +111,11 @@ Default local endpoints:
 | `COMMANDRELAY_AUTH_TOKEN` | Token auth for non-loopback binds |
 | `COMMANDRELAY_RUNTIME_BACKENDS` | Runtime backends (`tmux` default, optional `tmux,cmux`) |
 | `COMMANDRELAY_CMUX_COMMAND` | Optional `cmux` command/path override |
+| `COMMANDRELAY_TRANSPORT_MODE` | Startup transport selector (`ws` default, `ssh` enables SSH target contract checks) |
+| `COMMANDRELAY_SSH_PROFILE` | SSH profile name used by remote profile orchestration wiring (`primary` default) |
+| `COMMANDRELAY_SSH_TARGET` | SSH target (`user@host`); required when `COMMANDRELAY_TRANSPORT_MODE=ssh` |
+| `COMMANDRELAY_SSH_PORT` | SSH target port override (`22` default) |
+| `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` | SSH strict host key checking policy (`true` default) |
 | `COMMANDRELAY_INPUT_KILL_SWITCH` | Global input disable switch |
 | `COMMANDRELAY_ALLOW_INPUT_OVERRIDE` | Allow/deny forced lane takeover |
 | `COMMANDRELAY_MAX_INPUT_BYTES` | Max input payload size |

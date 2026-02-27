@@ -3,7 +3,13 @@
  */
 
 import process from "node:process";
-import { loadConfig, type RuntimeBackend as RuntimeBackendId, validateStartupConfig } from "./config.js";
+import {
+  loadConfig,
+  type BridgeConfig,
+  type RuntimeBackend as RuntimeBackendId,
+  type TransportMode,
+  validateStartupConfig
+} from "./config.js";
 import { TmuxAdapter } from "./tmux/tmux-adapter.js";
 import { CmuxAdapter } from "./runtime/cmux-adapter.js";
 import { RuntimeMultiplexer } from "./runtime/runtime-multiplexer.js";
@@ -22,6 +28,14 @@ interface RuntimeAdapter {
 interface RuntimeBackendAvailability {
   backendId: RuntimeBackendId;
   available: boolean;
+}
+
+interface StartupTransportConfig {
+  mode: TransportMode;
+  sshProfile: string;
+  sshTarget: string | null;
+  sshPort: number;
+  sshStrictHostKeyChecking: boolean;
 }
 
 /**
@@ -145,6 +159,56 @@ function wrapRuntimeBackend(
 }
 
 /**
+ * Resolves startup transport configuration from normalized runtime config.
+ *
+ * @param config Runtime bridge configuration.
+ * @returns Normalized startup transport configuration.
+ */
+function resolveStartupTransportConfig(config: BridgeConfig): StartupTransportConfig {
+  return {
+    mode: config.transportMode,
+    sshProfile: config.sshProfileName,
+    sshTarget: config.sshTarget,
+    sshPort: config.sshPort,
+    sshStrictHostKeyChecking: config.sshStrictHostKeyChecking
+  };
+}
+
+/**
+ * Logs startup transport configuration.
+ *
+ * @param transportConfig Normalized startup transport configuration.
+ * @returns Nothing.
+ */
+function logStartupTransportConfig(transportConfig: StartupTransportConfig): void {
+  console.info(`[bridge] transport mode: ${transportConfig.mode}`);
+  if (transportConfig.mode !== "ssh") {
+    return;
+  }
+
+  console.info(`[bridge] ssh profile: ${transportConfig.sshProfile}`);
+  console.info(`[bridge] ssh target: ${transportConfig.sshTarget ?? "(unset)"}`);
+  console.info(`[bridge] ssh port: ${transportConfig.sshPort}`);
+  console.info(`[bridge] ssh strict host key: ${transportConfig.sshStrictHostKeyChecking ? "enabled" : "disabled"}`);
+}
+
+/**
+ * Throws when startup requests an unsupported transport mode.
+ *
+ * @param transportConfig Normalized startup transport configuration.
+ * @returns Nothing.
+ */
+function assertSupportedTransportMode(transportConfig: StartupTransportConfig): void {
+  if (transportConfig.mode === "ws") {
+    return;
+  }
+
+  throw new Error(
+    'Transport mode "ssh" is configured but SSH runtime execution is not implemented yet. Set COMMANDRELAY_TRANSPORT_MODE=ws.'
+  );
+}
+
+/**
  * Boots the CommandRelay bridge runtime.
  *
  * @returns {Promise<void>} Completes when shutdown finishes.
@@ -152,6 +216,7 @@ function wrapRuntimeBackend(
 async function main() {
   const config = loadConfig();
   validateStartupConfig(config);
+  const transportConfig = resolveStartupTransportConfig(config);
 
   if (config.globalInputDisabled) {
     console.warn("[bridge] COMMANDRELAY_INPUT_KILL_SWITCH is active; remote input is disabled");
@@ -161,6 +226,8 @@ async function main() {
   } else {
     console.info("[bridge] static app hosting disabled");
   }
+  logStartupTransportConfig(transportConfig);
+  assertSupportedTransportMode(transportConfig);
   console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 
   const runtimeBackends = createRuntimeBackends(config.runtimeBackends, config.cmuxCommand);

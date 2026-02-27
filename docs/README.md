@@ -17,7 +17,7 @@ This folder contains project documentation for users, contributors, and operator
 ## Runtime Snapshot
 
 1. Gateway runtime: TypeScript on Node.js `>=22` (`tsx` execution, `tsc --noEmit` checks).
-2. SSH-first transport direction with WebSocket compatibility path (see `ssh-transport-contract.md` and ADR-001).
+2. SSH-first transport direction with current WS runtime path: data plane remains WebSocket (`/ws`), while SSH mode currently covers startup wiring + remote target contract for profile orchestration and then exits until SSH runtime execution lands (see `ssh-transport-contract.md` and ADR-001).
 3. Outbound proxy package set: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
 4. Client ecosystem direction: iOS (Swift) first, Android (Kotlin) second, web fallback last.
 
@@ -32,6 +32,13 @@ Local MCP note:
 4. Mobile builder: read [Getting Started](getting-started.md) for `M0ProtocolMockClient`, then [iOS Swift Architecture](ios-swift-architecture.md) and [Android Architecture](android-architecture.md).
 5. Planner: read [Native Roadmap](roadmap-native.md) and [Execution TODO](TODO.md).
 6. Release owner: read [Proxy Publish Runbook](release/proxy-publish.md) and capture outputs in weekly checkpoints.
+
+## Quickstart References
+
+1. [getting-started.md](getting-started.md): runtime quickstart and live environment setup.
+2. [operations.md](operations.md): operator runbook and runtime behavior details.
+3. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
+4. Tunnel helper runbook: [../scripts/ssh/README.md](../scripts/ssh/README.md).
 
 ## Current Execution Baselines
 
