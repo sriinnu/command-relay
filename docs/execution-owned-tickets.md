@@ -97,23 +97,29 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P0`
-- Status: `in_progress`
+- Status: `done`
 - File scope:
   - `src/net/proxy-interoperability-matrix.test.ts`
   - `src/net/proxy-agent-factory.test.ts`
   - `src/net/proxy-router.test.ts`
+  - `packages/proxy-fetch/test/proxy-fetch-client-env-matrix.test.ts`
+  - `packages/proxy-undici/test/proxy-undici-dispatcher-factory.test.ts`
+  - `packages/proxy-http-client/test/request-json-proxy-agent-interoperability.test.ts`
   - `docs/TODO.md`
   - `docs/execution-owned-tickets.md`
 - Acceptance criteria:
   - [x] Interoperability matrix covers env permutations across `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY` with uppercase/lowercase precedence scenarios.
   - [x] Matrix assertions validate resolved proxy URL behavior across `http`/`https`/`ws`/`wss`.
   - [x] Matrix assertions validate direct-vs-proxy outcomes and expected proxy agent class selection.
-  - [ ] Matrix coverage extends to concrete Node client adapters (`fetch`, `undici`, `http(s)`) and proxy-chaining expectations.
+  - [x] Matrix coverage extends to concrete Node client adapters (`fetch`, `undici`, `http(s)`) and proxy-chaining expectations.
   - [x] Current matrix + negative suites are passing in targeted validation (`node --import tsx --test src/net/proxy-interoperability-matrix.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`).
 - Evidence:
   - [Proxy interoperability matrix suite](../src/net/proxy-interoperability-matrix.test.ts)
   - [Proxy routing malformed env + NO_PROXY tests](../src/net/proxy-router.test.ts)
   - [Proxy agent malformed credential/fallback tests](../src/net/proxy-agent-factory.test.ts)
+  - [Proxy fetch adapter env matrix](../packages/proxy-fetch/test/proxy-fetch-client-env-matrix.test.ts)
+  - [Proxy undici adapter env matrix and unsupported chaining assertions](../packages/proxy-undici/test/proxy-undici-dispatcher-factory.test.ts)
+  - [Proxy http-client resolver interoperability](../packages/proxy-http-client/test/request-json-proxy-agent-interoperability.test.ts)
 
 ## P1 Tickets (This week)
 

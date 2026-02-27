@@ -87,7 +87,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - `@commandrelay/proxy-http-client`
 - [ ] Complete API stability review and public surface lock for v0.1.
 - [x] Add negative tests for malformed proxy URLs, auth variants, NO_PROXY edge cases, PAC failures, and fallback behavior ([proxy factory negative + PAC suite](../src/net/proxy-agent-factory.test.ts), [proxy router malformed + NO_PROXY suite](../src/net/proxy-router.test.ts), [expected-vs-actual malformed input report](../scripts/checkpoints/runs/proxy-negative-input-report-2026-02-27.md)).
-- [ ] Add interoperability matrix validation (Node fetch/undici/http(s), env var permutations, proxy chaining expectations). Routing/env permutation matrix coverage is now in place ([proxy interoperability matrix suite](../src/net/proxy-interoperability-matrix.test.ts)); concrete `fetch`/`undici`/`http(s)` adapter interoperability + chaining assertions still need coverage.
+- [x] Add interoperability matrix validation (Node fetch/undici/http(s), env var permutations, proxy chaining expectations) ([core env + routing matrix](../src/net/proxy-interoperability-matrix.test.ts), [fetch adapter matrix](../packages/proxy-fetch/test/proxy-fetch-client-env-matrix.test.ts), [undici dispatcher matrix + unsupported chaining expectations](../packages/proxy-undici/test/proxy-undici-dispatcher-factory.test.ts), [http(s) request resolver interoperability](../packages/proxy-http-client/test/request-json-proxy-agent-interoperability.test.ts)).
 
 ### B2) Productization Readiness
 
