@@ -38,6 +38,7 @@ interface StartupTransportConfig {
   sshTarget: string | null;
   sshPort: number;
   sshCommand: string;
+  sshConnectTimeoutSeconds: number;
   sshStrictHostKeyChecking: boolean;
 }
 
@@ -87,6 +88,7 @@ function createTmuxRuntimeAdapter(transportConfig: StartupTransportConfig): Runt
     sshTarget: transportConfig.sshTarget,
     sshPort: transportConfig.sshPort,
     sshCommand: transportConfig.sshCommand,
+    commandTimeoutMs: transportConfig.sshConnectTimeoutSeconds * 1000,
     strictHostKeyChecking: transportConfig.sshStrictHostKeyChecking
   });
 }
@@ -202,6 +204,7 @@ function resolveStartupTransportConfig(config: BridgeConfig): StartupTransportCo
     sshTarget: config.sshTarget,
     sshPort: config.sshPort,
     sshCommand: config.sshCommand,
+    sshConnectTimeoutSeconds: config.sshConnectTimeoutSeconds,
     sshStrictHostKeyChecking: config.sshStrictHostKeyChecking
   };
 }
@@ -222,6 +225,7 @@ function logStartupTransportConfig(transportConfig: StartupTransportConfig): voi
   console.info(`[bridge] ssh target: ${transportConfig.sshTarget ?? "(unset)"}`);
   console.info(`[bridge] ssh port: ${transportConfig.sshPort}`);
   console.info(`[bridge] ssh command: ${transportConfig.sshCommand}`);
+  console.info(`[bridge] ssh connect timeout: ${transportConfig.sshConnectTimeoutSeconds}s`);
   console.info(`[bridge] ssh strict host key: ${transportConfig.sshStrictHostKeyChecking ? "enabled" : "disabled"}`);
 }
 

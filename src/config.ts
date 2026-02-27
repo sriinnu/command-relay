@@ -15,6 +15,7 @@ export interface BridgeConfig {
   sshTarget: string | null;
   sshPort: number;
   sshCommand: string;
+  sshConnectTimeoutSeconds: number;
   sshStrictHostKeyChecking: boolean;
   strictProtocolParsing: boolean;
   appStaticEnabled: boolean;
@@ -307,6 +308,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       "COMMANDRELAY_SSH_PORT"
     ),
     sshCommand: parseStringEnv(env.COMMANDRELAY_SSH_COMMAND, "ssh"),
+    sshConnectTimeoutSeconds: parseStrictIntEnv(
+      env.COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS,
+      8,
+      { min: 1, max: 60 },
+      "COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS"
+    ),
     sshStrictHostKeyChecking: parseBooleanEnv(
       env.COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING,
       true,

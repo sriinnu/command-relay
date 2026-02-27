@@ -40,10 +40,11 @@ SSH transport startup env contract:
 3. `COMMANDRELAY_SSH_TARGET` is required when `COMMANDRELAY_TRANSPORT_MODE=ssh`; format must match `[user@]host` where host is `letters/numbers/._-` or bracketed IPv6.
 4. `COMMANDRELAY_SSH_COMMAND` overrides the SSH executable/command; default is `ssh`.
 5. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
-6. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
-7. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
-8. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target.
-9. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` sets SSH connect/runtime command timeout in seconds; default is `8`, valid range is `1..60`.
+7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
+8. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
+9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target.
+10. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Format examples:
 

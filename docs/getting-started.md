@@ -57,8 +57,9 @@ Use these env vars for SSH transport startup:
 3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`. Format must be `[user@]host`, where `host` is `letters/numbers/._-` or bracketed IPv6.
 4. `COMMANDRELAY_SSH_COMMAND`: SSH executable/command override. Defaults to `ssh`; used for startup preflight and runtime SSH execution.
 5. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
-6. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
-7. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
+6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`: SSH connect/runtime command timeout in seconds. Defaults to `8`; must be an integer between `1` and `60` when set.
+7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
+8. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
 
 SSH target examples:
 
@@ -85,6 +86,7 @@ COMMANDRELAY_SSH_PROFILE=primary \
 COMMANDRELAY_SSH_TARGET=relay@example.internal \
 COMMANDRELAY_SSH_COMMAND=ssh \
 COMMANDRELAY_SSH_PORT=22 \
+COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS=8 \
 COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true \
 COMMANDRELAY_RUNTIME_BACKENDS=tmux \
 npm run start

@@ -86,6 +86,7 @@ test("defaults transport to ws with ssh-safe defaults", () => {
   assert.equal(config.sshProfileName, "primary");
   assert.equal(config.sshPort, 22);
   assert.equal(config.sshCommand, "ssh");
+  assert.equal(config.sshConnectTimeoutSeconds, 8);
   assert.equal(config.sshStrictHostKeyChecking, true);
 });
 
@@ -112,6 +113,26 @@ test("parses and trims ssh command env value", () => {
 
   assert.equal(custom.sshCommand, "/usr/bin/ssh");
   assert.equal(blank.sshCommand, "ssh");
+});
+
+test("parses ssh connect timeout override when value is valid", () => {
+  const config = loadConfig({ COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS: "15" });
+  assert.equal(config.sshConnectTimeoutSeconds, 15);
+});
+
+test("rejects invalid ssh connect timeout values", () => {
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS: "0" }),
+    /COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS: "61" }),
+    /COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS: "8.5" }),
+    /COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS/
+  );
 });
 
 test("rejects invalid transport mode values", () => {

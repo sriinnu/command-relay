@@ -60,6 +60,7 @@ test("isAvailable runs tmux -V over ssh with configured options", async () => {
     sshPort: 2201,
     sshCommand: "ssh-custom",
     strictHostKeyChecking: false,
+    connectTimeoutSeconds: 12,
     commandTimeoutMs: 1234,
     runCommandImpl: mock.runCommandImpl
   });
@@ -72,6 +73,10 @@ test("isAvailable runs tmux -V over ssh with configured options", async () => {
       args: [
         "-p",
         "2201",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=12",
         "-o",
         "StrictHostKeyChecking=no",
         "dev@host.example",
@@ -92,7 +97,16 @@ test("isAvailable returns false on ssh command failure", async () => {
   assert.equal(await adapter.isAvailable(), false);
   assert.deepEqual(mock.calls[0], {
     command: "ssh",
-    args: ["-o", "StrictHostKeyChecking=yes", "dev@host.example", "tmux -V"],
+    args: [
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=8",
+      "-o",
+      "StrictHostKeyChecking=yes",
+      "dev@host.example",
+      "tmux -V"
+    ],
     timeoutMs: 6000
   });
 });
@@ -117,6 +131,10 @@ test("listPanes parses tmux rows and uses escaped format argument", async () => 
   assert.deepEqual(mock.calls[0], {
     command: "ssh",
     args: [
+      "-o",
+      "BatchMode=yes",
+      "-o",
+      "ConnectTimeout=8",
       "-o",
       "StrictHostKeyChecking=yes",
       "ops@remote",
@@ -185,7 +203,7 @@ test("capturePane clamps fromLine to at most -1", async () => {
   await adapter.capturePane("%9", 0);
   await adapter.capturePane("%9", 120);
 
-  assert.deepEqual(mock.calls.map((call) => call.args[3]), [
+  assert.deepEqual(mock.calls.map((call) => call.args.at(-1)), [
     "tmux capture-pane -p -J -S -1 -t %9",
     "tmux capture-pane -p -J -S -120 -t %9"
   ]);
@@ -203,11 +221,19 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
   assert.equal(mock.calls.length, 4);
   assert.deepEqual(mock.calls[0].args, [
     "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=8",
+    "-o",
     "StrictHostKeyChecking=yes",
     "dev@host.example",
     "tmux send-keys -t %3 -l -- 'echo '\"'\"'hello world'\"'\"''"
   ]);
   assert.deepEqual(mock.calls[1].args, [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=8",
     "-o",
     "StrictHostKeyChecking=yes",
     "dev@host.example",
@@ -215,11 +241,19 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
   ]);
   assert.deepEqual(mock.calls[2].args, [
     "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=8",
+    "-o",
     "StrictHostKeyChecking=yes",
     "dev@host.example",
     "tmux send-keys -t %3 C-m"
   ]);
   assert.deepEqual(mock.calls[3].args, [
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=8",
     "-o",
     "StrictHostKeyChecking=yes",
     "dev@host.example",
@@ -227,10 +261,22 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
   ]);
 });
 
-test("constructor validates required target and optional port", async () => {
+test("constructor validates required target, optional port, and connect timeout", async () => {
   assert.throws(() => new SshTmuxAdapter({ sshTarget: "   " }), /sshTarget must be a non-empty string/);
   assert.throws(
     () => new SshTmuxAdapter({ sshTarget: "dev@host", sshPort: 0 }),
     /sshPort must be a positive number/
+  );
+  assert.throws(
+    () => new SshTmuxAdapter({ sshTarget: "dev@host", connectTimeoutSeconds: 0 }),
+    /connectTimeoutSeconds must be an integer between 1 and 60/
+  );
+  assert.throws(
+    () => new SshTmuxAdapter({ sshTarget: "dev@host", connectTimeoutSeconds: 61 }),
+    /connectTimeoutSeconds must be an integer between 1 and 60/
+  );
+  assert.throws(
+    () => new SshTmuxAdapter({ sshTarget: "dev@host", connectTimeoutSeconds: 8.5 }),
+    /connectTimeoutSeconds must be an integer between 1 and 60/
   );
 });

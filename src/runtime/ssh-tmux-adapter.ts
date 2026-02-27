@@ -7,6 +7,7 @@ import { runCommand } from "../utils/run-command.js";
 
 const DEFAULT_SSH_COMMAND = "ssh";
 const DEFAULT_TIMEOUT_MS = 6000;
+const DEFAULT_CONNECT_TIMEOUT_SECONDS = 8;
 const PANE_FORMAT = [
   "#{session_name}",
   "#{window_index}",
@@ -57,6 +58,10 @@ export interface SshTmuxAdapterOptions {
    */
   commandTimeoutMs?: number;
   /**
+   * SSH connect timeout in seconds. Defaults to 8.
+   */
+  connectTimeoutSeconds?: number;
+  /**
    * Optional command execution implementation for testing.
    */
   runCommandImpl?: RunCommand;
@@ -73,6 +78,7 @@ export class SshTmuxAdapter implements RuntimeBackend {
   private readonly sshCommand: string;
   private readonly strictHostKeyChecking: boolean;
   private readonly commandTimeoutMs: number;
+  private readonly connectTimeoutSeconds: number;
   private readonly runCommandImpl: RunCommand;
 
   /**
@@ -84,6 +90,7 @@ export class SshTmuxAdapter implements RuntimeBackend {
     this.sshCommand = normalizeSshCommand(options.sshCommand);
     this.strictHostKeyChecking = options.strictHostKeyChecking ?? true;
     this.commandTimeoutMs = normalizeTimeoutMs(options.commandTimeoutMs);
+    this.connectTimeoutSeconds = normalizeConnectTimeoutSeconds(options.connectTimeoutSeconds);
     this.runCommandImpl = options.runCommandImpl ?? runCommand;
   }
 
@@ -184,7 +191,8 @@ export class SshTmuxAdapter implements RuntimeBackend {
       this.sshTarget,
       remoteCommand,
       this.sshPort,
-      this.strictHostKeyChecking
+      this.strictHostKeyChecking,
+      this.connectTimeoutSeconds
     );
     return await this.runCommandImpl(this.sshCommand, args, this.commandTimeoutMs);
   }
@@ -197,18 +205,22 @@ export class SshTmuxAdapter implements RuntimeBackend {
  * @param remoteCommand Remote shell command string.
  * @param sshPort Optional SSH TCP port.
  * @param strictHostKeyChecking Strict host key policy.
+ * @param connectTimeoutSeconds SSH connect timeout in seconds.
  * @returns SSH command arguments.
  */
 function buildSshArgs(
   sshTarget: string,
   remoteCommand: string,
   sshPort: number | null,
-  strictHostKeyChecking: boolean
+  strictHostKeyChecking: boolean,
+  connectTimeoutSeconds: number
 ): string[] {
   const args: string[] = [];
   if (sshPort !== null) {
     args.push("-p", String(sshPort));
   }
+  args.push("-o", "BatchMode=yes");
+  args.push("-o", `ConnectTimeout=${connectTimeoutSeconds}`);
   args.push("-o", `StrictHostKeyChecking=${strictHostKeyChecking ? "yes" : "no"}`);
   args.push(sshTarget, remoteCommand);
   return args;
@@ -302,4 +314,20 @@ function normalizeTimeoutMs(timeoutMs: number | undefined): number {
     return DEFAULT_TIMEOUT_MS;
   }
   return Math.max(1, Math.trunc(timeoutMs));
+}
+
+/**
+ * Normalizes SSH connect timeout.
+ *
+ * @param timeoutSeconds Optional timeout in seconds.
+ * @returns Connect timeout in seconds, constrained to 1..60.
+ */
+function normalizeConnectTimeoutSeconds(timeoutSeconds: number | undefined): number {
+  if (typeof timeoutSeconds === "undefined") {
+    return DEFAULT_CONNECT_TIMEOUT_SECONDS;
+  }
+  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 60) {
+    throw new TypeError("connectTimeoutSeconds must be an integer between 1 and 60 when provided");
+  }
+  return timeoutSeconds;
 }

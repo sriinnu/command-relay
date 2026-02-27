@@ -93,6 +93,7 @@ export COMMANDRELAY_SSH_PROFILE=primary
 export COMMANDRELAY_SSH_TARGET="dev@relay-host"
 export COMMANDRELAY_SSH_COMMAND=ssh
 export COMMANDRELAY_SSH_PORT=22
+export COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS=8
 export COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true
 npm start
 ```
@@ -119,6 +120,7 @@ Default local endpoints (current runtime path):
 | `COMMANDRELAY_SSH_TARGET` | SSH target (required in `ssh` mode) in `[user@]host` format, where host is `name` or bracketed IPv6 (`[2001:db8::1]`). |
 | `COMMANDRELAY_SSH_COMMAND` | SSH executable/command override used for preflight and runtime SSH execution (`ssh` default). |
 | `COMMANDRELAY_SSH_PORT` | SSH target port override (`22` default) |
+| `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` | SSH connect/runtime command timeout in seconds (`8` default, allowed `1..60`). |
 | `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` | SSH strict host key checking policy (`true` default) |
 | `COMMANDRELAY_INPUT_KILL_SWITCH` | Global input disable switch |
 | `COMMANDRELAY_ALLOW_INPUT_OVERRIDE` | Allow/deny forced lane takeover |
