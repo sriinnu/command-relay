@@ -4,6 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   PROTOCOL_V1,
   PROTOCOL_V1_REQUIRED_EVENT_TYPES,
@@ -35,6 +36,7 @@ interface GatewayContext {
 }
 
 const STRICT_TS = 1_771_934_131_735;
+const SSH_TRANSPORT_CONTRACT_DOC = new URL("../../docs/ssh-transport-contract.md", import.meta.url);
 const REQUIRED_REQUEST_ID_TYPES = new Set<ProtocolV1RequiredEventType>([
   "auth",
   "list_sessions",
@@ -261,6 +263,26 @@ test("strict parsing matrix accepts runtime extension commands in live strict mo
   }
   assert.equal(parsed.message.type, "enable_input");
   assert.equal(parsed.message.requestId, "req-enable");
+});
+
+test("contract matrix keeps compatibility declarations for connect/auth/list/attach/replay/input/ack/error", () => {
+  const doc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
+  const requiredTypes = new Set<string>(PROTOCOL_V1_REQUIRED_EVENT_TYPES);
+  for (const type of ["auth", "list_sessions", "attach", "input", "ack", "error"]) {
+    assert.equal(requiredTypes.has(type), true, `missing required compatibility type ${type}`);
+  }
+  for (const token of ["connect", "auth", "list", "attach", "replay", "input", "ack", "error"]) {
+    assert.match(doc, new RegExp("`" + token + "`"));
+  }
+  assert.match(doc, /no standalone `replay` message type/i);
+});
+
+test("contract matrix documents reconnect expectations as attach(lastSeq) resume path", () => {
+  const doc = readFileSync(SSH_TRANSPORT_CONTRACT_DOC, "utf8");
+  assert.match(doc, /new transport connection and new `hello\.payload\.clientId`/);
+  assert.match(doc, /Client re-runs auth .* before non-auth operations\./);
+  assert.match(doc, /reattaches each pane using `attach` .* `lastSeq` cursor/i);
+  assert.match(doc, /Reconnect never re-enables write mode automatically/i);
 });
 
 test("policy transition matrix applies enable -> input -> disable flow", async () => {

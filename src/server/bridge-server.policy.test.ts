@@ -299,11 +299,13 @@ test("arbitration establishes first input owner and blocks conflicting client in
   assert.equal(conflictingResult.type, "error");
   assert.equal(conflictingResult.payload.code, "input_lane_conflict");
   assert.equal(harness.sentInputs.length, 1);
+  assert.equal(harness.auditEvents.filter((event) => event.action === "input_takeover").length, 0);
   assert.ok(harness.auditEvents.find((event) => event.action === "input" && event.details.reason === "ownership_conflict"));
 });
 
 test("arbitration override takes pane ownership when override path is enabled", async () => {
   const harness = createOwnershipHarness(true);
+  const takeoverInput = "echo owner-b\n";
   await dispatch(harness.clientA, "enable_input", "enable-a");
   await dispatch(harness.clientB, "enable_input", "enable-b");
 
@@ -314,7 +316,7 @@ test("arbitration override takes pane ownership when override path is enabled", 
 
   const overrideResult = await dispatch(harness.clientB, "input", "input-b-override", {
     paneId: "pane-1",
-    data: "echo owner-b\n",
+    data: takeoverInput,
     override: true,
     takeOwnership: true
   });
@@ -323,6 +325,12 @@ test("arbitration override takes pane ownership when override path is enabled", 
   const takeoverEvents = harness.auditEvents.filter((event) => event.action === "input_takeover");
   assert.equal(takeoverEvents.length, 1);
   assert.equal(takeoverEvents[0]?.clientId, harness.clientB.clientId);
+  assert.deepEqual(takeoverEvents[0]?.details, {
+    paneId: "pane-1",
+    result: "allowed",
+    reason: "override",
+    bytes: Buffer.byteLength(takeoverInput, "utf8")
+  });
 
   const oldOwnerBlocked = await dispatch(harness.clientA, "input", "input-a-2", {
     paneId: "pane-1",
@@ -331,10 +339,11 @@ test("arbitration override takes pane ownership when override path is enabled", 
   assert.equal(oldOwnerBlocked.type, "error");
   assert.equal(oldOwnerBlocked.payload.code, "input_lane_conflict");
   assert.equal(harness.sentInputs.length, 2);
+  assert.equal(harness.auditEvents.filter((event) => event.action === "input_takeover").length, 1);
   assert.ok(harness.auditEvents.find((event) => event.action === "input" && event.details.reason === "ownership_conflict"));
 });
 
-test("arbitration releases ownership on detach and disconnect", async () => {
+test("disconnect expires lane lease and reconnect defaults client to read-only", async () => {
   const harness = createOwnershipHarness(false);
   await dispatch(harness.clientA, "enable_input", "enable-a");
   await dispatch(harness.clientB, "enable_input", "enable-b");
@@ -343,34 +352,40 @@ test("arbitration releases ownership on detach and disconnect", async () => {
     paneId: "pane-1",
     data: "echo owner-a\n"
   });
-  const blockedBeforeDetach = await dispatch(harness.clientB, "input", "input-b-1", {
+  const blockedBeforeDisconnect = await dispatch(harness.clientB, "input", "input-b-1", {
     paneId: "pane-1",
     data: "echo blocked\n"
   });
-  assert.equal(blockedBeforeDetach.type, "error");
+  assert.equal(blockedBeforeDisconnect.type, "error");
 
-  const detachAck = await dispatch(harness.clientA, "detach", "detach-a", {
-    paneId: "pane-1"
-  });
-  assert.equal(detachAck.type, "ack");
-  assert.equal(detachAck.payload.action, "detach");
+  const ownerDisconnectAck = await dispatch(harness.clientA, "disconnect", "disconnect-a");
+  assert.equal(ownerDisconnectAck.type, "ack");
+  assert.equal(ownerDisconnectAck.payload.action, "disconnect");
 
-  const afterDetach = await dispatch(harness.clientB, "input", "input-b-2", {
+  const afterLeaseExpiry = await dispatch(harness.clientB, "input", "input-b-2", {
     paneId: "pane-1",
     data: "echo owner-b\n"
   });
-  assert.equal(afterDetach.type, "ack");
+  assert.equal(afterLeaseExpiry.type, "ack");
 
-  const disconnectAck = await dispatch(harness.clientB, "disconnect", "disconnect-b");
-  assert.equal(disconnectAck.type, "ack");
-  assert.equal(disconnectAck.payload.action, "disconnect");
+  const reconnectDisconnectAck = await dispatch(harness.clientB, "disconnect", "disconnect-b");
+  assert.equal(reconnectDisconnectAck.type, "ack");
+  assert.equal(reconnectDisconnectAck.payload.action, "disconnect");
 
-  await dispatch(harness.clientA, "attach", "attach-a", { paneId: "pane-1" });
-  const afterDisconnect = await dispatch(harness.clientA, "input", "input-a-2", {
+  await dispatch(harness.clientB, "attach", "attach-b", { paneId: "pane-1" });
+  const reconnectBlocked = await dispatch(harness.clientB, "input", "input-b-reconnect-blocked", {
     paneId: "pane-1",
-    data: "echo owner-a-again\n"
+    data: "echo blocked-after-reconnect\n"
   });
-  assert.equal(afterDisconnect.type, "ack");
+  assert.equal(reconnectBlocked.type, "error");
+  assert.equal(reconnectBlocked.payload.code, "input_disabled");
+
+  await dispatch(harness.clientB, "enable_input", "enable-b-reconnect");
+  const afterReconnectEnable = await dispatch(harness.clientB, "input", "input-b-reconnect-enabled", {
+    paneId: "pane-1",
+    data: "echo owner-b-again\n"
+  });
+  assert.equal(afterReconnectEnable.type, "ack");
 });
 
 test("fixture scenario iOS writer -> web takeover enforces explicit lane handoff", async () => {

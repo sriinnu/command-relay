@@ -175,6 +175,8 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ## Prioritized Immediate Actions (Do Next)
 
+- Execution board: [Execution-Owned Tickets](./execution-owned-tickets.md)
+
 ### P0 (Today -> next 48h)
 
 - [ ] Convert this TODO into owned tickets with single owners and explicit file scope.

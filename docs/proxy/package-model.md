@@ -86,3 +86,13 @@ Caller
   - `npm --prefix packages/proxy-core test`
   - `npm --prefix packages/proxy-agent test`
   - `npm --prefix packages/proxy-http-client test`
+
+## Failure-Mode Matrix
+
+| Scenario | Input source | Expected behavior |
+| --- | --- | --- |
+| Malformed credential-bearing proxy URL (for example `http://user:pass@:8080`) | Explicit `ProxyAgentFactory` settings | `resolve()` throws `invalid_proxy_url` (no silent direct fallback). |
+| Unsupported proxy scheme (for example `ftp://proxy.local:21`) | Explicit settings | `resolve()` throws `unsupported_proxy_protocol:*`. |
+| Unsupported target scheme with selected proxy (for example target `ftp://...` + `ALL_PROXY=http://...`) | Target URL + explicit settings | `resolve()` throws `unsupported_target_protocol:*`. |
+| PAC resolver/network/script failure | `pac+*` proxy URL | Default behavior is fail-closed (`fallbackToDirect: false`), so runtime should not silently downgrade to direct mode. |
+| Invalid or unsupported env proxy values | Environment (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`) | Values are sanitized to `null`; factory resolves in direct mode (`viaProxy=false`). |

@@ -244,3 +244,103 @@ test("keeps uppercase NO_PROXY precedence over lowercase no_proxy", () => {
     }
   );
 });
+
+test("throws invalid_proxy_url for malformed credential-bearing proxy URLs", () => {
+  const malformedProxies = [
+    "http://user:pass@:8080",
+    "socks5://user:pass@:1080",
+    "pac+http://user:pass@/proxy.pac"
+  ];
+
+  for (const malformedProxy of malformedProxies) {
+    const factory = new ProxyAgentFactory({
+      settings: {
+        httpProxy: null,
+        httpsProxy: malformedProxy,
+        allProxy: null,
+        noProxy: []
+      }
+    });
+
+    assert.throws(() => factory.resolve("https://example.com"), /invalid_proxy_url/);
+  }
+});
+
+test("throws for unsupported explicit proxy schemes", () => {
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: null,
+      httpsProxy: null,
+      allProxy: "ftp://proxy.local:21",
+      noProxy: []
+    }
+  });
+
+  assert.throws(
+    () => factory.resolve("https://example.com"),
+    /unsupported_proxy_protocol:ftp:/
+  );
+});
+
+test("throws for unsupported target schemes when a proxy is selected", () => {
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: null,
+      httpsProxy: null,
+      allProxy: "http://proxy.local:8080",
+      noProxy: []
+    }
+  });
+
+  assert.throws(
+    () => factory.resolve("ftp://example.com/resource"),
+    /unsupported_target_protocol:ftp:/
+  );
+});
+
+test("sets PAC agents to no-direct fallback by default", () => {
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: null,
+      httpsProxy: null,
+      allProxy: "pac+http://proxy-config.local/proxy.pac",
+      noProxy: []
+    }
+  });
+
+  const result = factory.resolve("https://example.com");
+  assert.equal(result.viaProxy, true);
+  assert.equal(result.agent?.constructor.name, "PacProxyAgent");
+  const pacAgent = result.agent as unknown as {
+    opts?: { fallbackToDirect?: boolean };
+  };
+  assert.equal(pacAgent.opts?.fallbackToDirect, false);
+});
+
+test("falls back to direct mode when env proxy values are invalid or unsupported", () => {
+  withPatchedEnv(
+    {
+      HTTP_PROXY: "ftp://unsupported.local:2121",
+      http_proxy: undefined,
+      HTTPS_PROXY: "http://user:pass@:8080",
+      https_proxy: undefined,
+      ALL_PROXY: "ssh://bastion.local:22",
+      all_proxy: undefined,
+      NO_PROXY: undefined,
+      no_proxy: undefined
+    },
+    () => {
+      const factory = new ProxyAgentFactory();
+
+      const httpResult = factory.resolve("http://example.com");
+      assert.equal(httpResult.viaProxy, false);
+      assert.equal(httpResult.proxyUrl, null);
+      assert.equal(httpResult.agent, null);
+
+      const httpsResult = factory.resolve("https://example.com");
+      assert.equal(httpsResult.viaProxy, false);
+      assert.equal(httpsResult.proxyUrl, null);
+      assert.equal(httpsResult.agent, null);
+    }
+  );
+});

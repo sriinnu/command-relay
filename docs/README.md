@@ -72,3 +72,4 @@ Local MCP note:
 16. [release/proxy-publish.md](release/proxy-publish.md)
 17. [ssh-transport-contract.md](ssh-transport-contract.md)
 18. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
+19. [architecture/host-state-authority-plan.md](architecture/host-state-authority-plan.md)
