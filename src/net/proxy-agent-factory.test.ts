@@ -4,6 +4,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { ProxyAgentFactory } from "./proxy-agent-factory.js";
 
 function withPatchedEnv<T>(
@@ -32,6 +33,18 @@ function withPatchedEnv<T>(
       process.env[key] = value;
     }
   }
+}
+
+type PacConnectRequest = EventEmitter & {
+  path: string;
+  getHeader: (headerName: string) => string | undefined;
+};
+
+function createPacConnectRequest(path = "/proxy-target"): PacConnectRequest {
+  const request = new EventEmitter() as PacConnectRequest;
+  request.path = path;
+  request.getHeader = () => undefined;
+  return request;
 }
 
 test("returns direct mode when no proxy is configured", () => {
@@ -315,6 +328,43 @@ test("sets PAC agents to no-direct fallback by default", () => {
     opts?: { fallbackToDirect?: boolean };
   };
   assert.equal(pacAgent.opts?.fallbackToDirect, false);
+});
+
+test("surfaces PAC resolver failures during connect attempts", async () => {
+  const invalidPacSource = "function FindProxyForURL(url, host) {";
+  const factory = new ProxyAgentFactory({
+    settings: {
+      httpProxy: null,
+      httpsProxy: null,
+      allProxy: `pac+data:text/plain,${encodeURIComponent(invalidPacSource)}`,
+      noProxy: []
+    }
+  });
+
+  const result = factory.resolve("https://example.com");
+  assert.equal(result.viaProxy, true);
+  assert.equal(result.agent?.constructor.name, "PacProxyAgent");
+
+  const pacAgent = result.agent as unknown as {
+    connect: (
+      request: PacConnectRequest,
+      options: { host: string; port: number; secureEndpoint: boolean }
+    ) => Promise<unknown>;
+  };
+
+  await assert.rejects(
+    () =>
+      pacAgent.connect(createPacConnectRequest(), {
+        host: "example.com",
+        port: 443,
+        secureEndpoint: true
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.ok(error.message.length > 0);
+      return true;
+    }
+  );
 });
 
 test("falls back to direct mode when env proxy values are invalid or unsupported", () => {

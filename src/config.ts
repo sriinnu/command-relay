@@ -29,6 +29,7 @@ export interface BridgeConfig {
   maxInputsPerMinute: number;
   globalInputDisabled: boolean;
   allowInputOwnershipOverride: boolean;
+  inputLaneLeaseMs: number;
   authToken: string | null;
   auditLogPath: string | null;
 }
@@ -347,6 +348,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       env.COMMANDRELAY_ALLOW_INPUT_OVERRIDE,
       true,
       "COMMANDRELAY_ALLOW_INPUT_OVERRIDE"
+    ),
+    inputLaneLeaseMs: parseIntEnv(
+      env.COMMANDRELAY_INPUT_LANE_LEASE_MS,
+      30_000,
+      { min: 1_000, max: 300_000 }
     ),
     authToken: parseOptionalStringEnv(env.COMMANDRELAY_AUTH_TOKEN),
     auditLogPath: parseOptionalStringEnv(env.COMMANDRELAY_AUDIT_LOG)

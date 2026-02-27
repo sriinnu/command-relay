@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work)
+Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work + latest evidence check)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -73,7 +73,7 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P0`
-- Status: `in_progress`
+- Status: `done`
 - File scope:
   - `src/net/proxy-agent-factory.test.ts`
   - `src/net/proxy-router.test.ts`
@@ -82,15 +82,13 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 - Acceptance criteria:
   - [x] Negative tests cover malformed proxy URLs and invalid auth fragments.
   - [x] Negative tests cover `NO_PROXY` edge cases and fallback behavior.
-  - [ ] PAC failure behavior is asserted and documented.
-  - [ ] Test report notes expected vs actual handling for each malformed input class.
+  - [x] PAC failure behavior is asserted and documented ([PAC fail-closed assertion](../src/net/proxy-agent-factory.test.ts), [failure-mode matrix](./proxy/package-model.md#failure-mode-matrix)).
+  - [x] Test report notes expected vs actual handling for each malformed input class ([proxy negative input report](../scripts/checkpoints/runs/proxy-negative-input-report-2026-02-27.md)).
 - Evidence:
   - [Proxy routing malformed env + NO_PROXY tests](../src/net/proxy-router.test.ts)
   - [Proxy agent malformed credential/fallback tests](../src/net/proxy-agent-factory.test.ts)
+  - [PAC fail-closed behavior matrix](./proxy/package-model.md#failure-mode-matrix)
   - [Proxy hardening roadmap intent](./proxy-ecosystem-roadmap.md)
-- Remaining to close:
-  - Add an explicit PAC failure assertion path.
-  - Publish a malformed-input expected-vs-actual test report artifact.
 
 ## P1 Tickets (This week)
 
@@ -140,12 +138,15 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P1`
-- Status: `todo`
+- Status: `blocked`
 - File scope:
   - `docs/release/proxy-publish.md`
   - `scripts/checkpoints/runs/`
   - `docs/proxy-ecosystem-roadmap.md`
 - Acceptance criteria:
-  - [ ] Dry-run executes with explicit package selector and dist-tag policy.
-  - [ ] Artifact links include selected packages, dry-run logs, and policy checks.
-  - [ ] Publish blockers (if any) are documented with owner + due date.
+  - [x] Dry-run executes with explicit package selector and dist-tag policy (`@commandrelay/proxy-*`, `latest`) via local CLI workflow.
+  - [x] Artifact links include selected packages, dry-run logs, and policy checks.
+  - [x] Publish blockers are documented (local npm cache `EACCES` on `/home/sriinnu/.npm`).
+- Evidence:
+  - [2026-02-27 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)
+  - [Proxy publish runbook follow-up](./release/proxy-publish.md)

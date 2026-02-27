@@ -91,9 +91,9 @@ Use this only when your release process already guarantees approval and version 
   - `proxy-agent` TAP `<passed>/<total>`
   - `proxy-http-client` TAP `<passed>/<total>`
 - [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
-- [ ] Trigger dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`).
+- [ ] Trigger dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`). Status (2026-02-27): local CLI dry-run evidence captured; GitHub Actions dry-run not triggered in this step.
 - [ ] Verify GitHub policy (`NPM_TOKEN`, `npm-publish` reviewers, default-branch protections).
-- [ ] Capture dry-run run URL + artifact summary in checkpoint/release notes before any publish-mode trigger.
+- [x] Capture dry-run artifact summary in checkpoint/release notes before any publish-mode trigger. Artifact: [`scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md`](../../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md). Status: `partial` (`check/build/test` passed for all selected packages; `npm pack --dry-run --json` and `npm publish --dry-run` blocked by npm cache `EACCES` on `/home/sriinnu/.npm`).
 
 ## Internal v0.1 Gate Checklist (tag prep only)
 

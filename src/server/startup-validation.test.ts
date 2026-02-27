@@ -14,6 +14,20 @@ test("parses global input kill switch truthy and falsy values", () => {
   assert.equal(disabled.globalInputDisabled, false);
 });
 
+test("parses lane lease duration with bounded defaults", () => {
+  const defaults = loadConfig({});
+  const custom = loadConfig({ COMMANDRELAY_INPUT_LANE_LEASE_MS: "45000" });
+  const tooLow = loadConfig({ COMMANDRELAY_INPUT_LANE_LEASE_MS: "999" });
+  const tooHigh = loadConfig({ COMMANDRELAY_INPUT_LANE_LEASE_MS: "300001" });
+  const invalid = loadConfig({ COMMANDRELAY_INPUT_LANE_LEASE_MS: "invalid" });
+
+  assert.equal(defaults.inputLaneLeaseMs, 30_000);
+  assert.equal(custom.inputLaneLeaseMs, 45_000);
+  assert.equal(tooLow.inputLaneLeaseMs, 30_000);
+  assert.equal(tooHigh.inputLaneLeaseMs, 30_000);
+  assert.equal(invalid.inputLaneLeaseMs, 30_000);
+});
+
 test("defaults strict protocol parsing on and supports legacy toggle alias", () => {
   const defaults = loadConfig({});
   const strictOffPrimary = loadConfig({ COMMANDRELAY_STRICT_PROTOCOL_PARSING: "false" });

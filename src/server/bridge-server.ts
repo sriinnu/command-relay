@@ -47,7 +47,9 @@ export async function startBridgeServer(deps) {
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
   const telemetry = new BridgeTelemetryCollector();
   const pendingAttachLag = new Map<string, number>();
-  const inputOwnershipArbiter = new PaneInputOwnershipArbiter();
+  const inputOwnershipArbiter = new PaneInputOwnershipArbiter({
+    leaseDurationMs: config.inputLaneLeaseMs
+  });
   /** @type {Map<string, ClientState>} */
   const clients = new Map();
   const messageLimiter = new SlidingWindowRateLimiter({

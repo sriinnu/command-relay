@@ -130,7 +130,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - Acceptance criteria:
   - [x] SSH contract/spec document merged and referenced by tests ([contract](./ssh-transport-contract.md), [matrix test](../src/server/ws-contract-matrix.test.ts)).
   - [x] At least one automated suite exercises SSH reconnect with `lastSeq` replay ([replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
-  - [ ] Proxy test report includes malformed URL + NO_PROXY + PAC failure cases with expected results (in progress: [proxy router tests](../src/net/proxy-router.test.ts), [proxy factory tests](../src/net/proxy-agent-factory.test.ts)).
+  - [x] Proxy test report includes malformed URL + NO_PROXY + PAC failure cases with expected results ([proxy negative input report](../scripts/checkpoints/runs/proxy-negative-input-report-2026-02-27.md), [proxy factory tests](../src/net/proxy-agent-factory.test.ts), [proxy router tests](../src/net/proxy-router.test.ts)).
 
 ### Milestone W2 (2026-03-09 to 2026-03-15)
 
@@ -182,7 +182,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Convert this TODO into owned tickets with single owners and explicit file scope ([execution board](./execution-owned-tickets.md)).
 - [x] Land SSH transport contract doc + test plan references ([contract](./ssh-transport-contract.md), [protocol references](./protocol-v1.md#11-contract-compatibility-test-plan-references), [contract tests](../src/server/ws-contract-matrix.test.ts)).
 - [x] Start host-state authority implementation plan (lane owner + replay offsets + audit schema) ([plan](./architecture/host-state-authority-plan.md), [policy tests](../src/server/bridge-server.policy.test.ts)).
-- [ ] Execute proxy negative-test expansion for malformed env/config inputs (in progress: [proxy router tests](../src/net/proxy-router.test.ts), [proxy factory tests](../src/net/proxy-agent-factory.test.ts)).
+- [x] Execute proxy negative-test expansion for malformed env/config inputs ([proxy factory tests](../src/net/proxy-agent-factory.test.ts), [proxy router tests](../src/net/proxy-router.test.ts), [expected-vs-actual report](../scripts/checkpoints/runs/proxy-negative-input-report-2026-02-27.md)).
 
 ### P1 (This week)
 
@@ -195,7 +195,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - `node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts`
   - `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`
 - [ ] Update weekly checkpoint artifact and mirror milestone decisions into roadmap docs.
-- [ ] Run publish dry-run for `@commandrelay/proxy-*` and capture artifact links.
+- [x] Run publish dry-run for `@commandrelay/proxy-*` and capture artifact links ([proxy publish checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md); local dry-run blocked by npm cache `EACCES`, blocker documented in [release runbook](./release/proxy-publish.md)).
 
 ### P2 (Next 2 weeks)
 
