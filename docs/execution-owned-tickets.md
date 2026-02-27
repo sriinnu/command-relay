@@ -61,11 +61,14 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 - Acceptance criteria:
   - [x] Plan defines host ownership for lane owner, replay offsets, and capability flags.
   - [x] Audit schema fields are specified for enable/disable/input/takeover flows.
+  - [x] Host-side input audit records include actor (`clientId`), pane scope, `commandHash`, `previewPolicy`, timestamp (`ts`), and result metadata.
   - [x] Rollout sequence and fallback behavior are documented.
   - [x] At least one implementation slice is linked to validating tests.
 - Evidence:
   - [Host-state authority plan](./architecture/host-state-authority-plan.md)
+  - [Bridge audit payload writes (`input`, `input_takeover`, `lane_owner_released`)](../src/server/bridge-server.ts)
   - [Audit logger implementation](../src/server/audit-log.ts)
+  - [Bridge e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts)
   - [Lane ownership + reconnect read-only policy tests](../src/server/bridge-server.policy.test.ts)
   - [Replay resume semantics e2e tests](../src/server/bridge-server.replay.e2e.test.ts)
 

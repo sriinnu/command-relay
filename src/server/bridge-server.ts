@@ -2,7 +2,7 @@
  * @file HTTP/WebSocket bridge server for CommandRelay.
  */
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
@@ -227,7 +227,8 @@ export async function startBridgeServer(deps) {
       engine.detachAll(client.id);
       messageLimiter.clear(client.id);
       inputLimiter.clear(client.id);
-      releaseClientInputOwnership(inputOwnershipArbiter, client.id);
+      const releasedPanes = releaseClientInputOwnership(inputOwnershipArbiter, client.id);
+      if (releasedPanes > 0) void audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "socket_close", releasedPanes } });
       telemetry.recordConnectionClosed();
       clearClientAttachLag(pendingAttachLag, client.id);
       clients.delete(client.id);
@@ -357,9 +358,10 @@ export async function handleClientMessage(ctx) {
         return;
       }
       client.attachedPanes.delete(paneId);
-      releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
+      const released = releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
       engine.detach(client.id, paneId);
       await audit.write({ action: "detach", clientId: client.id, details: { paneId } });
+      if (released) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { paneId, result: "allowed", reason: "detach" } });
       send(client.socket, envelope("ack", { action: "detach", paneId }, requestId));
       return;
     }
@@ -380,14 +382,16 @@ export async function handleClientMessage(ctx) {
       const paneId = parseNonEmptyString(payload.paneId);
       const data = typeof payload.data === "string" ? payload.data : "";
       const inputBytes = Buffer.byteLength(data, "utf8");
+      const commandHash = data ? createHash("sha256").update(data, "utf8").digest("hex") : null;
+      const previewPolicy = data ? "sha256_only" : "none";
       const inputRate = inputLimiter.consume(client.id);
       if (!inputRate.allowed) {
-        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "rate_limited", bytes: inputBytes } });
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "rate_limited", bytes: inputBytes, commandHash, previewPolicy } });
         send(client.socket, envelope("error", { code: "input_rate_limited", retryAfterMs: inputRate.retryAfterMs, limit: inputRate.limit, windowMs: inputRate.windowMs }, requestId));
         return;
       }
       if (!isInputAllowed({ clientInputEnabled: client.inputEnabled, globalInputDisabled: config.globalInputDisabled })) {
-        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "policy_blocked", bytes: inputBytes } });
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "policy_blocked", bytes: inputBytes, commandHash, previewPolicy } });
         send(client.socket, envelope("error", { code: "input_disabled" }, requestId));
         return;
       }
@@ -407,21 +411,12 @@ export async function handleClientMessage(ctx) {
       const claimResult = claimPaneInputOwnership(paneInputOwnerState, paneId, client.id, overrideRequested, laneOverrideAllowed);
       if (claimResult?.ok === false) {
         const { ownerClientId, overrideAllowed } = claimResult;
-        await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes } });
+        await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes, commandHash, previewPolicy } });
         send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed }, requestId));
         return;
       }
       await tmux.sendInput(paneId, data);
-      await audit.write({
-        action: "input",
-        clientId: client.id,
-        details: {
-          paneId,
-          bytes: inputBytes,
-          result: "allowed",
-          reason: "ok"
-        }
-      });
+      await audit.write({ action: "input", clientId: client.id, details: { paneId, bytes: inputBytes, result: "allowed", reason: "ok", commandHash, previewPolicy } });
       if (claimResult?.ok && claimResult.overridden) {
         await audit.write({ action: "input_takeover", clientId: client.id, details: { paneId, result: "allowed", reason: "override", bytes: inputBytes } });
       }
@@ -435,9 +430,10 @@ export async function handleClientMessage(ctx) {
     }
     case "disconnect": {
       engine.detachAll(client.id);
-      releaseClientInputOwnership(paneInputOwnerState, client.id);
+      const releasedPanes = releaseClientInputOwnership(paneInputOwnerState, client.id);
       client.attachedPanes.clear();
       client.inputEnabled = false;
+      if (releasedPanes > 0) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "disconnect", releasedPanes } });
       await audit.write({ action: "disconnect", clientId: client.id, details: {} });
       send(client.socket, envelope("ack", { action: "disconnect" }, requestId));
       return;

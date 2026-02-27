@@ -51,7 +51,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 ### A4) Safety
 
 - [x] Controlled-input baseline exists (`enable_input`, `input`, `disable_input`, kill switch, size/rate limit payload metadata).
-- [ ] Add host-side input audit log record (actor, pane, command hash/preview policy, timestamp, result).
+- [x] Add host-side input audit log record (actor, pane, command hash/preview policy, timestamp, result) ([runtime audit writes](../src/server/bridge-server.ts), [audit timestamp envelope](../src/server/audit-log.ts), [policy audit assertions](../src/server/bridge-server.policy.test.ts), [e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts)).
 - [x] Add policy tests for default read-only on reconnect, lane lease expiry, and takeover audit event ([policy tests](../src/server/bridge-server.policy.test.ts), [arbiter lease tests](../src/server/bridge-server-utils.test.ts)).
 - [ ] Add operator safety runbook for kill-switch and lane lockout incidents.
 
@@ -142,7 +142,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - complete docs/examples pack for `@commandrelay/proxy-*`
   - execute publish workflow dry-run and archive artifacts
 - Acceptance criteria:
-  - [x] Audit log records are emitted for enable/disable/input/takeover flows.
+  - [x] Audit log records are emitted for enable/disable/input/takeover flows, and `input` records include command metadata policy fields (`commandHash`, `previewPolicy`) ([runtime audit writes](../src/server/bridge-server.ts), [e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts), [policy audit assertions](../src/server/bridge-server.policy.test.ts)).
   - [ ] Replay ordering suite passes under fixture harness without manual intervention.
   - [ ] Dry-run artifacts contain selected package set, dist-tag, and no publish-policy blockers.
 

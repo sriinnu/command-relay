@@ -21,12 +21,22 @@ This document defines the structured audit metadata emitted for controlled input
      - `policy_blocked`
      - `rate_limited`
      - `ownership_conflict`
-   - shared metadata: `details.paneId`, `details.bytes`
+   - shared metadata:
+     - `details.paneId`
+     - `details.bytes`
+     - `details.commandHash`: SHA-256 digest of submitted UTF-8 input when present, otherwise `null`
+     - `details.previewPolicy`: `sha256_only` when input payload exists, otherwise `none`
 4. `input_takeover`:
    - emitted when override path is used and lane ownership changes
    - includes `details.paneId`, `details.bytes`, `details.result=allowed`, `details.reason=override`
+5. `lane_owner_released`:
+   - emitted when a client loses ownership of one or more input lanes due to cleanup/release paths
+   - detach path: `details.paneId`, `details.result=allowed`, `details.reason=detach`
+   - disconnect/close path: `details.releasedPanes`, `details.result=allowed`, `details.reason` in:
+     - `disconnect`
+     - `socket_close`
 
 ## Sanitization
 
 1. Raw command payload text is never persisted in `details`.
-2. Metadata-only capture is enforced (`paneId`, byte count, result, reason).
+2. Metadata-only capture is enforced (`paneId`, byte count, result, reason, `commandHash`, `previewPolicy`).

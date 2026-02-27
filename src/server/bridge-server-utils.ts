@@ -171,13 +171,15 @@ export class PaneInputOwnershipArbiter {
    *
    * @param paneId Pane identifier.
    * @param clientId Client identifier.
-   * @returns Nothing.
+   * @returns True when ownership was released.
    */
-  releasePaneIfOwnedBy(paneId: string, clientId: string): void {
+  releasePaneIfOwnedBy(paneId: string, clientId: string): boolean {
     this.expireStaleOwners();
     if (this.paneOwners.get(paneId)?.clientId === clientId) {
       this.paneOwners.delete(paneId);
+      return true;
     }
+    return false;
   }
 
   /**
@@ -262,21 +264,22 @@ export function claimPaneInputOwnership(
  * @param ownershipState Ownership state container.
  * @param paneId Pane identifier.
  * @param clientId Client identifier.
- * @returns Nothing.
+ * @returns True when ownership was released.
  */
 export function releasePaneInputOwnership(
   ownershipState: PaneInputOwnershipState,
   paneId: string,
   clientId: string
-): void {
-  if (!ownershipState) return;
+): boolean {
+  if (!ownershipState) return false;
   if (ownershipState instanceof PaneInputOwnershipArbiter) {
-    ownershipState.releasePaneIfOwnedBy(paneId, clientId);
-    return;
+    return ownershipState.releasePaneIfOwnedBy(paneId, clientId);
   }
   if (ownershipState.get(paneId) === clientId) {
     ownershipState.delete(paneId);
+    return true;
   }
+  return false;
 }
 
 /**
