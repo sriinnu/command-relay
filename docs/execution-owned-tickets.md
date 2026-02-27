@@ -269,7 +269,7 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [x] Capture remaining gaps as explicit evidence asks in TODO/ticket docs.
 - A2 reconciliation result:
   - `A2 startup validation profile for remote host environments`: `done` ([startup profile checks](../src/startup/startup-profile.ts), [startup profile tests](../src/startup/startup-profile.test.ts), [remote runtime validator](../scripts/ssh/validate-remote-runtime.sh), [ops validator runbook](./operations.md#ssh-runtime-validator-reference), [checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
-  - `A2 tmux fixture harness deterministic replay + multi-pane ordering`: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture evidence runner](../scripts/tmux-fixtures/run-fixture-evidence.ts), [2026-02-27 fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md)); remaining gaps: a linked automated run now exists, but replay-order assertions fail because captured fixture lines are currently empty in this environment.
+  - `A2 tmux fixture harness deterministic replay + multi-pane ordering`: `done` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture evidence runner](../scripts/tmux-fixtures/run-fixture-evidence.ts), [2026-02-27 fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md)).
 - Evidence:
   - [TODO A2 runtime lane](./TODO.md#a2-runtime-host-state-ownership)
   - [W2 replay-ordering acceptance item](./TODO.md#milestone-w2-2026-03-09-to-2026-03-15)

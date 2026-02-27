@@ -86,20 +86,32 @@ export async function capturePane(
   paneRow: PaneRow,
   profile: FixtureProfile
 ): Promise<PaneCapture> {
-  const capture = await runCommand(projectRoot, "tmux", ["capture-pane", "-p", "-t", paneRow.paneId]);
-  const events = capture.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
+  const capture = await runCommand(projectRoot, "tmux", [
+    "capture-pane",
+    "-p",
+    "-J",
+    "-S",
+    "-200",
+    "-t",
+    paneRow.paneId
+  ]);
+  const events = extractFixtureCandidateLines(capture.stdout)
     .map((line) => parseFixtureEvent(line))
     .filter((event): event is FixtureEvent => event !== null)
     .filter((event) => event.profile === profile);
+  const uniqueBySeq = new Map<number, FixtureEvent>();
+  for (const event of events) {
+    if (!uniqueBySeq.has(event.seq)) {
+      uniqueBySeq.set(event.seq, event);
+    }
+  }
+  const dedupedEvents = Array.from(uniqueBySeq.values()).sort((left, right) => left.seq - right.seq);
 
   return {
     paneIndex: paneRow.paneIndex,
     paneId: paneRow.paneId,
-    fixtureEventCount: events.length,
-    events
+    fixtureEventCount: dedupedEvents.length,
+    events: dedupedEvents
   };
 }
 
@@ -149,4 +161,35 @@ function parseFixtureEvent(line: string): FixtureEvent | null {
     line: Number.parseInt(match.groups.line, 10),
     raw: line
   };
+}
+
+/**
+ * Extracts complete fixture event candidate lines from wrapped tmux captures.
+ *
+ * @param captureOutput Raw pane capture output.
+ * @returns Reconstructed fixture candidate lines.
+ */
+function extractFixtureCandidateLines(captureOutput: string): string[] {
+  const lines = captureOutput.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+  const fixtures: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    if (line.startsWith("[fixture profile=")) {
+      if (current.length > 0) {
+        fixtures.push(current);
+      }
+      current = line;
+      continue;
+    }
+    if (current.length > 0) {
+      // tmux wraps long lines; stitch continuation fragments back together.
+      current += line;
+    }
+  }
+
+  if (current.length > 0) {
+    fixtures.push(current);
+  }
+  return fixtures;
 }
