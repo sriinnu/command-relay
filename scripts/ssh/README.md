@@ -1,6 +1,7 @@
 # SSH Tunnel Runbook (CommandRelay)
 
 Use [`open-tunnel.sh`](./open-tunnel.sh) to open a local SSH tunnel to a remote CommandRelay instance without exposing remote ports publicly.
+Use [`validate-remote-runtime.sh`](./validate-remote-runtime.sh) to preflight a remote host for tmux + Node runtime readiness.
 
 ## What this does
 
@@ -66,4 +67,68 @@ Preview command without opening the tunnel:
 
 ```bash
 ./scripts/ssh/open-tunnel.sh --help
+```
+
+## Remote runtime validator
+
+Use this before opening tunnels or enabling SSH runtime mode.
+
+What it checks in one non-interactive SSH command set:
+
+1. `command -v tmux`
+2. `tmux -V`
+3. `node -v`
+
+### Quick start
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh --target <user@host>
+```
+
+### Examples
+
+Use a non-default SSH key:
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh \
+  --target relay-prod \
+  --identity ~/.ssh/id_ed25519
+```
+
+Custom SSH command/port and options:
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh \
+  --target relay-prod \
+  --ssh-command ssh \
+  --ssh-port 2222 \
+  --ssh-option ProxyJump=bastion-user@bastion-host \
+  --ssh-option ServerAliveInterval=30
+```
+
+Disable strict host key checking (for controlled temporary diagnostics only):
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh \
+  --target relay-prod \
+  --strict-host-key-checking off
+```
+
+Dry-run local validation:
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh --target relay-prod --dry-run
+```
+
+### Exit codes
+
+1. `0`: success (or valid dry-run)
+2. `2`: invalid usage/arguments
+3. `3`: local SSH command/setup issue
+4. `4`: remote runtime validation failed
+
+### Help
+
+```bash
+./scripts/ssh/validate-remote-runtime.sh --help
 ```

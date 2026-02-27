@@ -73,6 +73,23 @@ Tunnel defaults:
 
 For extra examples and option details, see [`scripts/ssh/README.md`](../scripts/ssh/README.md).
 
+## SSH Runtime Validator Reference
+
+Use [`scripts/ssh/validate-remote-runtime.sh`](../scripts/ssh/validate-remote-runtime.sh) before relying on remote tmux runtime operations.
+
+Quick check:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/ssh/validate-remote-runtime.sh --target <user@host>
+```
+
+Behavior:
+
+1. Uses a single non-interactive SSH command set to check `tmux` and `node`.
+2. Supports strict host key checking toggle (`--strict-host-key-checking on|off`), timeout, identity, and repeatable `--ssh-option`.
+3. Prints concise `PASS`/`FAIL` lines and returns deterministic exit codes (`0`, `2`, `3`, `4`).
+
 ## Web App Runtime Surface and Checks
 
 Implemented gateway routes:

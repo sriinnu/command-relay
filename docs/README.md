@@ -17,7 +17,7 @@ This folder contains project documentation for users, contributors, and operator
 ## Runtime Snapshot
 
 1. Gateway runtime: TypeScript on Node.js `>=22` (`tsx` execution, `tsc --noEmit` checks).
-2. SSH-first transport direction with current WS runtime path: data plane remains WebSocket (`/ws`), while SSH mode currently covers startup wiring + remote target contract for profile orchestration and then exits until SSH runtime execution lands (see `ssh-transport-contract.md` and ADR-001).
+2. SSH-first transport with current WS runtime path: data plane remains WebSocket (`/ws`), and `ssh` mode executes tmux runtime operations on the remote target after startup preflight passes (see `ssh-transport-contract.md` and ADR-001).
 3. Outbound proxy package set: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
 4. Client ecosystem direction: iOS (Swift) first, Android (Kotlin) second, web fallback last.
 
@@ -37,7 +37,7 @@ Local MCP note:
 
 1. [getting-started.md](getting-started.md): runtime quickstart and live environment setup.
 2. [operations.md](operations.md): operator runbook and runtime behavior details.
-3. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
+3. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_COMMAND`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
 4. Tunnel helper runbook: [../scripts/ssh/README.md](../scripts/ssh/README.md).
 
 ## Current Execution Baselines
@@ -65,9 +65,10 @@ Local MCP note:
 9. [roadmap-native.md](roadmap-native.md)
 10. [macos-menu-bar-control-lane-spec.md](macos-menu-bar-control-lane-spec.md)
 11. [control-lane-parity-checklist.md](control-lane-parity-checklist.md)
-12. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
-13. [research-next-opportunities.md](research-next-opportunities.md)
-14. [TODO.md](TODO.md)
-15. [release/proxy-publish.md](release/proxy-publish.md)
-16. [ssh-transport-contract.md](ssh-transport-contract.md)
-17. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
+12. [controlled-input-audit.md](controlled-input-audit.md)
+13. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
+14. [research-next-opportunities.md](research-next-opportunities.md)
+15. [TODO.md](TODO.md)
+16. [release/proxy-publish.md](release/proxy-publish.md)
+17. [ssh-transport-contract.md](ssh-transport-contract.md)
+18. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
