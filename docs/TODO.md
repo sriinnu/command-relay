@@ -34,8 +34,8 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 ### A2) Runtime (Host-State Ownership)
 
 - [ ] Make host runtime authoritative for session metadata, lane owner, replay offsets, and capability flags.
-- [ ] Validate tmux fixture harness for deterministic replay and multi-pane ordering.
-- [ ] Add startup validation profile for remote host environments (Node runtime, tmux availability, permissions, env policy).
+- [ ] Validate tmux fixture harness for deterministic replay and multi-pane ordering. Status: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture scripts](../scripts/tmux-fixtures/create-fixture.sh), [weekly checkpoint risk note](../scripts/checkpoints/runs/2026-02-25-weekly-cross-platform-checkpoint.md)); remaining gaps: no checkpoint artifact currently captures a completed `create-fixture -> emit-fixture-output -> teardown-fixture` run with replay-order assertions across multiple panes.
+- [x] Add startup validation profile for remote host environments (Node runtime, tmux availability, permissions, env policy). Status: `done` ([startup config loader + startup policy validator](../src/config.ts), [startup validation tests](../src/server/startup-validation.test.ts), [remote runtime validator script](../scripts/ssh/validate-remote-runtime.sh), [runtime validator runbook](./operations.md#ssh-runtime-validator-reference), [validation checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
 - [ ] Ensure runtime failure modes are explicit and recoverable (auth reject, transport drop, tmux session loss, stale lane owner).
 
 ### A3) UX (Thin Clients)
@@ -145,7 +145,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - execute publish workflow dry-run and archive artifacts
 - Acceptance criteria:
   - [x] Audit log records are emitted for enable/disable/input/takeover flows, and `input` records include command metadata policy fields (`commandHash`, `previewPolicy`) ([runtime audit writes](../src/server/bridge-server.ts), [e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts), [policy audit assertions](../src/server/bridge-server.policy.test.ts)).
-  - [ ] Replay ordering suite passes under fixture harness without manual intervention.
+  - [ ] Replay ordering suite passes under fixture harness without manual intervention. Status: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [weekly checkpoint follow-up queue](../scripts/checkpoints/runs/2026-02-25-weekly-cross-platform-checkpoint.md)); remaining gaps: the repo lacks a linked checkpoint run showing automated fixture-harness replay ordering pass output.
   - [ ] Dry-run artifacts contain selected package set, dist-tag, and no publish-policy blockers.
 
 ### Milestone W3 (2026-03-16 to 2026-03-22)

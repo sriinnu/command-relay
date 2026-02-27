@@ -20,6 +20,11 @@ import {
   resolveStartupTransportConfig,
   type StartupTransportConfig
 } from "./runtime/runtime-adapter-factory.js";
+import {
+  assertStartupProfilePass,
+  evaluateStartupProfile,
+  logStartupProfileReport
+} from "./startup/startup-profile.js";
 
 /**
  * Logs startup transport configuration.
@@ -123,6 +128,17 @@ async function main() {
       `No configured runtime backends are available (${config.runtimeBackends.join(",")})`
     );
   }
+  const startupProfile = await evaluateStartupProfile({
+    config: {
+      runtimeBackends: config.runtimeBackends,
+      appStaticEnabled: config.appStaticEnabled,
+      appStaticDir: config.appStaticDir,
+      auditLogPath: config.auditLogPath
+    },
+    runtimeAvailability: backendAvailability
+  });
+  logStartupProfileReport(startupProfile);
+  assertStartupProfilePass(startupProfile);
 
   const runtimeAdapter = createRuntimeAdapter(config.runtimeBackends, runtimeBackends);
   const proxySettings = loadProxySettings();

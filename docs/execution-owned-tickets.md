@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (status reconciliation after README+snapshot evidence refresh for B2.1/B2.2)
+Last updated: 2026-02-27 (status reconciliation for A2 startup profile + tmux fixture harness evidence)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -247,6 +247,26 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - `B2.3 CI gates explicit/reproducible at root + packages`: `done` ([root scripts](../package.json), [package scripts](./TODO.md#b2-productization-readiness)).
   - `B2.4 publish workflow dry-run path (selector + dist-tag)`: `partial` ([workflow](../.github/workflows/publish-proxy-packages.yml), [dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)); remaining gaps: successful unblocked dry-run artifact run still needed.
   - `B2.5 npm publish governance validation`: `partial` ([workflow guards](../.github/workflows/publish-proxy-packages.yml), [runbook config checklist](./release/proxy-publish.md#required-github-configuration)); remaining gaps: repository/environment policy verification evidence not yet captured in-repo.
+
+### CR-P1-007 Reconcile A2 Runtime Status with Link-Backed Evidence
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+  - `scripts/checkpoints/runs/`
+- Acceptance criteria:
+  - [x] Reconcile A2 startup-profile status using direct code/test evidence links.
+  - [x] Reconcile A2 fixture-harness status without over-claiming; keep `partial` where execution evidence is missing.
+  - [x] Capture remaining gaps as explicit evidence asks in TODO/ticket docs.
+- A2 reconciliation result:
+  - `A2 startup validation profile for remote host environments`: `done` ([config startup policy](../src/config.ts), [startup validation tests](../src/server/startup-validation.test.ts), [remote runtime validator](../scripts/ssh/validate-remote-runtime.sh), [ops validator runbook](./operations.md#ssh-runtime-validator-reference), [checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
+  - `A2 tmux fixture harness deterministic replay + multi-pane ordering`: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture create script](../scripts/tmux-fixtures/create-fixture.sh), [weekly checkpoint risk/follow-up](../scripts/checkpoints/runs/2026-02-25-weekly-cross-platform-checkpoint.md)); remaining gaps: no linked checkpoint run currently records `create-fixture -> emit-fixture-output -> teardown-fixture` plus replay-order assertions across multiple panes.
+- Evidence:
+  - [TODO A2 runtime lane](./TODO.md#a2-runtime-host-state-ownership)
+  - [W2 replay-ordering acceptance item](./TODO.md#milestone-w2-2026-03-09-to-2026-03-15)
 - Operational note:
   - Chitragupta co-orchestrator health check result: default path failed (`../chitragupta` not found), explicit path check passed via `scripts/chitragupta/health.sh --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
   - Delegation smoke test succeeded via `pnpm chitragupta -p "Co-orchestrator delegation smoke test: reply with OK only."` (response: `OK`).
