@@ -32,6 +32,25 @@ Startup availability behavior:
 3. Startup fails only when every configured backend is unavailable and runtime mode is not tmux-only.
 4. tmux-only startup behavior is unchanged.
 
+## SSH-First Tunnel Runbook
+
+Use the local helper at [`scripts/ssh/open-tunnel.sh`](../scripts/ssh/open-tunnel.sh) to reach a remote CommandRelay instance over SSH before exposing any direct network listener.
+
+Quick start (macOS/Linux):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/ssh/open-tunnel.sh --target <user@host>
+```
+
+Tunnel defaults:
+
+1. Local endpoint: `127.0.0.1:8787`
+2. Remote endpoint: `127.0.0.1:8787`
+3. Local URLs: `http://127.0.0.1:8787` and `ws://127.0.0.1:8787/ws`
+
+For extra examples and option details, see [`scripts/ssh/README.md`](../scripts/ssh/README.md).
+
 ## Web App Runtime Surface and Checks
 
 Implemented gateway routes:

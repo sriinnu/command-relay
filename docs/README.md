@@ -17,7 +17,7 @@ This folder contains project documentation for users, contributors, and operator
 ## Runtime Snapshot
 
 1. Gateway runtime: TypeScript on Node.js `>=22` (`tsx` execution, `tsc --noEmit` checks).
-2. Gateway transport package: `ws`.
+2. SSH-first transport direction with WebSocket compatibility path (see `ssh-transport-contract.md` and ADR-001).
 3. Outbound proxy package set: `http-proxy-agent`, `https-proxy-agent`, `socks-proxy-agent`, `pac-proxy-agent`.
 4. Client ecosystem direction: iOS (Swift) first, Android (Kotlin) second, web fallback last.
 
@@ -62,3 +62,5 @@ Local MCP note:
 13. [research-next-opportunities.md](research-next-opportunities.md)
 14. [TODO.md](TODO.md)
 15. [release/proxy-publish.md](release/proxy-publish.md)
+16. [ssh-transport-contract.md](ssh-transport-contract.md)
+17. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
