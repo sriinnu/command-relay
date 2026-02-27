@@ -292,6 +292,16 @@ Common error payload:
 }
 ```
 
+Guardrail payload fields (current runtime behavior):
+
+1. `error(code=rate_limited)` and `error(code=input_rate_limited)` include:
+   - `retryAfterMs`: non-negative cooldown before next allowed request
+   - `limit`: max requests/events in window
+   - `windowMs`: window size used by limiter
+2. `error(code=input_too_large)` includes:
+   - `maxInputBytes`: configured max payload size
+   - `receivedBytes`: actual UTF-8 payload size received
+
 Observed codes by stage:
 
 Strict/runtime parse stage:

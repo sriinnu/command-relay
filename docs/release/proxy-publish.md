@@ -1,11 +1,11 @@
 # Proxy Package Publish Runbook
 
-This repository ships scoped npm packages under `@commandrelay/proxy-*`.
+This repository ships scoped npm packages under `@commandrelay/proxy-*` and `@termina/proxy-*`.
 The publish workflow is `.github/workflows/publish-proxy-packages.yml`.
 
 ## Safety model
 
-- Publish scope is hard-limited to package names matching `@commandrelay/proxy-*`.
+- Publish scope is limited to selector-matched package names under proxy scopes (default selector: `@commandrelay/proxy-*,@termina/proxy-*`).
 - Manual publish requires:
   - `mode=publish`
   - `confirm_publish=publish-proxy-packages`
@@ -79,20 +79,20 @@ Creating a GitHub release with a tag starting `proxy-` triggers publish mode aut
 
 Use this only when your release process already guarantees approval and version readiness.
 
-## Batch Follow-up (2026-02-25)
+## Current Batch Follow-up
 
-- [x] Proxy package versions aligned for the current cut:
-  - `@commandrelay/proxy-core@0.1.0`
-  - `@commandrelay/proxy-agent@0.1.0`
-  - `@commandrelay/proxy-http-client@0.1.0`
-- [x] Batch validation evidence captured in current environment:
-  - root TAP `14/14`
-  - `proxy-core` TAP `1/1`
-  - `proxy-agent` TAP `2/2`
-  - `proxy-http-client` TAP `1/1`
-- [ ] Home-Mac rerun pending: `npm run check && npm test && npm run test:ci:all`.
-- [ ] Dry-run pending: trigger `Publish Proxy Packages` with `mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`.
-- [ ] GitHub policy verification pending: `NPM_TOKEN`, `npm-publish` reviewers, default-branch protections.
+- [ ] Record package versions for the current cut:
+  - `@commandrelay/proxy-core@<version>`
+  - `@commandrelay/proxy-agent@<version>`
+  - `@commandrelay/proxy-http-client@<version>`
+- [ ] Record validation evidence for the current environment:
+  - root TAP `<passed>/<total>`
+  - `proxy-core` TAP `<passed>/<total>`
+  - `proxy-agent` TAP `<passed>/<total>`
+  - `proxy-http-client` TAP `<passed>/<total>`
+- [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Trigger dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`).
+- [ ] Verify GitHub policy (`NPM_TOKEN`, `npm-publish` reviewers, default-branch protections).
 - [ ] Capture dry-run run URL + artifact summary in checkpoint/release notes before any publish-mode trigger.
 
 ## Internal v0.1 Gate Checklist (tag prep only)

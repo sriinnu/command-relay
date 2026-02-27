@@ -111,9 +111,67 @@ Operational notes:
 2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
 3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
 
-## Missing `tsx` Recovery (Tonight Path: 2026-02-25)
+## Distilled Capsule + Brief + Dispatch Operations
 
-Use this exact sequence to restore agentic capability tonight:
+Use capsule + brief + dispatch generation to reduce token cost and prevent context leakage.
+CLI commands: `npm run capsule:build --` (capsule JSON), `npm run capsule:brief --` (brief from capsule), and `npm run capsule:dispatch --` (dispatch payload from brief).
+
+Policy:
+
+1. Deterministic first (`task`, `owned files`, `expected output`).
+2. Minimal context capsule only.
+3. Close agents quickly after completion/stall.
+4. Redact secrets before dispatch.
+5. Scope each agent to owned files.
+
+Flow:
+
+1. Build a task capsule from goal, ownership, and scoped snippets.
+2. Generate an execution brief from the capsule file.
+3. Dispatch only the capsule/brief payload to the assigned agent owner.
+
+Concrete command example:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+npm run capsule:build -- \
+  --goal "Document capsule brief wiring in operations, docs index, and skill guide" \
+  --owner docs-brief-owner \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/README.md \
+  --path docs/operations.md \
+  --accept "Document capsule:brief full flow after capsule build" \
+  --accept "Keep examples concise and path-accurate" \
+  --risk "Over-broad snippets can leak unrelated context" \
+  --snippet docs/operations.md:114:155 \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.capsule.json
+
+npm run capsule:brief -- \
+  --capsule /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.capsule.json \
+  --task "Update docs distilled workflow section and skill references" \
+  --owner docs-brief-owner \
+  --path docs/operations.md \
+  --path docs/README.md \
+  --path skills/termina-orchestrator/SKILL.md \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md
+
+npm run capsule:dispatch -- \
+  --brief /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md \
+  --task "Update docs distilled workflow section and skill references" \
+  --owner docs-brief-owner \
+  --path docs/operations.md \
+  --path docs/README.md \
+  --path skills/termina-orchestrator/SKILL.md \
+  --agent-type worker \
+  --instruction "You are not alone in the codebase; respect owned file scope." \
+  --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.dispatch.json
+```
+
+`capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload; `capsule:dispatch` packages the brief for agent handoff.
+
+## Missing `tsx` Recovery
+
+Use this exact sequence to restore agentic capability:
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta
@@ -151,9 +209,9 @@ Coverage baseline:
 
 Use this suite as the protocol gate before merging schema changes.
 
-## Batch Outcomes Snapshot (2026-02-25)
+## Validation Scope Snapshot
 
-Tonight's validation scope for the iOS controlled-input baseline is:
+Validation scope for the iOS controlled-input baseline:
 
 1. App shell artifact set in `apps/ios/CommandRelay` (`AppRootView`, `AuthGateView`, `SessionListView`, `ReadOnlyStreamView`).
 2. Domain/transport contracts in `CommandRelayKit` (`AuthSessionServicing`, `SessionListServicing`, `ReadOnlyStreamServicing`, `ControlledInputServicing`, `RelayTransportClient`).
@@ -176,7 +234,7 @@ Behavior:
 2. `COMMANDRELAY_WS_URL` absent -> app remains on stub services.
 3. Input remains opt-in in UI: `enable_input` is explicit, `disable_input` is available, and `input` is guarded by policy state.
 
-## Tonight on Mac (Exact iOS Spike Command Pack - 2026-02-25)
+## iOS Spike Validation Command Pack
 
 Run in this exact order:
 
@@ -237,7 +295,7 @@ Kill-switch toggle guidance (runtime config sanity):
 COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
 ```
 
-## Controlled-Input Operator Runbook (Tonight - 2026-02-25)
+## Controlled-Input Operator Runbook
 
 This runbook verifies:
 

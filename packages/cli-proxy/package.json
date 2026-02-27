@@ -1,0 +1,75 @@
+{
+  "name": "@termina/cli-proxy",
+  "version": "0.1.0",
+  "description": "CLI diagnostics for proxy environment inspection and route explanation",
+  "keywords": [
+    "termina",
+    "proxy",
+    "cli",
+    "diagnostics",
+    "typescript",
+    "nodejs"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/cli-proxy"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "termina-cli-proxy": "./dist/cli.js",
+    "termina-proxy": "./dist/cli.js"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "NOTES.md",
+    "docs/examples",
+    "docs/assets/cli-proxy-brand.svg"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').chmodSync('dist/cli.js', 0o755)\"",
+    "test": "node --import tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@commandrelay/proxy-core": "^0.1.0"
+  },
+  "peerDependencies": {
+    "@commandrelay/proxy-agent": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@commandrelay/proxy-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}

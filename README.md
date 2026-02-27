@@ -180,9 +180,12 @@ src/
   tmux/          tmux adapter
   net/           proxy routing and agent factory adapters
 packages/
+  cli-proxy/
   proxy-core/
   proxy-agent/
+  proxy-fetch/
   proxy-http-client/
+  proxy-undici/
 docs/
   protocol, security, operations, roadmap, proxy ecosystem
 apps/
@@ -195,7 +198,7 @@ apps/
 2. `docs/getting-started.md` - setup and runbook
 3. `docs/operations.md` - operations and runtime handling
 4. `docs/roadmap-native.md` - iOS/Android/macos/web rollout
-5. `docs/proxy-ecosystem-roadmap.md` - proxy package expansion
+5. `docs/proxy-ecosystem-roadmap.md` - proxy package expansion + discovery/use strategy
 
 ## Project Status
 
@@ -205,7 +208,7 @@ Active work continues on:
 
 1. Native client parity and UX hardening.
 2. Multi-runtime and control-lane reliability.
-3. Externalized `@commandrelay` / `@termina` proxy package line.
+3. Externalized `@commandrelay` / `@termina` proxy package line, with P1 (`@termina/proxy-undici`, `@termina/cli-proxy`, `@termina/proxy-fetch`) implemented and validated.
 
 ## License
 

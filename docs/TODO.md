@@ -1,6 +1,6 @@
 # CommandRelay Execution TODO (Native-First)
 
-Last updated: 2026-02-25
+Last reviewed: 2026-02-26
 Owner scope: iOS first, Android second, web fallback last.
 
 ## Gateway Runtime Baseline
@@ -17,7 +17,7 @@ Owner scope: iOS first, Android second, web fallback last.
 
 ## Current Milestones
 
-## Controlled-Input Status Snapshot (2026-02-25)
+## Controlled-Input Status Snapshot
 
 - [x] Gateway controlled-input runtime is implemented and test-covered (`enable_input`, `input`, `disable_input`, kill switch enforcement).
 - [x] iOS controlled-input baseline is implemented (`enable_input`, `input`, `disable_input` wiring + UX safety gate); Mac runtime validation is pending.
@@ -49,7 +49,7 @@ Owner scope: iOS first, Android second, web fallback last.
 
 - [x] Implement explicit `enable_input` UX with clear risk gate.
 - [x] Implement input send/ack path with timeout/error handling.
-- [ ] Add safeguards: per-command length limits, rate limit feedback, kill switch handling.
+- [x] Add safeguards: per-command length limits, rate limit feedback, kill switch handling (`input_too_large` + `input_rate_limited` payload metadata, 2026-02-26).
 - [ ] Add audit event surfacing for sent commands.
 - [ ] Exit criteria met:
 - [ ] Read-only mode remains default on every reconnect.
@@ -119,7 +119,7 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Risk: app store review delays.
 - [ ] Mitigation: submit early TestFlight/Internal tracks and stage approvals.
 
-## Immediate Next Actions (This Week)
+## Immediate Next Actions (Rolling)
 
 - [x] Create `v1` protocol contract tests in gateway repo.
 - [x] Build iOS spike for WebSocket connect/list/attach/output, then extend with controlled-input baseline.
@@ -130,6 +130,8 @@ Owner scope: iOS first, Android second, web fallback last.
 - [x] Draft macOS menu bar control-lane spec and state diagram (`docs/macos-menu-bar-control-lane-spec.md`, completed 2026-02-25).
 - [x] Author iOS/web parity checklist for control-lane flows and map each item to an automated/manual test (`docs/control-lane-parity-checklist.md`, completed 2026-02-25).
 - [x] Add two gateway fixture scenarios for lane conflict + explicit takeover (iOS writer -> web takeover, web writer -> iOS takeover) (`src/server/bridge-server.policy.test.ts`, completed 2026-02-25).
+- [x] Document distilled capsule-to-brief wiring (`npm run capsule:build --` -> `npm run capsule:brief --`) in operations/docs/skill guidance (`docs/operations.md`, `docs/README.md`, `skills/termina-orchestrator/SKILL.md`, completed 2026-02-26).
+- [x] Document distilled capsule-to-dispatch wiring (`npm run capsule:build --` -> `npm run capsule:brief --` -> `npm run capsule:dispatch --`) in operations/docs/skill guidance (`docs/operations.md`, `docs/README.md`, `skills/termina-orchestrator/SKILL.md`, completed 2026-02-26).
 
 ## Weekly Cross-Platform Checkpoint Runbook
 
@@ -142,7 +144,7 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Post-sync tracking rule:
   checkpoint is complete only after sign-off boxes are checked and milestone decisions are mirrored in `docs/roadmap-native.md` + `docs/TODO.md`.
 
-## Tonight Test Acceptance Checklist (Mac Validation - 2026-02-25)
+## Mac Validation Acceptance Checklist
 
 - [ ] Node.js runtime is `v22.x` on Mac validation machine.
 - [ ] `npm run check` passes.
@@ -156,7 +158,7 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Live smoke (kill switch on) blocks input: `COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start` + `npm run bench:input -- --iterations 3` fails with input-disabled behavior.
 - [ ] Nightly evidence captured: TAP artifacts + swift test log + short smoke summary.
 
-## Home Pickup TODO (MacBook Session - 2026-02-24 Night)
+## Home Pickup TODO
 
 - [ ] Copy MCP template and set absolute paths: `cp mcp.example.json .mcp.json` then edit paths.
 - [ ] Verify Chitragupta MCP starts with the workaround command from `docs/operations.md`.
@@ -182,7 +184,7 @@ Owner scope: iOS first, Android second, web fallback last.
   - iOS/Android local test results
   - perf summary (`p50/p95/p99`)
 
-## Home-Mac Continuation Checklist (2026-02-26)
+## Home-Mac Continuation Checklist
 
 ### Session Bootstrap (single owner)
 
@@ -227,13 +229,13 @@ Owner scope: iOS first, Android second, web fallback last.
 - [ ] Gate 5: release notes/changelog draft reviewed before any publish-mode trigger.
   - Home Mac action: append dry-run URL + artifact summary + go/no-go note.
 
-## Proposed Internal v0.1 Tag Plan (proposal only; do not create tags yet)
+## Internal v0.1 Tag Plan (proposal only; do not create tags yet)
 
-- [ ] `2026-02-26`: complete tmux + iOS parallel follow-up tracks and evidence capture.
-- [ ] `2026-02-27`: run proxy publish dry-run gate review and resolve blockers.
-- [ ] `2026-02-28`: freeze internal v0.1 candidate scope and finalize release notes draft.
-- [ ] `2026-03-02`: final go/no-go check (tests, perf, release gates, checkpoint sign-off).
-- [ ] `2026-03-03`: if all gates stay green, prepare internal `v0.1` tag request in PR/release notes (still no tag creation in this step).
+- [ ] Step 1: complete tmux + iOS follow-up tracks and evidence capture.
+- [ ] Step 2: run proxy publish dry-run gate review and resolve blockers.
+- [ ] Step 3: freeze internal v0.1 candidate scope and finalize release notes draft.
+- [ ] Step 4: run final go/no-go check (tests, perf, release gates, checkpoint sign-off).
+- [ ] Step 5: if all gates stay green, prepare internal `v0.1` tag request in PR/release notes (no tag creation in this step).
 
 ## Proxy Ecosystem Expansion Backlog
 
@@ -241,10 +243,11 @@ Reference roadmap: `docs/proxy-ecosystem-roadmap.md`.
 
 - [x] Harden current package line for external use (`@commandrelay/proxy-core`, `@commandrelay/proxy-agent`, `@commandrelay/proxy-http-client`) with reusable docs/assets/examples.
 - [ ] Publish/validate adapter ecosystem package plan and naming contract (`@termina/proxy-*`).
-- [ ] P1 package wave:
-  - `@termina/cli-proxy`
-  - `@termina/proxy-undici`
-  - `@termina/proxy-fetch`
+- [ ] P1 package wave (active):
+  - [x] `@termina/cli-proxy` (`packages/cli-proxy`, diagnostics CLI + JSON/human modes + tests/docs/assets completed on 2026-02-26)
+  - [x] `@termina/proxy-undici` (`packages/proxy-undici`, check/build/test + docs/assets/examples complete on 2026-02-26)
+  - [x] `@termina/proxy-fetch` (`packages/proxy-fetch`, fetch adapter + JSON/timeout/size guards + tests/docs/assets completed on 2026-02-26)
+- [x] P1 exit criteria: `@termina/cli-proxy` + `@termina/proxy-fetch` both pass check/build/test and include README + NOTES + SVG branding assets.
 - [ ] P2 package wave:
   - `@termina/proxy-axios`
   - `@termina/proxy-got`

@@ -26,6 +26,12 @@ Use this skill when requests involve any of:
    - strict TypeScript style where practical
 3. Do not copy third-party code directly; learn patterns and implement first-party equivalents.
 4. Preserve read-only-by-default remote input policy unless explicitly changed by user direction.
+5. Enforce distilled context orchestration policy:
+   - deterministic first (explicit task + owned files + output shape)
+   - minimal context capsules only
+   - close agents fast when done/stalled
+   - redact secrets in all capsule payloads
+   - strict file-ownership scope per agent
 
 ## Standard Workflow
 
@@ -45,6 +51,42 @@ Use this skill when requests involve any of:
 5. **Push**
    - Commit cohesive units with explicit scope.
    - Push to current feature branch and report exact commit IDs.
+
+## Capsule + Brief + Dispatch CLI (Distilled Context)
+
+Use capsule build + brief generation + dispatch to keep orchestration deterministic and low-leakage.
+Command paths: `npm run capsule:build --` then `npm run capsule:brief --` then `npm run capsule:dispatch --`.
+
+```bash
+npm run capsule:build -- --help
+
+npm run capsule:build -- \
+  --goal "Update distilled context docs policy" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --accept "Replace stale capsule/brief script references" \
+  --risk "Over-broad context increases leakage risk" \
+  --out /tmp/docs-policy.capsule.json
+
+npm run capsule:brief -- \
+  --capsule /tmp/docs-policy.capsule.json \
+  --task "Update distilled context docs policy" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --out /tmp/docs-policy.brief.md
+
+npm run capsule:dispatch -- \
+  --brief /tmp/docs-policy.brief.md \
+  --task "Update distilled context docs policy" \
+  --owner docs-policy \
+  --path skills/termina-orchestrator/SKILL.md \
+  --path docs/operations.md \
+  --agent-type worker \
+  --instruction "You are not alone in the codebase; respect owned file scope." \
+  --out /tmp/docs-policy.dispatch.json
+```
 
 ## Chitragupta Co-Orchestrator Runbook
 

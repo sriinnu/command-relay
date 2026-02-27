@@ -3,6 +3,16 @@
 This folder contains project documentation for users, contributors, and operators.
 
 > **Docs summary:** Architecture, protocol, operations, and native roadmap docs for the CommandRelay TypeScript gateway.
+> **Freshness policy:** keep `/docs` evergreen; record date-stamped execution evidence in `scripts/checkpoints/runs/*.md`.
+
+## Distilled Context Workflow (Cost + Leakage)
+
+1. Deterministic first: define exact task, owned files, and expected output before spawning agents.
+2. Use minimal task capsules: include only required snippets/interfaces, not broad repository context.
+3. Close agents fast when complete or stalled; relaunch with narrower scope when needed.
+4. Redact secrets from all capsules/prompts/logs (tokens, keys, credentials, raw `.env` values).
+5. Scope work by owned files only to avoid overlap and accidental leakage.
+6. Command examples for `capsule:build`, `capsule:brief`, and `capsule:dispatch` live in [operations.md](operations.md).
 
 ## Runtime Snapshot
 
@@ -21,12 +31,19 @@ Local MCP note:
 3. Operator: read [Operations](operations.md) and [Security](security.md).
 4. Mobile builder: read [Getting Started](getting-started.md) for `M0ProtocolMockClient`, then [iOS Swift Architecture](ios-swift-architecture.md) and [Android Architecture](android-architecture.md).
 5. Planner: read [Native Roadmap](roadmap-native.md) and [Execution TODO](TODO.md).
+6. Release owner: read [Proxy Publish Runbook](release/proxy-publish.md) and capture outputs in weekly checkpoints.
 
 ## Current Execution Baselines
 
 1. iOS protocol mock package path: `apps/ios/M0ProtocolMockClient` (`swift test`).
 2. Protocol contract matrix entrypoint: `node --import tsx --test src/protocol.conformance.test.ts`.
 3. Local MCP/chitragupta entrypoint workaround: `node --import tsx packages/cli/src/mcp-entry.ts --stdio --project ... --agent`.
+
+## Production Readiness Path
+
+1. Validate runtime and protocol gates from [Getting Started](getting-started.md) and [Operations](operations.md).
+2. Run release gates from [release/proxy-publish.md](release/proxy-publish.md) in `dry-run` mode first.
+3. Record evidence in `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`.
 
 ## Document Index
 
@@ -44,3 +61,4 @@ Local MCP note:
 12. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
 13. [research-next-opportunities.md](research-next-opportunities.md)
 14. [TODO.md](TODO.md)
+15. [release/proxy-publish.md](release/proxy-publish.md)

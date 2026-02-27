@@ -127,9 +127,10 @@ The matrix validates required v1 event types:
 8. `heartbeat`
 9. `policy_update`
 
-## Tonight on Mac (iOS Read-Only Spike Validation - 2026-02-25)
+## iOS Read-Only Validation Command Pack
 
-Run this command pack exactly as written to validate the new iOS read-only spike artifacts.
+Run this command pack to validate iOS read-only artifacts.
+Record dated run evidence in `scripts/checkpoints/runs/YYYY-MM-DD-weekly-cross-platform-checkpoint.md`.
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
@@ -165,7 +166,7 @@ node --import tsx --test src/protocol.conformance.test.ts
 node --import tsx --test src/server/ws-contract-matrix.test.ts
 ```
 
-Pass criteria for tonight:
+Pass criteria:
 
 1. All `test -f ...` checks exit with code `0`.
 2. `xcodebuild ... build` exits `0` for scheme `CommandRelay`.
@@ -173,7 +174,7 @@ Pass criteria for tonight:
 4. Full `swift test` in both `CommandRelayKit` and `M0ProtocolMockClient` exits `0`.
 5. Both Node protocol gates end with `# fail 0`.
 
-## Tonight on Mac (Controlled-Input Verification - 2026-02-25)
+## Controlled-Input Verification Command Pack
 
 Run policy gates from repo root:
 

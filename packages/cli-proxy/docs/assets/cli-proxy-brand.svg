@@ -1,0 +1,13 @@
+<svg width="720" height="240" viewBox="0 0 720 240" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">cli-proxy brand</title>
+  <desc id="desc">Terminal themed brand mark for the cli-proxy package.</desc>
+  <rect width="720" height="240" rx="24" fill="#0F172A"/>
+  <rect x="24" y="24" width="672" height="192" rx="16" fill="#111827" stroke="#334155" stroke-width="2"/>
+  <circle cx="58" cy="56" r="8" fill="#EF4444"/>
+  <circle cx="84" cy="56" r="8" fill="#F59E0B"/>
+  <circle cx="110" cy="56" r="8" fill="#22C55E"/>
+  <path d="M72 124L116 146L72 168" stroke="#38BDF8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="136" y="161" width="64" height="10" rx="5" fill="#38BDF8"/>
+  <text x="230" y="153" fill="#E2E8F0" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace" font-size="56" font-weight="700">cli-proxy</text>
+  <text x="234" y="185" fill="#94A3B8" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace" font-size="20">inspect and explain outbound proxy routing</text>
+</svg>
