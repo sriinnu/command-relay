@@ -113,7 +113,7 @@ jobs:
         run: |
           set -euo pipefail
           cd apps/ios/M0ProtocolMockClient
-          swift test --parallel
+          swift test
 
       - name: Note skipped Swift tests
         if: steps.detect.outputs.should_run != 'true'

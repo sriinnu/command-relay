@@ -17,7 +17,7 @@
     "check:root": "tsc --noEmit",
     "check:orchestration": "tsc --noEmit -p tsconfig.orchestration.json",
     "check:packages": "scripts/packages/run-phase.sh check",
-    "check:all": "scripts/packages/run-phase.sh check --include-root --root-script check:root",
+    "check:all": "scripts/packages/run-phase.sh check --include-root --root-script check",
     "build": "npm run build:all",
     "build:packages": "scripts/packages/run-phase.sh build",
     "build:all": "npm run build:packages",
