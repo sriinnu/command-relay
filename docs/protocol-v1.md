@@ -335,11 +335,15 @@ Message handling and policy stage:
 Streaming/runtime failure stage:
 
 23. `pane_poll_failed`
-24. `handler_failed`
+24. `runtime_session_unavailable`
+25. `transport_drop`
+26. `invalid_pane_target`
+27. `handler_failed`
 
 Ownership note:
 
 1. Current runtime emits `input_lane_conflict` when another client owns a pane input lane and takeover is not requested/allowed.
+2. Recoverable rejection payloads include `recoverable=true` and should be treated as retriable by clients once user action/environment changes.
 
 ## 9. End-to-End Example
 

@@ -4,13 +4,14 @@ import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
 import { envelope, parseMessage } from "../protocol.js";
-import { BridgeEngine, type BridgeAttachReplayMetadata } from "../bridge/bridge-engine.js";
+import { BridgeEngine } from "../bridge/bridge-engine.js";
 import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
 import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
+import { classifyBridgeRuntimeFailure, classifyReplaySnapshotFallbackReason } from "./bridge-runtime-failures.js";
 /** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
 const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -215,18 +216,24 @@ export async function startBridgeServer(deps) {
           }
         });
       } catch (error) {
+        const runtimeFailure = classifyBridgeRuntimeFailure(error);
+        await audit.write({ action: "runtime_failure", clientId: client.id, details: { code: runtimeFailure.code, reason: runtimeFailure.reason, recoverable: runtimeFailure.recoverable } });
         send(client.socket, envelope("error", {
-          code: "handler_failed",
-          message: error instanceof Error ? error.message : String(error)
+          code: runtimeFailure.code,
+          reason: runtimeFailure.reason,
+          recoverable: runtimeFailure.recoverable,
+          message: runtimeFailure.message
         }, requestId));
       }
     });
-    socket.on("close", () => {
+    socket.on("close", (code, reasonBuffer) => {
       engine.detachAll(client.id);
       messageLimiter.clear(client.id);
       inputLimiter.clear(client.id);
       const releasedPanes = releaseClientInputOwnership(inputOwnershipArbiter, client.id);
       if (releasedPanes > 0) void audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "socket_close", releasedPanes } });
+      const closeReason = reasonBuffer.toString("utf8");
+      void audit.write({ action: "transport_drop", clientId: client.id, details: { code, reason: closeReason || "socket_closed", releasedPanes } });
       telemetry.recordConnectionClosed();
       clearClientAttachLag(pendingAttachLag, client.id);
       clients.delete(client.id);
@@ -262,16 +269,6 @@ export function parseIncomingClientMessage(raw, strictProtocolParsing) {
   return parseMessage(raw, strictProtocolParsing ? { strictV1: true } : undefined);
 }
 
-function classifyReplaySnapshotFallbackReason(
-  replayMetadata: BridgeAttachReplayMetadata
-): "ahead_of_stream" | "outside_retained_window" | "empty_resume_window" {
-  const { requestedLastSeq, latestSeq, oldestHistorySeq, replayGapDetected } = replayMetadata;
-  if (requestedLastSeq === null) return "empty_resume_window";
-  if (requestedLastSeq > latestSeq) return "ahead_of_stream";
-  if (replayGapDetected || (oldestHistorySeq !== null && requestedLastSeq < oldestHistorySeq - 1)) return "outside_retained_window";
-  return "empty_resume_window";
-}
-
 /** Handles a single parsed client message. @param {object} ctx Message context. @returns {Promise<void>} Completion signal. */
 export async function handleClientMessage(ctx) {
   const {
@@ -296,7 +293,7 @@ export async function handleClientMessage(ctx) {
   const laneOverrideAllowed = allowInputOwnershipOverride ?? config.allowInputOwnershipOverride ?? true;
   const paneInputOwnerState = inputOwnershipArbiter ?? paneInputOwnership ?? paneInputOwners;
   if (!client.authenticated && type !== "auth") {
-    send(client.socket, envelope("error", { code: "auth_required" }, requestId));
+    send(client.socket, envelope("error", { code: "auth_required", recoverable: true }, requestId));
     return;
   }
   switch (type) {
@@ -310,7 +307,7 @@ export async function handleClientMessage(ctx) {
       const token = parseNonEmptyString(payload.token) ?? "";
       if (!tokenEquals(config.authToken, token)) {
         await audit.write({ action: "auth_fail", clientId: client.id, details: { reason: "invalid_token" } });
-        send(client.socket, envelope("auth_error", { code: "invalid_token" }, requestId));
+        send(client.socket, envelope("auth_error", { code: "invalid_token", recoverable: true }, requestId));
         return;
       }
       client.authenticated = true;
@@ -416,7 +413,7 @@ export async function handleClientMessage(ctx) {
       if (claimResult?.ok === false) {
         const { ownerClientId, overrideAllowed } = claimResult;
         await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes, commandHash, previewPolicy } });
-        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed }, requestId));
+        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed, recoverable: true }, requestId));
         return;
       }
       await tmux.sendInput(paneId, data);

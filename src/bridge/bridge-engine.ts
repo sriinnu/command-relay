@@ -209,20 +209,12 @@ export class BridgeEngine {
         replayGapDetected: false
       };
     } catch (error) {
-      this.onError(clientId, paneId, error);
-      const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
-      this.ensureStarted();
-      return {
-        paneId,
-        requestedLastSeq,
-        latestSeq: watcher.streamSeq,
-        oldestHistorySeq: historyBySeq.at(0)?.streamSeq ?? null,
-        latestHistorySeq: historyBySeq.at(-1)?.streamSeq ?? null,
-        replayedCount: 0,
-        replayUsed: false,
-        fallbackToSnapshot: false,
-        replayGapDetected: false
-      };
+      watcher.subscribers.delete(clientId);
+      if (watcher.subscribers.size === 0 && watcher.streamSeq === 0) {
+        this.panes.delete(paneId);
+      }
+      this.stopIfIdle();
+      throw error;
     }
   }
 

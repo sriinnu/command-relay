@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (status reconciliation for A2 startup profile + tmux fixture harness evidence)
+Last updated: 2026-02-27 (CR-P1-002 weekly evidence lane + A2 runtime failure-mode hardening)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -196,7 +196,7 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 - Owner: `@owner-tbd`
 - Priority: `P1`
-- Status: `todo`
+- Status: `done`
 - File scope:
   - `scripts/checkpoints/generate-weekly-checkpoint.sh`
   - `scripts/checkpoints/templates/weekly-cross-platform-checkpoint.md`
@@ -204,9 +204,15 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - `docs/TODO.md`
   - `docs/proxy-ecosystem-roadmap.md`
 - Acceptance criteria:
-  - [ ] Weekly checkpoint artifact is generated or updated for the current cycle.
-  - [ ] Milestone decisions are mirrored into roadmap docs with concrete dates/status.
-  - [ ] Evidence links in the checkpoint resolve to existing files/artifacts.
+  - [x] Weekly checkpoint artifact is generated or updated for the current cycle.
+  - [x] Milestone decisions are mirrored into roadmap docs with concrete dates/status.
+  - [x] Evidence links in the checkpoint resolve to existing files/artifacts.
+- Execution note:
+  - This ticket is complete for docs synchronization only; it does not clear execution blockers tracked in mirrored milestone statuses.
+- Evidence:
+  - [2026-02-27 CR-P1-002 weekly evidence lane checkpoint](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md)
+  - [TODO P1 status mirror](./TODO.md#p1-this-week)
+  - [Proxy roadmap milestone decision mirror](./proxy-ecosystem-roadmap.md#milestone-decision-mirror-2026-02-27-cr-p1-002)
 
 ### CR-P1-003 Run Proxy Publish Dry-Run + Capture Artifact Links
 
@@ -262,11 +268,37 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [x] Reconcile A2 fixture-harness status without over-claiming; keep `partial` where execution evidence is missing.
   - [x] Capture remaining gaps as explicit evidence asks in TODO/ticket docs.
 - A2 reconciliation result:
-  - `A2 startup validation profile for remote host environments`: `done` ([config startup policy](../src/config.ts), [startup validation tests](../src/server/startup-validation.test.ts), [remote runtime validator](../scripts/ssh/validate-remote-runtime.sh), [ops validator runbook](./operations.md#ssh-runtime-validator-reference), [checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
-  - `A2 tmux fixture harness deterministic replay + multi-pane ordering`: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture create script](../scripts/tmux-fixtures/create-fixture.sh), [weekly checkpoint risk/follow-up](../scripts/checkpoints/runs/2026-02-25-weekly-cross-platform-checkpoint.md)); remaining gaps: no linked checkpoint run currently records `create-fixture -> emit-fixture-output -> teardown-fixture` plus replay-order assertions across multiple panes.
+  - `A2 startup validation profile for remote host environments`: `done` ([startup profile checks](../src/startup/startup-profile.ts), [startup profile tests](../src/startup/startup-profile.test.ts), [remote runtime validator](../scripts/ssh/validate-remote-runtime.sh), [ops validator runbook](./operations.md#ssh-runtime-validator-reference), [checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
+  - `A2 tmux fixture harness deterministic replay + multi-pane ordering`: `partial` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture evidence runner](../scripts/tmux-fixtures/run-fixture-evidence.ts), [2026-02-27 fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md)); remaining gaps: a linked automated run now exists, but replay-order assertions fail because captured fixture lines are currently empty in this environment.
 - Evidence:
   - [TODO A2 runtime lane](./TODO.md#a2-runtime-host-state-ownership)
   - [W2 replay-ordering acceptance item](./TODO.md#milestone-w2-2026-03-09-to-2026-03-15)
 - Operational note:
   - Chitragupta co-orchestrator health check result: default path failed (`../chitragupta` not found), explicit path check passed via `scripts/chitragupta/health.sh --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
   - Delegation smoke test succeeded via `pnpm chitragupta -p "Co-orchestrator delegation smoke test: reply with OK only."` (response: `OK`).
+
+### CR-P1-008 Harden A2 Runtime Failure Modes as Explicit + Recoverable
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `src/server/bridge-runtime-failures.ts`
+  - `src/server/bridge-server.ts`
+  - `src/bridge/bridge-engine.ts`
+  - `src/server/bridge-runtime-failures.test.ts`
+  - `src/server/bridge-server.failure-modes.e2e.test.ts`
+  - `docs/TODO.md`
+  - `docs/protocol-v1.md`
+- Acceptance criteria:
+  - [x] Runtime handler failures are classified into explicit client-facing codes with recoverability metadata.
+  - [x] Attach no longer acks after capture failure; runtime error returns to client with structured code/reason.
+  - [x] Transport-drop close path emits explicit audit event and lane release remains recoverable.
+  - [x] Unit + e2e coverage exists for runtime-session loss and transport-drop recovery paths.
+- Evidence:
+  - [Runtime failure classifier](../src/server/bridge-runtime-failures.ts)
+  - [Bridge handler runtime failure envelope wiring](../src/server/bridge-server.ts)
+  - [Bridge attach failure propagation](../src/bridge/bridge-engine.ts)
+  - [Runtime failure classifier tests](../src/server/bridge-runtime-failures.test.ts)
+  - [Failure-mode e2e tests](../src/server/bridge-server.failure-modes.e2e.test.ts)
+  - [Protocol error-code matrix update](./protocol-v1.md#8-error-codes-and-validation-contract)
