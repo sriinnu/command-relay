@@ -81,6 +81,21 @@ const oneShotProxy = resolveProxyForUrlFromEnv("https://edge.example.com");
 console.log({ controlPlaneProxy, telemetryProxy, oneShotProxy });
 ```
 
+## Examples
+
+- [Examples index](./docs/examples/README.md)
+- [Load and inspect normalized proxy settings + snapshot](./docs/examples/settings.md)
+- [Resolve per-target proxy routing + snapshot](./docs/examples/resolve.md)
+
+## Usage Matrix
+
+| Integration need | Use `@commandrelay/proxy-core` | Pair with |
+| --- | --- | --- |
+| Shared proxy policy across multiple HTTP clients | Yes, as the single source of env parsing and `NO_PROXY` matching | `@commandrelay/proxy-agent`, `@termina/proxy-undici`, `@termina/proxy-fetch`, or app wrapper |
+| Build a thin adapter for a specific transport | Yes, call `loadProxySettings` once and `resolveProxyForUrl` per target | Transport-specific package in your stack |
+| Need ready-to-use runtime agents/dispatchers | Not by itself | `@commandrelay/proxy-agent` or `@termina/proxy-undici` |
+| Need operator diagnostics from terminal/CI | Core can power this, but prefer dedicated UX | `@termina/cli-proxy` |
+
 ## API Surface
 
 - `loadProxySettings(env?: ProxyEnvironment): ProxySettings`
@@ -107,6 +122,21 @@ Export policy:
 
 - Current line: `0.1.x`
 - Until `1.0`, pin minor versions in production (for example `~0.1.0`)
+
+## Migration and Compatibility
+
+- Runtime baseline: Node.js `>=18`, npm `>=9`, ESM package usage.
+- If migrating from custom proxy env parsing, replace local logic with one startup call to `loadProxySettings(process.env)`.
+- Replace per-client `NO_PROXY` matching code with `resolveProxyForUrl(target, settings)` to keep behavior consistent.
+- Use root imports only (`@commandrelay/proxy-core`); deep imports are not compatibility-safe.
+- While pre-`1.0`, pin minor versions (`~0.1.x`) before broad rollout.
+
+## Troubleshooting
+
+- Proxy unexpectedly not used: verify target has `http:` or `https:` scheme and matching `*_PROXY` values are set.
+- Target unexpectedly bypassed: review `NO_PROXY` entries (host/domain/port rules may match more than expected).
+- `HTTP_PROXY` appears ignored: expected when `REQUEST_METHOD` is set (CGI hardening behavior).
+- Resolved proxy is `null`: invalid proxy URL inputs are sanitized and treated as unset.
 
 ## Integration Notes
 

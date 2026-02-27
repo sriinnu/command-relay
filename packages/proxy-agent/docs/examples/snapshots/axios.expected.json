@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "service": "axios-example",
+  "localRouting": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  },
+  "cacheProbe": {
+    "firstFromCache": false,
+    "secondFromCache": true
+  }
+}

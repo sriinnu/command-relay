@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work + observability/evidence contract baseline)
+Last updated: 2026-02-27 (status reconciliation after README+snapshot evidence refresh for B2.1/B2.2)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -224,3 +224,29 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 - Evidence:
   - [2026-02-27 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)
   - [Proxy publish runbook follow-up](./release/proxy-publish.md)
+
+## B2 Status Reconciliation (Docs + Readiness Evidence)
+
+### CR-P1-006 Reconcile B2 Productization Status with Link-Backed Evidence
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+  - `docs/proxy/package-docs-matrix.md`
+- Acceptance criteria:
+  - [x] Add central per-package docs coverage matrix (README/NOTES/examples) with direct evidence links.
+  - [x] Mark B2 TODO items as `done` only where substantiated by links.
+  - [x] Mark incomplete B2 items as `partial` with explicit remaining gaps.
+  - [x] Record reconciliation result in execution-owned tickets.
+- B2 reconciliation result:
+  - `B2.1 docs pack per package`: `done` ([matrix](./proxy/package-docs-matrix.md)); evidence confirms README usage matrix + NOTES + migration/compat + troubleshooting coverage for all six packages.
+  - `B2.2 runnable examples + expected snapshots`: `done` ([matrix](./proxy/package-docs-matrix.md)); evidence confirms snapshot-backed runnable examples across all six packages.
+  - `B2.3 CI gates explicit/reproducible at root + packages`: `done` ([root scripts](../package.json), [package scripts](./TODO.md#b2-productization-readiness)).
+  - `B2.4 publish workflow dry-run path (selector + dist-tag)`: `partial` ([workflow](../.github/workflows/publish-proxy-packages.yml), [dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)); remaining gaps: successful unblocked dry-run artifact run still needed.
+  - `B2.5 npm publish governance validation`: `partial` ([workflow guards](../.github/workflows/publish-proxy-packages.yml), [runbook config checklist](./release/proxy-publish.md#required-github-configuration)); remaining gaps: repository/environment policy verification evidence not yet captured in-repo.
+- Operational note:
+  - Chitragupta co-orchestrator health check result: default path failed (`../chitragupta` not found), explicit path check passed via `scripts/chitragupta/health.sh --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
+  - Delegation smoke test succeeded via `pnpm chitragupta -p "Co-orchestrator delegation smoke test: reply with OK only."` (response: `OK`).

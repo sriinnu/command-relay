@@ -91,11 +91,11 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### B2) Productization Readiness
 
-- [ ] Complete docs pack per package: README usage matrix, NOTES, migration/compat notes, troubleshooting.
-- [ ] Add runnable examples with expected output snapshots.
-- [ ] Ensure CI gates are explicit and reproducible (`check`, `build`, `test`) at root and per package.
-- [ ] Confirm publish workflow dry-run path with selector and dist-tag policy.
-- [ ] Validate npm publish governance (`NPM_TOKEN`, `npm-publish` environment reviewers, branch protections).
+- [x] Complete docs pack per package: README usage matrix, NOTES, migration/compat notes, troubleshooting. Status: `done` ([coverage matrix](./proxy/package-docs-matrix.md)); evidence confirms all six packages now satisfy this set.
+- [x] Add runnable examples with expected output snapshots. Status: `done` ([coverage matrix](./proxy/package-docs-matrix.md)); evidence confirms all six packages now include runnable examples plus expected snapshot artifacts.
+- [x] Ensure CI gates are explicit and reproducible (`check`, `build`, `test`) at root and per package ([root scripts](../package.json), [cli-proxy scripts](../packages/cli-proxy/package.json), [proxy-core scripts](../packages/proxy-core/package.json), [proxy-agent scripts](../packages/proxy-agent/package.json), [proxy-fetch scripts](../packages/proxy-fetch/package.json), [proxy-http-client scripts](../packages/proxy-http-client/package.json), [proxy-undici scripts](../packages/proxy-undici/package.json)).
+- [ ] Confirm publish workflow dry-run path with selector and dist-tag policy. Status: `partial` ([workflow dispatch + selector/dist-tag logic](../.github/workflows/publish-proxy-packages.yml), [release runbook](./release/proxy-publish.md), [2026-02-27 local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)); remaining gaps: rerun dry-run in an unblocked environment and archive successful `npm pack/publish --dry-run` artifacts.
+- [ ] Validate npm publish governance (`NPM_TOKEN`, `npm-publish` environment reviewers, branch protections). Status: `partial` ([workflow token/env guards](../.github/workflows/publish-proxy-packages.yml), [governance checklist](./release/proxy-publish.md#required-github-configuration)); remaining gaps: repository-level verification of secret presence, environment reviewers, and branch protection settings is not evidenced in-repo yet.
 
 ### B3) Parallel Ecosystem Wave
 

@@ -19,6 +19,22 @@ npm install @termina/proxy-fetch
 - npm `>=9`
 - ESM package (`"type": "module"`)
 
+## Compatibility
+
+- Node-only package: this wrapper depends on Undici dispatchers and Node `fetch` behavior.
+- `fetch` dispatcher injection is supported in Node and is not a browser API.
+- Works with explicit `settings` objects or with environment variables (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`).
+- Compatible with `@termina/proxy-undici@^0.1.0`.
+
+## Migration
+
+`@termina/proxy-fetch` is currently `0.1.x`; there is no prior package-specific breaking release. Most migrations are from direct `fetch` usage or custom proxy wrappers.
+
+1. Replace direct `fetch` calls with `proxyFetch`/`proxyFetchJson` for one-shot calls.
+2. For services with repeated outbound calls, switch to one long-lived `ProxyFetchClient`.
+3. Move timeout/body-size checks into package options (`timeoutMs`, `maxResponseBytes`).
+4. Update error handling to map typed package errors (`invalid_url`, `request_timeout`, `response_size_limit_exceeded`, `non_json_response:*`).
+
 ## Features
 
 1. Proxy routing with `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`.
@@ -44,6 +60,15 @@ console.log(response.body?.ok);
 
 client.destroy();
 ```
+
+## Usage Matrix
+
+| Use case | Recommended entry point | Why |
+| --- | --- | --- |
+| One-off proxied `fetch` call with routing metadata | `proxyFetch` | Minimal setup for scripts and low-frequency calls |
+| One-off JSON call with timeout/size guards | `proxyFetchJson<T>` | Adds typed JSON parse + guardrail errors |
+| Service making repeated outbound calls | `new ProxyFetchClient()` | Reuses dispatcher cache and centralizes defaults |
+| Need only Undici dispatcher wiring (no fetch wrapper) | Prefer `@termina/proxy-undici` | Lower-level control for custom Undici clients |
 
 ## API
 
@@ -84,11 +109,25 @@ Pass temporary client options with `options.client`.
 - `ResponseSizeLimitError` -> `response_size_limit_exceeded:<maxBytes>`
 - `NonJsonResponseError` -> `non_json_response:invalid_content_type` or `non_json_response:invalid_json`
 
+## Troubleshooting
+
+- Requests unexpectedly bypass proxy:
+  - Confirm `NO_PROXY` rules and lowercase/uppercase env precedence in your runtime.
+  - Inspect `result.routing.viaProxy` and `result.routing.proxyUrl` in logs.
+- `request_timeout:<ms>` errors:
+  - Increase `timeoutMs` for slow endpoints or set a higher client default timeout.
+- `response_size_limit_exceeded:<max>` errors:
+  - Increase `maxResponseBytes` only for endpoints that are expected to return large JSON payloads.
+- `non_json_response:*` errors:
+  - Verify endpoint `content-type` and whether non-JSON responses should be handled through `fetch()` instead of `fetchJson()`.
+- Process shutdown hangs:
+  - Ensure `client.destroy()` is called when the process or worker exits.
+
 ## Examples
 
 - [Examples index](./docs/examples/README.md)
-- [One-shot usage](./docs/examples/one-shot.md)
-- [Reusable client usage](./docs/examples/client.md)
+- [One-shot usage + snapshot](./docs/examples/one-shot.md)
+- [Reusable client usage + snapshot](./docs/examples/client.md)
 
 ## Notes
 

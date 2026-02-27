@@ -1,0 +1,21 @@
+{
+  "resolved": [
+    {
+      "target": "http://public.example.com/v1",
+      "proxyUrl": "http://edge-proxy.local:8080/"
+    },
+    {
+      "target": "https://public.example.com/v1",
+      "proxyUrl": "http://secure-proxy.local:8443/"
+    },
+    {
+      "target": "https://api.internal.local/v1",
+      "proxyUrl": null
+    },
+    {
+      "target": "ftp://legacy.example.com/archive",
+      "proxyUrl": "socks5://fallback-proxy.local:1080"
+    }
+  ],
+  "oneShot": "http://secure-proxy.local:8443/"
+}
