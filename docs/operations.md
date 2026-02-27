@@ -43,8 +43,9 @@ SSH transport startup env contract:
 6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` sets SSH connect/runtime command timeout in seconds; default is `8`, valid range is `1..60`.
 7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
 8. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
-9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target.
-10. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+10. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
+11. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Format examples:
 
@@ -96,6 +97,7 @@ curl -i http://127.0.0.1:8787/does-not-exist
 2. Auth is handled inside WebSocket protocol messages (`auth.payload.token`), not via HTTP `Authorization` headers.
 3. Rotate tokens by updating env and restarting the bridge process.
 4. Keep token values out of shell history and operator notes; audit logs store auth outcomes, not submitted token values.
+5. SSH runtime hardening is always non-interactive (`-T`, `BatchMode=yes`); if strict host key checking is off, known_hosts writes are suppressed (`UserKnownHostsFile=/dev/null`).
 
 ## Multi-Tab Safe Writer Operations
 

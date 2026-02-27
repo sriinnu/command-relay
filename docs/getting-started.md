@@ -75,7 +75,8 @@ Startup preflight in `ssh` mode:
 
 1. Runs `<COMMANDRELAY_SSH_COMMAND> -V` at startup.
 2. Fails fast if `ssh` is missing/unusable or returns no version text.
-3. After preflight passes, runtime executes tmux commands on the remote SSH target.
+3. After preflight passes, runtime executes tmux commands on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+4. If `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=false`, runtime sets `UserKnownHostsFile=/dev/null` so no known_hosts entries are written.
 
 Copy-paste startup example (`ssh` mode):
 

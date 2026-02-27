@@ -219,9 +219,13 @@ function buildSshArgs(
   if (sshPort !== null) {
     args.push("-p", String(sshPort));
   }
+  args.push("-T");
   args.push("-o", "BatchMode=yes");
   args.push("-o", `ConnectTimeout=${connectTimeoutSeconds}`);
   args.push("-o", `StrictHostKeyChecking=${strictHostKeyChecking ? "yes" : "no"}`);
+  if (!strictHostKeyChecking) {
+    args.push("-o", "UserKnownHostsFile=/dev/null");
+  }
   args.push(sshTarget, remoteCommand);
   return args;
 }

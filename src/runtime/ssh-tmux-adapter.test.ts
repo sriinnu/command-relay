@@ -73,12 +73,15 @@ test("isAvailable runs tmux -V over ssh with configured options", async () => {
       args: [
         "-p",
         "2201",
+        "-T",
         "-o",
         "BatchMode=yes",
         "-o",
         "ConnectTimeout=12",
         "-o",
         "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
         "dev@host.example",
         "tmux -V"
       ],
@@ -98,6 +101,7 @@ test("isAvailable returns false on ssh command failure", async () => {
   assert.deepEqual(mock.calls[0], {
     command: "ssh",
     args: [
+      "-T",
       "-o",
       "BatchMode=yes",
       "-o",
@@ -109,6 +113,41 @@ test("isAvailable returns false on ssh command failure", async () => {
     ],
     timeoutMs: 6000
   });
+});
+
+test("isAvailable always includes -T to disable pseudo-tty", async () => {
+  const strictMock = createRunCommandMock([{ stdout: "tmux 3.4" }]);
+  const strictAdapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    strictHostKeyChecking: true,
+    runCommandImpl: strictMock.runCommandImpl
+  });
+  const looseMock = createRunCommandMock([{ stdout: "tmux 3.4" }]);
+  const looseAdapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    strictHostKeyChecking: false,
+    runCommandImpl: looseMock.runCommandImpl
+  });
+
+  await strictAdapter.isAvailable();
+  await looseAdapter.isAvailable();
+
+  assert.equal(strictMock.calls[0].args.includes("-T"), true);
+  assert.equal(looseMock.calls[0].args.includes("-T"), true);
+});
+
+test("isAvailable adds UserKnownHostsFile override when strict host key checking is disabled", async () => {
+  const mock = createRunCommandMock([{ stdout: "tmux 3.4" }]);
+  const adapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    strictHostKeyChecking: false,
+    runCommandImpl: mock.runCommandImpl
+  });
+
+  await adapter.isAvailable();
+
+  assert.equal(mock.calls[0].args.includes("StrictHostKeyChecking=no"), true);
+  assert.equal(mock.calls[0].args.includes("UserKnownHostsFile=/dev/null"), true);
 });
 
 test("listPanes parses tmux rows and uses escaped format argument", async () => {
@@ -131,6 +170,7 @@ test("listPanes parses tmux rows and uses escaped format argument", async () => 
   assert.deepEqual(mock.calls[0], {
     command: "ssh",
     args: [
+      "-T",
       "-o",
       "BatchMode=yes",
       "-o",
@@ -220,6 +260,7 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
 
   assert.equal(mock.calls.length, 4);
   assert.deepEqual(mock.calls[0].args, [
+    "-T",
     "-o",
     "BatchMode=yes",
     "-o",
@@ -230,6 +271,7 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
     "tmux send-keys -t %3 -l -- 'echo '\"'\"'hello world'\"'\"''"
   ]);
   assert.deepEqual(mock.calls[1].args, [
+    "-T",
     "-o",
     "BatchMode=yes",
     "-o",
@@ -240,6 +282,7 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
     "tmux send-keys -t %3 C-m"
   ]);
   assert.deepEqual(mock.calls[2].args, [
+    "-T",
     "-o",
     "BatchMode=yes",
     "-o",
@@ -250,6 +293,7 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
     "tmux send-keys -t %3 C-m"
   ]);
   assert.deepEqual(mock.calls[3].args, [
+    "-T",
     "-o",
     "BatchMode=yes",
     "-o",

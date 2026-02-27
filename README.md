@@ -100,6 +100,7 @@ npm start
 
 Current runtime data path remains the WS server (`/ws`) plus tmux runtime control.
 In `ssh` mode, the bridge runs tmux operations on the remote target over SSH after startup preflight passes.
+SSH runtime execution is non-interactive (`-T`, `BatchMode=yes`); when strict host key checking is disabled, runtime uses `UserKnownHostsFile=/dev/null` to suppress known_hosts writes.
 `ssh` mode is tmux-only: set `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Default local endpoints (current runtime path):

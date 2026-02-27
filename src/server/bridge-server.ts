@@ -93,10 +93,10 @@ export async function startBridgeServer(deps) {
         status: "ok",
         uptimeMs: Date.now() - startupTs,
         clients: clients.size,
-        panesAttached: Array.from(clients.values()).reduce(
-          (sum, client) => sum + client.attachedPanes.size,
-          0
-        ),
+        panesAttached: Array.from(clients.values()).reduce((sum, client) => sum + client.attachedPanes.size, 0),
+        transportMode: config.transportMode,
+        runtimeBackends: config.runtimeBackends,
+        globalInputDisabled: config.globalInputDisabled,
         engine: engine.getStats(),
         telemetry: telemetry.getSafeSnapshot(clients.size),
         timestamp: Date.now()
