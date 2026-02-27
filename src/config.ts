@@ -2,6 +2,8 @@
  * @file Runtime configuration loader for the CommandRelay bridge server.
  */
 
+import { isValidSshProfileName, parseSshTarget } from "./ssh/ssh-target.js";
+
 /** Runtime bridge configuration values. */
 export interface BridgeConfig {
   runtimeBackends: RuntimeBackend[];
@@ -151,6 +153,50 @@ function parseOptionalStringEnv(raw: string | undefined): string | null {
 }
 
 /**
+ * Parses and validates SSH profile env value.
+ *
+ * @param raw Raw env value.
+ * @param fallback Fallback when value is unset.
+ * @param envName Environment variable name for error messages.
+ * @returns Normalized SSH profile name.
+ */
+function parseSshProfileNameEnv(raw: string | undefined, fallback: string, envName: string): string {
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error(`${envName} must be non-empty when provided`);
+  }
+  if (!isValidSshProfileName(trimmed)) {
+    throw new Error(
+      `${envName} must contain only letters, numbers, dot, underscore, or hyphen (received "${raw}")`
+    );
+  }
+
+  return trimmed;
+}
+
+/**
+ * Parses and validates optional SSH target env value.
+ *
+ * @param raw Raw env value.
+ * @param envName Environment variable name for error messages.
+ * @returns Trimmed SSH target or null.
+ */
+function parseOptionalSshTargetEnv(raw: string | undefined, envName: string): string | null {
+  const parsed = parseOptionalStringEnv(raw);
+  if (!parsed) return null;
+  try {
+    parseSshTarget(parsed);
+  } catch {
+    throw new Error(
+      `${envName} must match [user@]host format (letters/numbers/._- or bracketed IPv6 host)`
+    );
+  }
+
+  return parsed;
+}
+
+/**
  * Parses a required-ish string env with fallback.
  *
  * @param raw Raw env value.
@@ -247,8 +293,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       SUPPORTED_TRANSPORT_MODES,
       "COMMANDRELAY_TRANSPORT_MODE"
     ),
-    sshProfileName: parseStringEnv(env.COMMANDRELAY_SSH_PROFILE, "primary"),
-    sshTarget: parseOptionalStringEnv(env.COMMANDRELAY_SSH_TARGET),
+    sshProfileName: parseSshProfileNameEnv(
+      env.COMMANDRELAY_SSH_PROFILE,
+      "primary",
+      "COMMANDRELAY_SSH_PROFILE"
+    ),
+    sshTarget: parseOptionalSshTargetEnv(env.COMMANDRELAY_SSH_TARGET, "COMMANDRELAY_SSH_TARGET"),
     sshPort: parseStrictIntEnv(
       env.COMMANDRELAY_SSH_PORT,
       22,

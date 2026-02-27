@@ -96,7 +96,8 @@ export COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true
 npm start
 ```
 
-Current runtime data path remains the WS server (`/ws`) with tmux backends. SSH mode currently adds startup wiring and target-contract validation for remote profile orchestration, then exits with a not-implemented runtime error.
+Current runtime data path remains the WS server (`/ws`) with tmux backends.
+In `ssh` mode, startup now hardens env inputs (`COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`) and runs an SSH client preflight (`ssh -V` must succeed and return a version string). After preflight passes, startup still exits with a not-implemented SSH runtime error.
 
 Default local endpoints (current runtime path):
 
@@ -112,8 +113,8 @@ Default local endpoints (current runtime path):
 | `COMMANDRELAY_RUNTIME_BACKENDS` | Runtime backends (`tmux` default, optional `tmux,cmux`) |
 | `COMMANDRELAY_CMUX_COMMAND` | Optional `cmux` command/path override |
 | `COMMANDRELAY_TRANSPORT_MODE` | Startup transport selector (`ws` default, `ssh` enables SSH target contract checks) |
-| `COMMANDRELAY_SSH_PROFILE` | SSH profile name used by remote profile orchestration wiring (`primary` default) |
-| `COMMANDRELAY_SSH_TARGET` | SSH target (`user@host`); required when `COMMANDRELAY_TRANSPORT_MODE=ssh` |
+| `COMMANDRELAY_SSH_PROFILE` | SSH profile name (`primary` when unset). If set, must be non-empty and match `[A-Za-z0-9._-]+`. |
+| `COMMANDRELAY_SSH_TARGET` | SSH target (required in `ssh` mode) in `[user@]host` format, where host is `name` or bracketed IPv6 (`[2001:db8::1]`). |
 | `COMMANDRELAY_SSH_PORT` | SSH target port override (`22` default) |
 | `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` | SSH strict host key checking policy (`true` default) |
 | `COMMANDRELAY_INPUT_KILL_SWITCH` | Global input disable switch |

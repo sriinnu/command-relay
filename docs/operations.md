@@ -35,11 +35,19 @@ Startup availability behavior:
 SSH transport startup env contract:
 
 1. `COMMANDRELAY_TRANSPORT_MODE` accepts `ws` (default) or `ssh`.
-2. `COMMANDRELAY_SSH_PROFILE` selects the SSH profile name; default is `primary` (blank falls back to default).
-3. `COMMANDRELAY_SSH_TARGET` is required when `COMMANDRELAY_TRANSPORT_MODE=ssh`; unset/blank is rejected in ssh mode.
+2. `COMMANDRELAY_SSH_PROFILE` selects the SSH profile name; default is `primary` only when unset. If provided, it must be non-empty and match `[A-Za-z0-9._-]+`.
+3. `COMMANDRELAY_SSH_TARGET` is required when `COMMANDRELAY_TRANSPORT_MODE=ssh`; format must match `[user@]host` where host is `letters/numbers/._-` or bracketed IPv6.
 4. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
 5. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
-6. Current behavior: `ssh` mode validates config and exits with a not-implemented runtime error until SSH execution path lands.
+6. Startup preflight for `ssh` mode runs `ssh -V` and requires a version string; missing/unusable `ssh` fails startup.
+7. Current behavior after passing preflight: `ssh` mode still exits with a not-implemented runtime error until SSH execution path lands.
+
+Format examples:
+
+1. Valid SSH targets: `relay@example.internal`, `example.internal`, `ops@[2001:db8::1]`.
+2. Invalid SSH targets: `relay target`, `relay@@example`, `ops@`.
+3. Valid SSH profiles: `primary`, `primary.ops-1_2`.
+4. Invalid SSH profiles: `primary/profile`, `   `.
 
 ## SSH-First Tunnel Runbook
 

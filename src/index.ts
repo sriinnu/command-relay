@@ -17,6 +17,7 @@ import type { RuntimeBackend as RuntimeBackendContract } from "./runtime/runtime
 import { startBridgeServer } from "./server/bridge-server.js";
 import { loadProxySettings } from "./net/proxy-router.js";
 import { ProxyAgentFactory } from "./net/proxy-agent-factory.js";
+import { checkSshClientAvailability } from "./ssh/ssh-preflight.js";
 
 interface RuntimeAdapter {
   isAvailable: () => Promise<boolean>;
@@ -209,6 +210,49 @@ function assertSupportedTransportMode(transportConfig: StartupTransportConfig): 
 }
 
 /**
+ * Runs SSH startup preflight checks for SSH transport mode.
+ *
+ * @param transportConfig Normalized startup transport configuration.
+ * @returns Nothing.
+ */
+async function preflightSshTransport(transportConfig: StartupTransportConfig): Promise<void> {
+  if (transportConfig.mode !== "ssh") {
+    return;
+  }
+
+  const availability = await checkSshClientAvailability();
+  if (!availability.available) {
+    throw new Error(
+      `SSH startup preflight failed: ${formatSshPreflightFailureReason(availability.reason)}`
+    );
+  }
+  if (!availability.version) {
+    throw new Error("SSH startup preflight failed: SSH client version was unavailable.");
+  }
+
+  console.info(`[bridge] ssh client version: ${availability.version}`);
+}
+
+/**
+ * Maps SSH preflight reason keys to startup-safe error text.
+ *
+ * @param reason Preflight reason key.
+ * @returns Human-readable startup failure reason.
+ */
+function formatSshPreflightFailureReason(reason: string | null): string {
+  switch (reason) {
+    case "ssh_command_not_found":
+      return 'SSH client binary "ssh" was not found in PATH.';
+    case "ssh_version_check_timeout":
+      return "SSH client version check timed out.";
+    case "ssh_version_check_failed":
+      return "SSH client version check failed.";
+    default:
+      return "unknown failure";
+  }
+}
+
+/**
  * Boots the CommandRelay bridge runtime.
  *
  * @returns {Promise<void>} Completes when shutdown finishes.
@@ -227,6 +271,7 @@ async function main() {
     console.info("[bridge] static app hosting disabled");
   }
   logStartupTransportConfig(transportConfig);
+  await preflightSshTransport(transportConfig);
   assertSupportedTransportMode(transportConfig);
   console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 

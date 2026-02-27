@@ -88,6 +88,17 @@ test("defaults transport to ws with ssh-safe defaults", () => {
   assert.equal(config.sshStrictHostKeyChecking, true);
 });
 
+test("parses and validates ssh profile names", () => {
+  const trimmed = loadConfig({ COMMANDRELAY_SSH_PROFILE: "  primary.ops-1_2  " });
+  assert.equal(trimmed.sshProfileName, "primary.ops-1_2");
+
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_PROFILE: "   " }), /COMMANDRELAY_SSH_PROFILE/);
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_PROFILE: "primary/profile" }),
+    /COMMANDRELAY_SSH_PROFILE/
+  );
+});
+
 test("parses ssh transport mode", () => {
   const config = loadConfig({ COMMANDRELAY_TRANSPORT_MODE: "ssh" });
 
@@ -116,6 +127,25 @@ test("accepts ssh transport mode when ssh target is provided", () => {
   });
 
   validateStartupConfig(config);
+});
+
+test("rejects invalid ssh target format when provided", () => {
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_TARGET: "relay target" }),
+    /COMMANDRELAY_SSH_TARGET/
+  );
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_TARGET: "relay@@example" }), /COMMANDRELAY_SSH_TARGET/);
+  assert.throws(() => loadConfig({ COMMANDRELAY_SSH_TARGET: "ops@" }), /COMMANDRELAY_SSH_TARGET/);
+});
+
+test("accepts valid ssh target formats", () => {
+  const hostOnly = loadConfig({ COMMANDRELAY_SSH_TARGET: "example.internal" });
+  const userAndHost = loadConfig({ COMMANDRELAY_SSH_TARGET: "ops-user@example-1.internal" });
+  const ipv6 = loadConfig({ COMMANDRELAY_SSH_TARGET: "ops@[2001:db8::1]" });
+
+  assert.equal(hostOnly.sshTarget, "example.internal");
+  assert.equal(userAndHost.sshTarget, "ops-user@example-1.internal");
+  assert.equal(ipv6.sshTarget, "ops@[2001:db8::1]");
 });
 
 test("parses ssh port override when value is valid", () => {

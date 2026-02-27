@@ -52,12 +52,26 @@ Notes:
 Use these env vars for SSH transport startup:
 
 1. `COMMANDRELAY_TRANSPORT_MODE`: transport mode selector. Allowed values are `ws` (default) and `ssh`.
-2. `COMMANDRELAY_SSH_PROFILE`: SSH profile name. Defaults to `primary`; blank values fall back to `primary`.
-3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
+2. `COMMANDRELAY_SSH_PROFILE`: SSH profile name. Defaults to `primary` only when unset. If set, it must be non-empty and contain only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
+3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`. Format must be `[user@]host`, where `host` is `letters/numbers/._-` or bracketed IPv6.
 4. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
 5. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
 
-Current status: `COMMANDRELAY_TRANSPORT_MODE=ssh` is wired and validated at startup, but SSH runtime execution is not implemented yet. Startup exits after validation with an explicit not-implemented error.
+SSH target examples:
+
+1. Valid: `relay@example.internal`, `example.internal`, `ops@[2001:db8::1]`.
+2. Invalid: `relay target`, `relay@@example`, `ops@`.
+
+SSH profile examples:
+
+1. Valid: `primary`, `primary.ops-1_2`.
+2. Invalid: `primary/profile`, `   `.
+
+Startup preflight in `ssh` mode:
+
+1. Runs `ssh -V` at startup.
+2. Fails fast if `ssh` is missing/unusable or returns no version text.
+3. After preflight passes, startup still exits with the explicit not-implemented SSH runtime error.
 
 Copy-paste startup example (`ssh` mode):
 
