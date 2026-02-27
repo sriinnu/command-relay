@@ -2,12 +2,21 @@
  * @file Runtime configuration loader for the CommandRelay bridge server.
  */
 
+import { isValidSshProfileName, parseSshTarget } from "./ssh/ssh-target.js";
+
 /** Runtime bridge configuration values. */
 export interface BridgeConfig {
   runtimeBackends: RuntimeBackend[];
   cmuxCommand: string;
   host: string;
   port: number;
+  transportMode: TransportMode;
+  sshProfileName: string;
+  sshTarget: string | null;
+  sshPort: number;
+  sshCommand: string;
+  sshConnectTimeoutSeconds: number;
+  sshStrictHostKeyChecking: boolean;
   strictProtocolParsing: boolean;
   appStaticEnabled: boolean;
   appStaticDir: string;
@@ -20,16 +29,23 @@ export interface BridgeConfig {
   maxInputsPerMinute: number;
   globalInputDisabled: boolean;
   allowInputOwnershipOverride: boolean;
+  inputLaneLeaseMs: number;
   authToken: string | null;
   auditLogPath: string | null;
 }
 
 const SUPPORTED_RUNTIME_BACKENDS = ["tmux", "cmux"] as const;
+const SUPPORTED_TRANSPORT_MODES = ["ws", "ssh"] as const;
 
 /**
  * Supported backend identifiers for runtime pane operations.
  */
 export type RuntimeBackend = (typeof SUPPORTED_RUNTIME_BACKENDS)[number];
+
+/**
+ * Supported transport mode identifiers for bridge connectivity.
+ */
+export type TransportMode = (typeof SUPPORTED_TRANSPORT_MODES)[number];
 
 interface NumericBounds {
   min?: number;
@@ -50,6 +66,39 @@ function parseIntEnv(raw: string | undefined, fallback: number, bounds: NumericB
   if (!Number.isFinite(parsed)) return fallback;
   if (bounds.min !== undefined && parsed < bounds.min) return fallback;
   if (bounds.max !== undefined && parsed > bounds.max) return fallback;
+  return parsed;
+}
+
+/**
+ * Parses an integer environment variable strictly with fallback and bounds.
+ *
+ * @param raw Raw env value.
+ * @param fallback Fallback value when unset.
+ * @param bounds Required numeric bounds.
+ * @param envName Environment variable name for error messages.
+ * @returns Parsed integer or fallback.
+ */
+function parseStrictIntEnv(
+  raw: string | undefined,
+  fallback: number,
+  bounds: NumericBounds,
+  envName: string
+): number {
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) return fallback;
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`${envName} must be an integer (received "${raw}")`);
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (bounds.min !== undefined && parsed < bounds.min) {
+    throw new Error(`${envName} must be >= ${bounds.min} (received "${raw}")`);
+  }
+  if (bounds.max !== undefined && parsed > bounds.max) {
+    throw new Error(`${envName} must be <= ${bounds.max} (received "${raw}")`);
+  }
+
   return parsed;
 }
 
@@ -107,6 +156,50 @@ function parseOptionalStringEnv(raw: string | undefined): string | null {
 }
 
 /**
+ * Parses and validates SSH profile env value.
+ *
+ * @param raw Raw env value.
+ * @param fallback Fallback when value is unset.
+ * @param envName Environment variable name for error messages.
+ * @returns Normalized SSH profile name.
+ */
+function parseSshProfileNameEnv(raw: string | undefined, fallback: string, envName: string): string {
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error(`${envName} must be non-empty when provided`);
+  }
+  if (!isValidSshProfileName(trimmed)) {
+    throw new Error(
+      `${envName} must contain only letters, numbers, dot, underscore, or hyphen (received "${raw}")`
+    );
+  }
+
+  return trimmed;
+}
+
+/**
+ * Parses and validates optional SSH target env value.
+ *
+ * @param raw Raw env value.
+ * @param envName Environment variable name for error messages.
+ * @returns Trimmed SSH target or null.
+ */
+function parseOptionalSshTargetEnv(raw: string | undefined, envName: string): string | null {
+  const parsed = parseOptionalStringEnv(raw);
+  if (!parsed) return null;
+  try {
+    parseSshTarget(parsed);
+  } catch {
+    throw new Error(
+      `${envName} must match [user@]host format (letters/numbers/._- or bracketed IPv6 host)`
+    );
+  }
+
+  return parsed;
+}
+
+/**
  * Parses a required-ish string env with fallback.
  *
  * @param raw Raw env value.
@@ -117,6 +210,30 @@ function parseStringEnv(raw: string | undefined, fallback: string): string {
   if (!raw) return fallback;
   const trimmed = raw.trim();
   return trimmed ? trimmed : fallback;
+}
+
+/**
+ * Parses a strict enum environment variable from a list of allowed values.
+ *
+ * @param raw Raw env value.
+ * @param fallback Fallback when value is unset/blank.
+ * @param allowed Allowed values.
+ * @param envName Environment variable name for error messages.
+ * @returns Parsed enum value.
+ */
+function parseEnumEnv<T extends string>(
+  raw: string | undefined,
+  fallback: T,
+  allowed: readonly T[],
+  envName: string
+): T {
+  if (raw === undefined) return fallback;
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return fallback;
+  if (!allowed.includes(trimmed as T)) {
+    throw new Error(`${envName} must be one of: ${allowed.join(",")} (received "${raw}")`);
+  }
+  return trimmed as T;
 }
 
 /**
@@ -173,6 +290,36 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     cmuxCommand: parseStringEnv(env.COMMANDRELAY_CMUX_COMMAND, "cmux"),
     host: env.COMMANDRELAY_HOST || "127.0.0.1",
     port: parseIntEnv(env.COMMANDRELAY_PORT, 8787, { min: 1, max: 65535 }),
+    transportMode: parseEnumEnv(
+      env.COMMANDRELAY_TRANSPORT_MODE,
+      "ws",
+      SUPPORTED_TRANSPORT_MODES,
+      "COMMANDRELAY_TRANSPORT_MODE"
+    ),
+    sshProfileName: parseSshProfileNameEnv(
+      env.COMMANDRELAY_SSH_PROFILE,
+      "primary",
+      "COMMANDRELAY_SSH_PROFILE"
+    ),
+    sshTarget: parseOptionalSshTargetEnv(env.COMMANDRELAY_SSH_TARGET, "COMMANDRELAY_SSH_TARGET"),
+    sshPort: parseStrictIntEnv(
+      env.COMMANDRELAY_SSH_PORT,
+      22,
+      { min: 1, max: 65535 },
+      "COMMANDRELAY_SSH_PORT"
+    ),
+    sshCommand: parseStringEnv(env.COMMANDRELAY_SSH_COMMAND, "ssh"),
+    sshConnectTimeoutSeconds: parseStrictIntEnv(
+      env.COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS,
+      8,
+      { min: 1, max: 60 },
+      "COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS"
+    ),
+    sshStrictHostKeyChecking: parseBooleanEnv(
+      env.COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING,
+      true,
+      "COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING"
+    ),
     strictProtocolParsing: parseBooleanEnvWithAlias(
       env,
       "COMMANDRELAY_STRICT_PROTOCOL_PARSING",
@@ -202,6 +349,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       true,
       "COMMANDRELAY_ALLOW_INPUT_OVERRIDE"
     ),
+    inputLaneLeaseMs: parseIntEnv(
+      env.COMMANDRELAY_INPUT_LANE_LEASE_MS,
+      30_000,
+      { min: 1_000, max: 300_000 }
+    ),
     authToken: parseOptionalStringEnv(env.COMMANDRELAY_AUTH_TOKEN),
     auditLogPath: parseOptionalStringEnv(env.COMMANDRELAY_AUDIT_LOG)
   };
@@ -217,6 +369,19 @@ export function validateStartupConfig(config: BridgeConfig): void {
   if (!isLoopbackHost(config.host) && !config.authToken) {
     throw new Error(
       "COMMANDRELAY_AUTH_TOKEN is required when COMMANDRELAY_HOST is not loopback"
+    );
+  }
+  if (config.transportMode === "ssh" && !config.sshTarget) {
+    throw new Error(
+      "COMMANDRELAY_SSH_TARGET is required when COMMANDRELAY_TRANSPORT_MODE is ssh"
+    );
+  }
+  if (
+    config.transportMode === "ssh" &&
+    (config.runtimeBackends.length !== 1 || config.runtimeBackends[0] !== "tmux")
+  ) {
+    throw new Error(
+      `COMMANDRELAY_RUNTIME_BACKENDS must be tmux when COMMANDRELAY_TRANSPORT_MODE is ssh (received "${config.runtimeBackends.join(",")}")`
     );
   }
 }

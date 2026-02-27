@@ -25,6 +25,17 @@ This guide captures current security and performance behavior for `@commandrelay
 - `src/index.ts` initializes proxy settings/factory and logs detection, but does not make outbound control-plane requests in startup flow.
 - Malformed proxy env values are sanitized to `null`; they do not hard-fail startup.
 
+## Negative-Case Guarantees
+
+- Malformed or unsupported proxy URL env values are sanitized to `null` and never throw during settings load.
+- Malformed `NO_PROXY` tokens are ignored safely; valid tokens in the same list still apply.
+- `NO_PROXY` suffix matching enforces label boundaries (`badexample.com` does not match `example.com`).
+- Invalid `NO_PROXY` ports (for example `:99999`) degrade to host-only matching without parser failure.
+- Fallback behavior is explicit:
+  - `https`/`wss`: `HTTPS_PROXY -> HTTP_PROXY -> ALL_PROXY`
+  - `http`/`ws`: `HTTP_PROXY -> ALL_PROXY`
+  - unknown schemes: `ALL_PROXY` only (otherwise direct)
+
 ## Production Security Guidance
 
 - Keep `COMMANDRELAY_HOST` loopback unless `COMMANDRELAY_AUTH_TOKEN` is set.

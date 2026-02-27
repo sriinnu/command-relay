@@ -1,0 +1,20 @@
+Proxy Route Explain
+Agent support: disabled
+
+[1] https://public.example.com
+  decision: proxy
+  target: https://public.example.com/
+  protocol: https:
+  proxyUrl: http://secure-proxy.local:8443/
+  proxySource: httpsProxy
+  matchedNoProxyRule: <none>
+  reason: Route uses httpsProxy with proxy http://secure-proxy.local:8443/.
+
+[2] https://api.internal.local
+  decision: direct
+  target: https://api.internal.local/
+  protocol: https:
+  proxyUrl: <unset>
+  proxySource: <unset>
+  matchedNoProxyRule: *.internal.local
+  reason: Direct route due to NO_PROXY rule *.internal.local.

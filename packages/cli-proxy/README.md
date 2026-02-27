@@ -22,6 +22,22 @@ npm install @commandrelay/proxy-agent
 - npm `>=9`
 - ESM package (`"type": "module"`)
 
+## Compatibility
+
+- CLI/runtime package for Node environments.
+- `@commandrelay/proxy-agent` is an optional peer dependency used only for agent-level explain details.
+- Lowercase proxy env vars override uppercase variants.
+- In CGI mode (`REQUEST_METHOD` set), uppercase `HTTP_PROXY` is ignored for safety.
+
+## Migration
+
+`@termina/cli-proxy` is currently `0.1.x`; there is no prior package-specific breaking release. Typical migration is from shell scripts or custom debug tooling.
+
+1. Replace custom env debug scripts with `termina-cli-proxy env --json`.
+2. Replace hand-written routing checks with `termina-cli-proxy explain --json <urls...>`.
+3. If you do not need optional agent metadata, run with `--no-agent` for deterministic output in CI.
+4. Update automation to treat parse/usage failures as exit code `2`.
+
 ## CLI
 
 Binary names:
@@ -63,8 +79,17 @@ For each URL, reports:
 Use `--json` for machine-readable output:
 
 ```bash
-termina-cli-proxy explain --json https://example.com https://api.internal.local
+termina-cli-proxy explain --json --no-agent https://example.com https://api.internal.local
 ```
+
+## Usage Matrix
+
+| Operational need | Command/API path | Why |
+| --- | --- | --- |
+| Validate effective proxy env in CI or containers | `termina-cli-proxy env --json` | Emits normalized settings from runtime env with stable machine output |
+| Explain route decisions for specific outbound URLs | `termina-cli-proxy explain [--json] <url...>` | Shows proxy/direct choice, source, and matched `NO_PROXY` rule |
+| Keep output deterministic without optional agent dependency | `termina-cli-proxy explain --no-agent ...` | Avoids optional peer loading and agent metadata variance |
+| Embed diagnostics in Node scripts | Programmatic `inspectProxyEnvironment` / `explainProxyRoutes` | Reuses CLI logic without shelling out |
 
 ## Programmatic API
 
@@ -85,11 +110,22 @@ const explain = await explainProxyRoutes(["https://example.com"], {
 console.log(inspection.settings.httpProxy, explain.routes[0]?.decision);
 ```
 
+## Troubleshooting
+
+- `Unknown command` or `Unknown option`:
+  - Use `termina-cli-proxy help`; parse failures return exit code `2`.
+- Route output does not match expected proxy:
+  - Re-check `NO_PROXY` inputs and whether lowercase env vars shadow uppercase values.
+- `agentSupport: unavailable` in explain output:
+  - Install optional `@commandrelay/proxy-agent` or run with `--no-agent`.
+- Invalid URL route entries:
+  - `decision=error` and `error=invalid_target_url` indicate malformed URL input.
+
 ## Examples
 
 - Overview: [docs/examples/README.md](./docs/examples/README.md)
-- Environment inspection: [docs/examples/env.md](./docs/examples/env.md)
-- Route explanation: [docs/examples/explain.md](./docs/examples/explain.md)
+- Environment inspection + snapshots: [docs/examples/env.md](./docs/examples/env.md)
+- Route explanation + snapshots: [docs/examples/explain.md](./docs/examples/explain.md)
 
 ## Notes
 

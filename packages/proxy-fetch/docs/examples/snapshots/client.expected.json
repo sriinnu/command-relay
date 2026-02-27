@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "email": "ada@example.com",
+  "routing": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  }
+}

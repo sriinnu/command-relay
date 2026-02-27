@@ -22,6 +22,17 @@ scripts/tmux-fixtures/emit-fixture-output.sh --profile replay --cycles 10 --line
 scripts/tmux-fixtures/teardown-fixture.sh
 ```
 
+4. Run end-to-end A2 fixture evidence (create -> emit -> replay-order assertions -> teardown):
+
+```bash
+node --import tsx scripts/tmux-fixtures/run-fixture-evidence.ts
+```
+
+The command writes a checkpoint artifact to:
+
+- `scripts/checkpoints/runs/YYYY-MM-DD-a2-tmux-fixture-harness-evidence.md`
+- It also prints the absolute artifact path as `fixture_evidence_artifact=...`.
+
 ## Safety checks
 
 - Session names must start with `fixture`.
@@ -41,6 +52,9 @@ scripts/tmux-fixtures/teardown-fixture.sh
 scripts/tmux-fixtures/create-fixture.sh --session fixture_perf --panes 4
 scripts/tmux-fixtures/emit-fixture-output.sh --session fixture_perf --profile load --cycles 25 --lines-per-cycle 8 --delay-ms 0
 scripts/tmux-fixtures/teardown-fixture.sh --session fixture_perf
+
+# A2 evidence run via checkpoint wrapper
+scripts/checkpoints/run-a2-tmux-fixture-evidence.sh --session fixture_a2_perf --panes 4 --cycles 6
 ```
 
 ## Notes

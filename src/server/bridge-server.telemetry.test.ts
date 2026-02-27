@@ -21,6 +21,13 @@ interface WsProbe {
   next: (predicate: (message: Envelope) => boolean, timeoutMs?: number) => Promise<Envelope>;
 }
 
+interface HealthPayload {
+  telemetry: BridgeTelemetrySnapshot;
+  transportMode: string;
+  runtimeBackends: string[];
+  globalInputDisabled: boolean;
+}
+
 const HOST = "127.0.0.1";
 const DEFAULT_TIMEOUT_MS = 3_000;
 
@@ -221,6 +228,8 @@ test("health endpoint publishes telemetry counters/latencies for connect/reconne
       maxAttachedPanes: 4,
       maxMessagesPerMinute: 1_000,
       maxInputsPerMinute: 1_000,
+      transportMode: "ws",
+      runtimeBackends: ["tmux"],
       globalInputDisabled: false,
       authToken: null,
       auditLogPath: null
@@ -255,10 +264,13 @@ test("health endpoint publishes telemetry counters/latencies for connect/reconne
 
     const healthResponse = await fetch(`http://${HOST}:${port}/health`);
     assert.equal(healthResponse.status, 200);
-    const health = await healthResponse.json() as { telemetry: BridgeTelemetrySnapshot };
+    const health = await healthResponse.json() as HealthPayload;
 
     assert.equal(health.telemetry.schema, "bridge.telemetry.v1");
     assert.equal(health.telemetry.activeClients, 2);
+    assert.equal(health.transportMode, "ws");
+    assert.deepEqual(health.runtimeBackends, ["tmux"]);
+    assert.equal(health.globalInputDisabled, false);
     assert.ok(health.telemetry.counters.connectionsOpened >= 2);
     assert.ok(health.telemetry.counters.listRequests >= 1);
     assert.ok(health.telemetry.counters.attachRequests >= 2);

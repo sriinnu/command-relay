@@ -46,6 +46,52 @@ Notes:
 4. `COMMANDRELAY_CMUX_COMMAND` is trimmed at startup; blank values fall back to `cmux`.
 5. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
 6. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
+7. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
+
+## SSH Transport Environment
+
+Use these env vars for SSH transport startup:
+
+1. `COMMANDRELAY_TRANSPORT_MODE`: transport mode selector. Allowed values are `ws` (default) and `ssh`.
+2. `COMMANDRELAY_SSH_PROFILE`: SSH profile name. Defaults to `primary` only when unset. If set, it must be non-empty and contain only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
+3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`. Format must be `[user@]host`, where `host` is `letters/numbers/._-` or bracketed IPv6.
+4. `COMMANDRELAY_SSH_COMMAND`: SSH executable/command override. Defaults to `ssh`; used for startup preflight and runtime SSH execution.
+5. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
+6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`: SSH connect/runtime command timeout in seconds. Defaults to `8`; must be an integer between `1` and `60` when set.
+7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
+8. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
+
+SSH target examples:
+
+1. Valid: `relay@example.internal`, `example.internal`, `ops@[2001:db8::1]`.
+2. Invalid: `relay target`, `relay@@example`, `ops@`.
+
+SSH profile examples:
+
+1. Valid: `primary`, `primary.ops-1_2`.
+2. Invalid: `primary/profile`, `   `.
+
+Startup preflight in `ssh` mode:
+
+1. Runs `<COMMANDRELAY_SSH_COMMAND> -V` at startup.
+2. Fails fast if `ssh` is missing/unusable or returns no version text.
+3. After preflight passes, runtime executes tmux commands on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+4. If `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=false`, runtime sets `UserKnownHostsFile=/dev/null` so no known_hosts entries are written.
+
+Copy-paste startup example (`ssh` mode):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+COMMANDRELAY_TRANSPORT_MODE=ssh \
+COMMANDRELAY_SSH_PROFILE=primary \
+COMMANDRELAY_SSH_TARGET=relay@example.internal \
+COMMANDRELAY_SSH_COMMAND=ssh \
+COMMANDRELAY_SSH_PORT=22 \
+COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS=8 \
+COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true \
+COMMANDRELAY_RUNTIME_BACKENDS=tmux \
+npm run start
+```
 
 ## Web App Route Usage (Current Runtime)
 
@@ -225,9 +271,10 @@ Use this when two or more clients/tabs may attach to the same pane.
 2. Keep observer tabs read-only by not calling `enable_input` (or calling `disable_input` after diagnostics).
 3. First successful `input` claims that pane's write lane for the writer client; other clients get `error.code=input_lane_conflict`.
 4. For handoff, current writer calls `disable_input` and then `detach` or `disconnect`; next writer calls `enable_input` and sends first `input`.
-5. If you want to block forced takeovers, run with `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off`.
-6. If command collisions are suspected, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable one writer.
-7. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
+5. Tune stale lane expiry with `COMMANDRELAY_INPUT_LANE_LEASE_MS` (default `30000`, bounds `1000..300000`) for your environment.
+6. If you want to block forced takeovers, run with `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off`.
+7. If command collisions are suspected, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable one writer.
+8. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
 
 ## iOS Live Environment
 

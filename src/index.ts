@@ -3,145 +3,96 @@
  */
 
 import process from "node:process";
-import { loadConfig, type RuntimeBackend as RuntimeBackendId, validateStartupConfig } from "./config.js";
-import { TmuxAdapter } from "./tmux/tmux-adapter.js";
-import { CmuxAdapter } from "./runtime/cmux-adapter.js";
-import { RuntimeMultiplexer } from "./runtime/runtime-multiplexer.js";
-import type { RuntimeBackend as RuntimeBackendContract } from "./runtime/runtime-backend.js";
+import {
+  loadConfig,
+  validateStartupConfig
+} from "./config.js";
 import { startBridgeServer } from "./server/bridge-server.js";
 import { loadProxySettings } from "./net/proxy-router.js";
 import { ProxyAgentFactory } from "./net/proxy-agent-factory.js";
-
-interface RuntimeAdapter {
-  isAvailable: () => Promise<boolean>;
-  listPanes: () => Promise<unknown[]>;
-  capturePane: (paneId: string, lines: number) => Promise<string>;
-  sendInput: (paneId: string, rawInput: string) => Promise<void>;
-}
-
-interface RuntimeBackendAvailability {
-  backendId: RuntimeBackendId;
-  available: boolean;
-}
-
-/**
- * Creates runtime backend adapters from configured backend ids.
- *
- * @param runtimeBackends Ordered backend list from config.
- * @param cmuxCommand Configured cmux executable/command.
- * @returns Runtime backend adapters with stable identifiers.
- */
-function createRuntimeBackends(
-  runtimeBackends: RuntimeBackendId[],
-  cmuxCommand: string
-): RuntimeBackendContract[] {
-  const adapters: RuntimeBackendContract[] = [];
-  for (const backend of runtimeBackends) {
-    if (backend === "tmux") {
-      adapters.push(wrapRuntimeBackend(backend, new TmuxAdapter()));
-      continue;
-    }
-    adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter({ cmuxCommand })));
-  }
-  return adapters;
-}
+import { checkSshClientAvailability } from "./ssh/ssh-preflight.js";
+import {
+  checkRuntimeBackendAvailability,
+  createRuntimeAdapter,
+  createRuntimeBackends,
+  isTmuxOnly,
+  logRuntimeBackendAvailability,
+  resolveStartupTransportConfig,
+  type StartupTransportConfig
+} from "./runtime/runtime-adapter-factory.js";
+import {
+  assertStartupProfilePass,
+  evaluateStartupProfile,
+  logStartupProfileReport
+} from "./startup/startup-profile.js";
 
 /**
- * Creates the selected runtime adapter set from configured backends.
+ * Logs startup transport configuration.
  *
- * @param runtimeBackends Ordered backend list from config.
- * @param adapters Runtime backend adapters.
- * @returns Adapter used by the bridge runtime.
+ * @param transportConfig Normalized startup transport configuration.
+ * @returns Nothing.
  */
-function createRuntimeAdapter(
-  runtimeBackends: RuntimeBackendId[],
-  adapters: RuntimeBackendContract[]
-): RuntimeAdapter {
-  if (isTmuxOnly(runtimeBackends)) {
-    return adapters[0];
+function logStartupTransportConfig(transportConfig: StartupTransportConfig): void {
+  console.info(`[bridge] transport mode: ${transportConfig.mode}`);
+  if (transportConfig.mode !== "ssh") {
+    return;
   }
 
-  return new RuntimeMultiplexer({ backends: adapters });
+  console.info(`[bridge] ssh profile: ${transportConfig.sshProfile}`);
+  console.info(`[bridge] ssh target: ${transportConfig.sshTarget ?? "(unset)"}`);
+  console.info(`[bridge] ssh port: ${transportConfig.sshPort}`);
+  console.info(`[bridge] ssh command: ${transportConfig.sshCommand}`);
+  console.info(`[bridge] ssh connect timeout: ${transportConfig.sshConnectTimeoutSeconds}s`);
+  console.info(`[bridge] ssh strict host key: ${transportConfig.sshStrictHostKeyChecking ? "enabled" : "disabled"}`);
 }
 
 /**
- * Checks availability of each configured runtime backend.
+ * Runs SSH startup preflight checks for SSH transport mode.
  *
- * @param adapters Runtime backend adapters.
- * @returns Availability status for each backend.
+ * @param transportConfig Normalized startup transport configuration.
+ * @returns Nothing.
  */
-async function checkRuntimeBackendAvailability(
-  adapters: RuntimeBackendContract[]
-): Promise<RuntimeBackendAvailability[]> {
-  return await Promise.all(
-    adapters.map(async (adapter) => ({
-      backendId: adapter.backendId as RuntimeBackendId,
-      available: await safeIsBackendAvailable(adapter)
-    }))
-  );
-}
-
-/**
- * Checks runtime backend availability without throwing.
- *
- * @param adapter Runtime backend adapter.
- * @returns True when backend is reachable.
- */
-async function safeIsBackendAvailable(adapter: RuntimeBackendContract): Promise<boolean> {
-  try {
-    return await adapter.isAvailable();
-  } catch {
-    return false;
+async function preflightSshTransport(transportConfig: StartupTransportConfig): Promise<void> {
+  if (transportConfig.mode !== "ssh") {
+    return;
   }
-}
 
-/**
- * Logs startup availability state for every configured backend.
- *
- * @param availability Availability rows.
- * @returns Number of available backends.
- */
-function logRuntimeBackendAvailability(availability: RuntimeBackendAvailability[]): number {
-  let availableCount = 0;
-  for (const backend of availability) {
-    if (backend.available) {
-      availableCount += 1;
-      console.info(`[bridge] runtime backend available: ${backend.backendId}`);
-      continue;
-    }
-    console.warn(`[bridge] runtime backend unavailable: ${backend.backendId}`);
+  const availability = await checkSshClientAvailability({
+    sshCommand: transportConfig.sshCommand
+  });
+  if (!availability.available) {
+    throw new Error(
+      `SSH startup preflight failed: ${formatSshPreflightFailureReason(
+        availability.reason,
+        transportConfig.sshCommand
+      )}`
+    );
   }
-  return availableCount;
+  if (!availability.version) {
+    throw new Error("SSH startup preflight failed: SSH client version was unavailable.");
+  }
+
+  console.info(`[bridge] ssh client version: ${availability.version}`);
 }
 
 /**
- * Checks if runtime configuration is legacy tmux-only mode.
+ * Maps SSH preflight reason keys to startup-safe error text.
  *
- * @param runtimeBackends Ordered backend ids from config.
- * @returns True when runtime is configured with tmux only.
+ * @param reason Preflight reason key.
+ * @param sshCommand SSH executable command.
+ * @returns Human-readable startup failure reason.
  */
-function isTmuxOnly(runtimeBackends: RuntimeBackendId[]): boolean {
-  return runtimeBackends.length === 1 && runtimeBackends[0] === "tmux";
-}
-
-/**
- * Wraps a runtime adapter with a stable backend identifier.
- *
- * @param backendId Backend identifier from config.
- * @param adapter Runtime adapter implementation.
- * @returns Adapter with backend metadata for multiplexing.
- */
-function wrapRuntimeBackend(
-  backendId: RuntimeBackendId,
-  adapter: RuntimeAdapter
-): RuntimeBackendContract {
-  return {
-    backendId,
-    isAvailable: async () => await adapter.isAvailable(),
-    listPanes: async () => (await adapter.listPanes()) as any,
-    capturePane: async (paneId: string, lines: number) => await adapter.capturePane(paneId, lines),
-    sendInput: async (paneId: string, rawInput: string) => await adapter.sendInput(paneId, rawInput)
-  };
+function formatSshPreflightFailureReason(reason: string | null, sshCommand: string): string {
+  switch (reason) {
+    case "ssh_command_not_found":
+      return `SSH client binary "${sshCommand}" was not found in PATH.`;
+    case "ssh_version_check_timeout":
+      return "SSH client version check timed out.";
+    case "ssh_version_check_failed":
+      return "SSH client version check failed.";
+    default:
+      return "unknown failure";
+  }
 }
 
 /**
@@ -152,6 +103,7 @@ function wrapRuntimeBackend(
 async function main() {
   const config = loadConfig();
   validateStartupConfig(config);
+  const transportConfig = resolveStartupTransportConfig(config);
 
   if (config.globalInputDisabled) {
     console.warn("[bridge] COMMANDRELAY_INPUT_KILL_SWITCH is active; remote input is disabled");
@@ -161,9 +113,14 @@ async function main() {
   } else {
     console.info("[bridge] static app hosting disabled");
   }
+  logStartupTransportConfig(transportConfig);
+  await preflightSshTransport(transportConfig);
   console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 
-  const runtimeBackends = createRuntimeBackends(config.runtimeBackends, config.cmuxCommand);
+  const runtimeBackends = createRuntimeBackends(config.runtimeBackends, {
+    cmuxCommand: config.cmuxCommand,
+    transportConfig
+  });
   const backendAvailability = await checkRuntimeBackendAvailability(runtimeBackends);
   const availableBackends = logRuntimeBackendAvailability(backendAvailability);
   if (availableBackends === 0 && !isTmuxOnly(config.runtimeBackends)) {
@@ -171,6 +128,17 @@ async function main() {
       `No configured runtime backends are available (${config.runtimeBackends.join(",")})`
     );
   }
+  const startupProfile = await evaluateStartupProfile({
+    config: {
+      runtimeBackends: config.runtimeBackends,
+      appStaticEnabled: config.appStaticEnabled,
+      appStaticDir: config.appStaticDir,
+      auditLogPath: config.auditLogPath
+    },
+    runtimeAvailability: backendAvailability
+  });
+  logStartupProfileReport(startupProfile);
+  assertStartupProfilePass(startupProfile);
 
   const runtimeAdapter = createRuntimeAdapter(config.runtimeBackends, runtimeBackends);
   const proxySettings = loadProxySettings();

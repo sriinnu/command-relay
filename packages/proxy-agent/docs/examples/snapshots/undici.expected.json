@@ -1,0 +1,13 @@
+{
+  "statusCode": 200,
+  "service": "undici-example",
+  "localRouting": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  },
+  "cacheProbe": {
+    "firstFromCache": false,
+    "secondFromCache": true
+  }
+}

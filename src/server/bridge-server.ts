@@ -1,6 +1,3 @@
-/**
- * @file HTTP/WebSocket bridge server for CommandRelay.
- */
 import { createServer } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -14,14 +11,8 @@ import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
 import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
-/**
- * @typedef {object} ClientState
- * @property {string} id Client identifier.
- * @property {import("ws").WebSocket} socket Client WebSocket instance.
- * @property {boolean} authenticated Whether auth is satisfied.
- * @property {boolean} inputEnabled Whether remote input is enabled.
- * @property {Set<string>} attachedPanes Subscribed tmux panes.
- */
+import { classifyBridgeRuntimeFailure, classifyReplaySnapshotFallbackReason } from "./bridge-runtime-failures.js";
+/** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
 const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -31,23 +22,20 @@ const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon"
 };
-/**
- * Starts the CommandRelay bridge server.
- *
- * @param {object} deps Runtime dependencies.
- * @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown.
- */
+/** Starts the CommandRelay bridge server. @param {object} deps Runtime dependencies. @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown. */
 export async function startBridgeServer(deps) {
   const { config, tmux } = deps;
   const logger = deps.logger ?? console;
   if (!(await tmux.isAvailable())) {
-    throw new Error("tmux not available in PATH; bridge cannot start");
+    throw new Error("runtime backend is unavailable; bridge cannot start");
   }
   const startupTs = Date.now();
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
   const telemetry = new BridgeTelemetryCollector();
   const pendingAttachLag = new Map<string, number>();
-  const inputOwnershipArbiter = new PaneInputOwnershipArbiter();
+  const inputOwnershipArbiter = new PaneInputOwnershipArbiter({
+    leaseDurationMs: config.inputLaneLeaseMs
+  });
   /** @type {Map<string, ClientState>} */
   const clients = new Map();
   const messageLimiter = new SlidingWindowRateLimiter({
@@ -77,7 +65,8 @@ export async function startBridgeServer(deps) {
     onError: (clientId, paneId, error) => {
       const client = clients.get(clientId);
       if (!client) return;
-      pendingAttachLag.delete(`${clientId}:${paneId}`);
+      const lagKey = `${clientId}:${paneId}`;
+      pendingAttachLag.delete(lagKey);
       send(client.socket, envelope("error", {
         code: "pane_poll_failed",
         paneId,
@@ -93,10 +82,10 @@ export async function startBridgeServer(deps) {
         status: "ok",
         uptimeMs: Date.now() - startupTs,
         clients: clients.size,
-        panesAttached: Array.from(clients.values()).reduce(
-          (sum, client) => sum + client.attachedPanes.size,
-          0
-        ),
+        panesAttached: Array.from(clients.values()).reduce((sum, client) => sum + client.attachedPanes.size, 0),
+        transportMode: config.transportMode,
+        runtimeBackends: config.runtimeBackends,
+        globalInputDisabled: config.globalInputDisabled,
         engine: engine.getStats(),
         telemetry: telemetry.getSafeSnapshot(clients.size),
         timestamp: Date.now()
@@ -169,6 +158,17 @@ export async function startBridgeServer(deps) {
       attachedPanes: new Set()
     };
     clients.set(client.id, client);
+    void audit.write({
+      action: "connect",
+      clientId: client.id,
+      details: {
+        result: "allowed",
+        reason: "socket_open",
+        requiresAuth: Boolean(config.authToken),
+        inputEnabled: false,
+        globalInputDisabled: config.globalInputDisabled
+      }
+    });
     send(
       socket,
       envelope("hello", {
@@ -211,21 +211,29 @@ export async function startBridgeServer(deps) {
           inputOwnershipArbiter,
           allowInputOwnershipOverride: config.allowInputOwnershipOverride ?? true,
           trackAttachLag: (clientId, paneId, startedAtMs) => {
-            pendingAttachLag.set(`${clientId}:${paneId}`, startedAtMs);
+            const lagKey = `${clientId}:${paneId}`;
+            pendingAttachLag.set(lagKey, startedAtMs);
           }
         });
       } catch (error) {
+        const runtimeFailure = classifyBridgeRuntimeFailure(error);
+        await audit.write({ action: "runtime_failure", clientId: client.id, details: { code: runtimeFailure.code, reason: runtimeFailure.reason, recoverable: runtimeFailure.recoverable } });
         send(client.socket, envelope("error", {
-          code: "handler_failed",
-          message: error instanceof Error ? error.message : String(error)
+          code: runtimeFailure.code,
+          reason: runtimeFailure.reason,
+          recoverable: runtimeFailure.recoverable,
+          message: runtimeFailure.message
         }, requestId));
       }
     });
-    socket.on("close", () => {
+    socket.on("close", (code, reasonBuffer) => {
       engine.detachAll(client.id);
       messageLimiter.clear(client.id);
       inputLimiter.clear(client.id);
-      releaseClientInputOwnership(inputOwnershipArbiter, client.id);
+      const releasedPanes = releaseClientInputOwnership(inputOwnershipArbiter, client.id);
+      if (releasedPanes > 0) void audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "socket_close", releasedPanes } });
+      const closeReason = reasonBuffer.toString("utf8");
+      void audit.write({ action: "transport_drop", clientId: client.id, details: { code, reason: closeReason || "socket_closed", releasedPanes } });
       telemetry.recordConnectionClosed();
       clearClientAttachLag(pendingAttachLag, client.id);
       clients.delete(client.id);
@@ -241,9 +249,7 @@ export async function startBridgeServer(deps) {
       for (const client of clients.values()) {
         try {
           client.socket.close();
-        } catch {
-          // Ignore close race during shutdown.
-        }
+        } catch {}
       }
       await new Promise<void>((resolve) => {
         wsServer.close(() => resolve());
@@ -257,22 +263,13 @@ export async function startBridgeServer(deps) {
     }
   };
 }
-/**
- * Parses an incoming client websocket frame using configured protocol strictness.
- *
- * @param {string} raw UTF-8 JSON message text.
- * @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled.
- * @returns {import("../protocol.js").ParseMessageResult} Parse result.
- */
+/** Parses an incoming client websocket frame using configured protocol strictness.
+ * @param {string} raw UTF-8 JSON message text. @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled. @returns {import("../protocol.js").ParseMessageResult} Parse result. */
 export function parseIncomingClientMessage(raw, strictProtocolParsing) {
   return parseMessage(raw, strictProtocolParsing ? { strictV1: true } : undefined);
 }
-/**
- * Handles a single parsed client message.
- *
- * @param {object} ctx Message context.
- * @returns {Promise<void>} Completion signal.
- */
+
+/** Handles a single parsed client message. @param {object} ctx Message context. @returns {Promise<void>} Completion signal. */
 export async function handleClientMessage(ctx) {
   const {
     client,
@@ -296,7 +293,7 @@ export async function handleClientMessage(ctx) {
   const laneOverrideAllowed = allowInputOwnershipOverride ?? config.allowInputOwnershipOverride ?? true;
   const paneInputOwnerState = inputOwnershipArbiter ?? paneInputOwnership ?? paneInputOwners;
   if (!client.authenticated && type !== "auth") {
-    send(client.socket, envelope("error", { code: "auth_required" }, requestId));
+    send(client.socket, envelope("error", { code: "auth_required", recoverable: true }, requestId));
     return;
   }
   switch (type) {
@@ -310,7 +307,7 @@ export async function handleClientMessage(ctx) {
       const token = parseNonEmptyString(payload.token) ?? "";
       if (!tokenEquals(config.authToken, token)) {
         await audit.write({ action: "auth_fail", clientId: client.id, details: { reason: "invalid_token" } });
-        send(client.socket, envelope("auth_error", { code: "invalid_token" }, requestId));
+        send(client.socket, envelope("auth_error", { code: "invalid_token", recoverable: true }, requestId));
         return;
       }
       client.authenticated = true;
@@ -338,7 +335,14 @@ export async function handleClientMessage(ctx) {
       const lastSeq = parseOptionalInt(payload.lastSeq);
       client.attachedPanes.add(paneId);
       trackAttachLag?.(client.id, paneId, startedAtMs);
-      await engine.attach(client.id, paneId, lastSeq);
+      const attachReplayMetadata = await engine.attach(client.id, paneId, lastSeq);
+      if (lastSeq !== null && attachReplayMetadata?.replayUsed && attachReplayMetadata.replayedCount > 0) {
+        const replayStartSeq = lastSeq + 1;
+        const replayEndSeq = lastSeq + attachReplayMetadata.replayedCount;
+        await audit.write({ action: "replay_resume", clientId: client.id, details: { paneId, lastSeq, replayedCount: attachReplayMetadata.replayedCount, replayStartSeq, replayEndSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: "resume" } });
+      } else if (lastSeq !== null && attachReplayMetadata?.fallbackToSnapshot) {
+        await audit.write({ action: "replay_gap_snapshot_fallback", clientId: client.id, details: { paneId, lastSeq, streamSeq: attachReplayMetadata.latestSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: classifyReplaySnapshotFallbackReason(attachReplayMetadata) } });
+      }
       await audit.write({ action: "attach", clientId: client.id, details: { paneId, lastSeq } });
       const attachLatencyMs = Date.now() - startedAtMs;
       telemetry?.recordAttachLatency(attachLatencyMs);
@@ -355,46 +359,43 @@ export async function handleClientMessage(ctx) {
         return;
       }
       client.attachedPanes.delete(paneId);
-      releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
+      const released = releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
       engine.detach(client.id, paneId);
       await audit.write({ action: "detach", clientId: client.id, details: { paneId } });
+      if (released) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { paneId, result: "allowed", reason: "detach" } });
       send(client.socket, envelope("ack", { action: "detach", paneId }, requestId));
       return;
     }
     case "enable_input": {
       const nextInputEnabled = !config.globalInputDisabled;
       client.inputEnabled = nextInputEnabled;
-      await audit.write({
-        action: nextInputEnabled ? "enable_input" : "enable_input_blocked",
-        clientId: client.id,
-        details: nextInputEnabled ? {} : { reason: "global_input_kill_switch" }
-      });
+      await audit.write({ action: "enable_input", clientId: client.id, details: { result: nextInputEnabled ? "allowed" : "denied", reason: nextInputEnabled ? "client_enabled" : "global_input_kill_switch" } });
       sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
     case "disable_input": {
       client.inputEnabled = false;
-      await audit.write({ action: "disable_input", clientId: client.id, details: {} });
+      await audit.write({ action: "disable_input", clientId: client.id, details: { result: "allowed", reason: "client_disabled" } });
       sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
     case "input": {
+      const paneId = parseNonEmptyString(payload.paneId);
+      const data = typeof payload.data === "string" ? payload.data : "";
+      const inputBytes = Buffer.byteLength(data, "utf8");
+      const commandHash = data ? createHash("sha256").update(data, "utf8").digest("hex") : null;
+      const previewPolicy = data ? "sha256_only" : "none";
       const inputRate = inputLimiter.consume(client.id);
       if (!inputRate.allowed) {
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "rate_limited", bytes: inputBytes, commandHash, previewPolicy } });
         send(client.socket, envelope("error", { code: "input_rate_limited", retryAfterMs: inputRate.retryAfterMs, limit: inputRate.limit, windowMs: inputRate.windowMs }, requestId));
         return;
       }
-      if (
-        !isInputAllowed({
-          clientInputEnabled: client.inputEnabled,
-          globalInputDisabled: config.globalInputDisabled
-        })
-      ) {
+      if (!isInputAllowed({ clientInputEnabled: client.inputEnabled, globalInputDisabled: config.globalInputDisabled })) {
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "policy_blocked", bytes: inputBytes, commandHash, previewPolicy } });
         send(client.socket, envelope("error", { code: "input_disabled" }, requestId));
         return;
       }
-      const paneId = parseNonEmptyString(payload.paneId);
-      const data = typeof payload.data === "string" ? payload.data : "";
       if (!paneId || !data) {
         send(client.socket, envelope("error", { code: "invalid_input" }, requestId));
         return;
@@ -403,7 +404,6 @@ export async function handleClientMessage(ctx) {
         send(client.socket, envelope("error", { code: "pane_not_attached" }, requestId));
         return;
       }
-      const inputBytes = Buffer.byteLength(data, "utf8");
       if (inputBytes > config.maxInputBytes) {
         send(client.socket, envelope("error", { code: "input_too_large", maxInputBytes: config.maxInputBytes, receivedBytes: inputBytes }, requestId));
         return;
@@ -412,23 +412,17 @@ export async function handleClientMessage(ctx) {
       const claimResult = claimPaneInputOwnership(paneInputOwnerState, paneId, client.id, overrideRequested, laneOverrideAllowed);
       if (claimResult?.ok === false) {
         const { ownerClientId, overrideAllowed } = claimResult;
-        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed }, requestId));
+        await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes, commandHash, previewPolicy } });
+        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed, recoverable: true }, requestId));
         return;
       }
       await tmux.sendInput(paneId, data);
-      await audit.write({
-        action: "input",
-        clientId: client.id,
-        details: {
-          paneId,
-          bytes: inputBytes,
-          sha256: createHash("sha256").update(data).digest("hex"),
-          overrideRequested,
-          laneOverridden: claimResult?.ok ? claimResult.overridden : false
-        }
-      });
+      await audit.write({ action: "input", clientId: client.id, details: { paneId, bytes: inputBytes, result: "allowed", reason: "ok", commandHash, previewPolicy } });
+      if (claimResult?.ok && claimResult.overridden) {
+        await audit.write({ action: "input_takeover", clientId: client.id, details: { paneId, result: "allowed", reason: "override", bytes: inputBytes } });
+      }
       telemetry?.recordInputAckLatency(Date.now() - startedAtMs);
-      send(client.socket, envelope("ack", { action: "input", paneId, bytes: data.length }, requestId));
+      send(client.socket, envelope("ack", { action: "input", paneId, bytes: inputBytes }, requestId));
       return;
     }
     case "heartbeat": {
@@ -437,9 +431,10 @@ export async function handleClientMessage(ctx) {
     }
     case "disconnect": {
       engine.detachAll(client.id);
-      releaseClientInputOwnership(paneInputOwnerState, client.id);
+      const releasedPanes = releaseClientInputOwnership(paneInputOwnerState, client.id);
       client.attachedPanes.clear();
       client.inputEnabled = false;
+      if (releasedPanes > 0) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "disconnect", releasedPanes } });
       await audit.write({ action: "disconnect", clientId: client.id, details: {} });
       send(client.socket, envelope("ack", { action: "disconnect" }, requestId));
       return;

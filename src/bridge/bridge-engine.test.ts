@@ -182,3 +182,31 @@ test("pollOnce does not emit an event when pane output is unchanged", async (t) 
     streamSeq: 1
   });
 });
+
+test("attach propagates capture failures and does not invoke poll error callback", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const captureError = new Error("no server running on /tmp/tmux-1000/default");
+  const captureMock: CapturePaneMock = {
+    calls: [],
+    capturePane: async (paneId: string, lines: number) => {
+      captureMock.calls.push({ paneId, lines });
+      throw captureError;
+    }
+  };
+  let onErrorCalls = 0;
+  const engine = new BridgeEngine({
+    tmux: { capturePane: captureMock.capturePane },
+    replayLines: 40,
+    pollIntervalMs: 25,
+    onOutput: () => assert.fail("onOutput should not be called"),
+    onError: () => { onErrorCalls += 1; }
+  });
+
+  await assert.rejects(async () => {
+    await engine.attach("client-a", "%6");
+  }, captureError);
+  assert.equal(onErrorCalls, 0);
+  assert.equal(engine.getStats().watchedPanes, 0);
+});

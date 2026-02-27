@@ -36,6 +36,14 @@ npm install @commandrelay/proxy-http-client
 - Convert library errors into app-specific domain errors at one place.
 - For rollout guidance, use [NOTES.md](./NOTES.md).
 
+## Migration and Compatibility
+
+- Runtime baseline: Node.js `>=18`, npm `>=9`, ESM package usage.
+- If migrating from direct `fetch`/`axios` calls, move request policy (`timeoutMs`, `maxResponseBytes`, error mapping) into one wrapper module.
+- Integrate proxy routing via `proxyResolver` when needed instead of embedding proxy logic per call site.
+- Use root imports only (`@commandrelay/proxy-http-client`); deep imports are not compatibility-safe.
+- While pre-`1.0`, pin minor versions (`~0.1.x`) before broad deployments.
+
 ## Quick Start
 
 ```ts
@@ -122,6 +130,15 @@ export async function fetchProfile(userId: string) {
 - Got-style adapter: [docs/examples/got.md](./docs/examples/got.md)
 - Fetch-style adapter: [docs/examples/fetch.md](./docs/examples/fetch.md)
 
+## Usage Matrix
+
+| Integration scenario | Recommended usage | Why |
+| --- | --- | --- |
+| Service-layer JSON client with standardized errors | `requestJson<T>()` via one app wrapper module | Consistent timeout/size/error policy at the boundary |
+| CLI/tooling call that needs strict JSON + proxy support | Direct `requestJson<T>()` call | Minimal API with explicit controls (`timeoutMs`, `maxResponseBytes`) |
+| Existing proxy stack using `@commandrelay/proxy-agent` | Pass `proxyResolver` | Reuses your established routing + agent lifecycle |
+| Need generic raw HTTP streaming client behavior | Prefer a lower-level transport directly | This package is intentionally JSON-first |
+
 ## API Summary
 
 ```ts
@@ -169,6 +186,14 @@ Exported error classes:
 - Responses with `content-length` above `maxResponseBytes` are rejected before body buffering.
 - Proxy resolver failures are wrapped into `ProxyResolutionError` with a `cause`.
 - Avoid logging raw payloads when handling `HttpStatusError` or `JsonParseError`.
+
+## Troubleshooting
+
+- `UnsupportedProtocolError`: ensure request URLs use `http:` or `https:` only.
+- Frequent `RequestTimeoutError`: tune `timeoutMs` per endpoint SLA and check upstream latency.
+- `ResponseSizeLimitError`: increase `maxResponseBytes` for expected payloads or narrow response shape upstream.
+- `JsonParseError`: upstream returned non-JSON content; inspect `rawBody` safely in controlled logs.
+- `ProxyResolutionError`: validate `proxyResolver` wiring and underlying proxy-agent configuration.
 
 ## Docs and Assets
 

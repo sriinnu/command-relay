@@ -1,0 +1,11 @@
+{
+  "status": 200,
+  "body": {
+    "version": "2026.02.0"
+  },
+  "routing": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy.local:8080/",
+    "fromCache": false
+  }
+}

@@ -19,6 +19,7 @@ Runtime backend selection is controlled by `COMMANDRELAY_RUNTIME_BACKENDS`:
 2. Multi-backend example: `tmux,cmux`
 3. Supported backend values: `tmux`, `cmux`
 4. In multi-backend mode, pane IDs are backend-namespaced (for example `tmux:%1`, `cmux:<pane-id>`). tmux-only mode keeps existing tmux pane IDs.
+5. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
 
 `cmux` executable override:
 
@@ -31,6 +32,63 @@ Startup availability behavior:
 2. Unavailable backends are logged as warnings.
 3. Startup fails only when every configured backend is unavailable and runtime mode is not tmux-only.
 4. tmux-only startup behavior is unchanged.
+
+SSH transport startup env contract:
+
+1. `COMMANDRELAY_TRANSPORT_MODE` accepts `ws` (default) or `ssh`.
+2. `COMMANDRELAY_SSH_PROFILE` selects the SSH profile name; default is `primary` only when unset. If provided, it must be non-empty and match `[A-Za-z0-9._-]+`.
+3. `COMMANDRELAY_SSH_TARGET` is required when `COMMANDRELAY_TRANSPORT_MODE=ssh`; format must match `[user@]host` where host is `letters/numbers/._-` or bracketed IPv6.
+4. `COMMANDRELAY_SSH_COMMAND` overrides the SSH executable/command; default is `ssh`.
+5. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
+6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` sets SSH connect/runtime command timeout in seconds; default is `8`, valid range is `1..60`.
+7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
+8. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
+9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+10. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
+11. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+
+Format examples:
+
+1. Valid SSH targets: `relay@example.internal`, `example.internal`, `ops@[2001:db8::1]`.
+2. Invalid SSH targets: `relay target`, `relay@@example`, `ops@`.
+3. Valid SSH profiles: `primary`, `primary.ops-1_2`.
+4. Invalid SSH profiles: `primary/profile`, `   `.
+
+## SSH-First Tunnel Runbook
+
+Use the local helper at [`scripts/ssh/open-tunnel.sh`](../scripts/ssh/open-tunnel.sh) to reach a remote CommandRelay instance over SSH before exposing any direct network listener.
+
+Quick start (macOS/Linux):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/ssh/open-tunnel.sh --target <user@host>
+```
+
+Tunnel defaults:
+
+1. Local endpoint: `127.0.0.1:8787`
+2. Remote endpoint: `127.0.0.1:8787`
+3. Local URLs: `http://127.0.0.1:8787` and `ws://127.0.0.1:8787/ws`
+
+For extra examples and option details, see [`scripts/ssh/README.md`](../scripts/ssh/README.md).
+
+## SSH Runtime Validator Reference
+
+Use [`scripts/ssh/validate-remote-runtime.sh`](../scripts/ssh/validate-remote-runtime.sh) before relying on remote tmux runtime operations.
+
+Quick check:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/ssh/validate-remote-runtime.sh --target <user@host>
+```
+
+Behavior:
+
+1. Uses a single non-interactive SSH command set to check `tmux` and `node`.
+2. Supports strict host key checking toggle (`--strict-host-key-checking on|off`), timeout, identity, and repeatable `--ssh-option`.
+3. Prints concise `PASS`/`FAIL` lines and returns deterministic exit codes (`0`, `2`, `3`, `4`).
 
 ## Web App Runtime Surface and Checks
 
@@ -56,6 +114,7 @@ curl -i http://127.0.0.1:8787/does-not-exist
 2. Auth is handled inside WebSocket protocol messages (`auth.payload.token`), not via HTTP `Authorization` headers.
 3. Rotate tokens by updating env and restarting the bridge process.
 4. Keep token values out of shell history and operator notes; audit logs store auth outcomes, not submitted token values.
+5. SSH runtime hardening is always non-interactive (`-T`, `BatchMode=yes`); if strict host key checking is off, known_hosts writes are suppressed (`UserKnownHostsFile=/dev/null`).
 
 ## Multi-Tab Safe Writer Operations
 
@@ -64,7 +123,8 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Pane write ownership is acquired on first successful `input`.
 4. Handoff: old writer `disable_input` then `detach`/`disconnect`; new writer `enable_input` and send first command.
 5. Optional hardening: set `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off` to block forced ownership takeover.
-6. Emergency freeze: restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`; resume by restarting with it off.
+6. Lease tuning: set `COMMANDRELAY_INPUT_LANE_LEASE_MS` (default `30000`, bounds `1000..300000`) to control stale-lane expiry timing.
+7. Emergency freeze: restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`; resume by restarting with it off.
 
 ## Keyboard/Input Operational Notes
 
@@ -73,43 +133,15 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Very large pasted payloads can fail with `input_too_large` (default `maxInputBytes=4096`).
 4. Rapid key/send loops can fail with `input_rate_limited` (`COMMANDRELAY_MAX_INPUT_PER_MIN`).
 
+## Controlled-Input Audit Behavior
+
+1. Controlled-input events are metadata-only (no raw command payloads).
+2. Current action contract is documented in [controlled-input-audit.md](controlled-input-audit.md).
+
 ## Local Chitragupta Bootstrap + Health
 
-Use the local scripts in `scripts/chitragupta` to validate and run MCP safely.
-
-Bootstrap (dependencies + entrypoint readiness):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/bootstrap.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-```
-
-Health diagnostics (includes `--check` from MCP entrypoint):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/health.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-```
-
-Start command (EPERM-safe, uses `node --import tsx`):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/start-mcp.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
-  --name terminal
-```
-
-Operational notes:
-
-1. `start-mcp.sh` avoids direct `tsx` execution to prevent `EPERM`.
-2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
-3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
+Use scripts in `scripts/chitragupta` for bootstrap, health checks, and start flows.
+Operational details are maintained with the script implementations to avoid drift.
 
 ## Distilled Capsule + Brief + Dispatch Operations
 
@@ -295,16 +327,11 @@ Kill-switch toggle guidance (runtime config sanity):
 COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
 ```
 
-## Controlled-Input Operator Runbook
+## Controlled-Input Safety Incident Runbook
 
-This runbook verifies:
+Use this runbook for operator incidents in the write path: `kill-switch engaged unexpectedly` and `lane lockout` (`input_lane_conflict` blocks intended writer).
 
-1. `enable_input` can transition policy to input-enabled when kill switch is off.
-2. `input` is accepted only while input-enabled.
-3. `disable_input` returns policy to read-only and blocks later `input`.
-4. Kill switch blocks `enable_input` and all `input`.
-
-### A) Contract and policy gate (fast verification)
+### A) Fast policy verification gate
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
@@ -313,50 +340,42 @@ node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge
 
 Pass signal:
 
-1. Test run ends with `# fail 0`.
-2. `ws-contract-matrix` includes `enable -> input -> disable` and kill-switch policy assertions.
+1. Run ends with `# fail 0`.
+2. Suites cover `enable -> input -> disable`, kill-switch enforcement, and lane/takeover policy behavior.
 
-### B) Live smoke with kill switch off (input should work)
+### B) Incident: kill switch is blocking input
 
-Terminal 1:
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start
-```
-
-Terminal 2:
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-npm run bench:input -- --iterations 5
-```
-
-Pass signal:
-
-1. Benchmark exits `0`.
-2. Output includes input ack latency summary.
-
-### C) Live smoke with kill switch on (input must be blocked)
-
-Terminal 1 (restart bridge):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start
-```
-
-Terminal 2:
+1. Contain: restart bridge with `COMMANDRELAY_INPUT_KILL_SWITCH=on` to freeze all writers while triaging.
+2. Verify block:
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 npm run bench:input -- --iterations 3
 ```
 
-Pass signal:
+3. Pass signal: benchmark exits non-zero and reports input disabled after `enable_input`.
+4. Recover: only after explicit operator approval, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=off` and re-run `npm run bench:input -- --iterations 5` (must exit `0`).
 
-1. Benchmark exits non-zero.
-2. Failure message reports that input remained disabled after `enable_input` (kill switch effective).
+### C) Incident: lane lockout (`input_lane_conflict`)
+
+1. Identify owner from conflict payload (`ownerClientId`) and request owner handoff (`disable_input` then `detach`/disconnect).
+2. If owner is stale, wait for lease expiry (`COMMANDRELAY_INPUT_LANE_LEASE_MS`) or perform explicit takeover per policy.
+3. If lockout persists across reconnects, temporarily freeze writes with kill switch (`on`), clear stale clients, then resume with kill switch (`off`).
+4. Verification gate:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node --import tsx --test src/server/bridge-server.policy.test.ts
+```
+
+5. Pass signal: lane conflict and takeover paths pass (`# fail 0`) and intended writer can send input after handoff.
+
+### D) Evidence to record in checkpoint artifacts
+
+1. Incident UTC timestamp, active commit SHA, and trigger symptom.
+2. Containment action (`kill switch on/off`, handoff/takeover path) and operator identity.
+3. Verification commands executed and pass/fail outcome.
+4. Link the incident note in `scripts/checkpoints/runs/*-checkpoint.md`.
 
 ## iOS Protocol Mock Package Usage
 
@@ -386,6 +405,23 @@ What this validates:
 3. Session discovery success/failure counts.
 4. Input dispatch latency.
 5. Reconnect and replay success rate.
+
+## Weekly Observability Baseline and Evidence Pack
+
+Use [`docs/observability-evidence-contract.md`](./observability-evidence-contract.md) as the normative weekly checkpoint contract.
+
+Required weekly artifact flow:
+
+1. Keep all artifacts in `scripts/checkpoints/runs/` using date-prefixed filenames.
+2. Produce these files for each weekly checkpoint:
+   - `YYYY-MM-DD-weekly-cross-platform-checkpoint.md`
+   - `YYYY-MM-DD-command-evidence.md`
+   - `YYYY-MM-DD-observability-metrics.json`
+   - `YYYY-MM-DD-dashboard-baseline.md`
+   - `YYYY-MM-DD-soak-or-incident.md`
+3. Use canonical metric names exactly as specified (`cr_connect_latency_ms`, `cr_replay_lag_events`, `cr_reconnect_total`, `cr_input_ack_latency_ms`, `cr_lane_conflict_total`, `cr_kill_switch_block_total`).
+4. Record command outputs and pass signals in the command evidence file using the mapping table in the contract doc.
+5. Any missing artifact must be explicitly marked `not-run` with owner and next action in the checkpoint summary.
 
 ## Logs
 

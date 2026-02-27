@@ -111,7 +111,7 @@ if [[ "${PROFILE}" != "replay" && "${PROFILE}" != "load" ]]; then
   die "--profile must be replay or load"
 fi
 
-mapfile -t PANE_ROWS < <(tmux list-panes -t "${SESSION_NAME}:${WINDOW_NAME}" -F '#{pane_index}\t#{pane_id}' | LC_ALL=C sort -n)
+mapfile -t PANE_ROWS < <(tmux list-panes -t "${SESSION_NAME}:${WINDOW_NAME}" -F '#{pane_index} #{pane_id}' | LC_ALL=C sort -n)
 
 if [[ "${#PANE_ROWS[@]}" -eq 0 ]]; then
   die "no panes found for ${SESSION_NAME}:${WINDOW_NAME}"
@@ -154,8 +154,8 @@ seq=1
 for ((cycle = 1; cycle <= CYCLES; cycle += 1)); do
   for ((line = 1; line <= LINES_PER_CYCLE; line += 1)); do
     for pane_row in "${PANE_ROWS[@]}"; do
-      pane_index="${pane_row%%$'\t'*}"
-      pane_id="${pane_row#*$'\t'}"
+      pane_index="${pane_row%% *}"
+      pane_id="${pane_row#* }"
       payload="$(profile_payload "${PROFILE}" "${pane_index}" "${cycle}" "${line}")"
       formatted="$(printf '[fixture profile=%s seq=%05d] %s' "${PROFILE}" "${seq}" "${payload}")"
 

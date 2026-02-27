@@ -101,7 +101,7 @@ fi
 tmux select-layout -t "${SESSION_NAME}:${WINDOW_NAME}" tiled >/dev/null
 mark_fixture_session "${SESSION_NAME}" "${PANE_COUNT}" "${WINDOW_NAME}"
 
-pane_listing="$(tmux list-panes -t "${SESSION_NAME}:${WINDOW_NAME}" -F '#{pane_index}\t#{pane_id}' | LC_ALL=C sort -n)"
+pane_listing="$(tmux list-panes -t "${SESSION_NAME}:${WINDOW_NAME}" -F '#{pane_index} #{pane_id}' | LC_ALL=C sort -n)"
 
 printf 'fixture session created\n'
 printf 'session=%s\n' "${SESSION_NAME}"

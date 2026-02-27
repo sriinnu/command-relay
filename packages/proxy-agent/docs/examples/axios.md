@@ -6,31 +6,92 @@
 npm install axios @commandrelay/proxy-agent
 ```
 
-## Example
+## Run
 
-```ts
+```bash
+node --import tsx <<'TS'
+import { createServer } from "node:http";
 import axios from "axios";
 import { ProxyAgentFactory } from "@commandrelay/proxy-agent";
 
-const factory = new ProxyAgentFactory();
-const target = "https://httpbin.org/get";
+const server = createServer((_request, response) => {
+  response.writeHead(200, { "content-type": "application/json" });
+  response.end(JSON.stringify({ service: "axios-example" }));
+});
+
+await new Promise<void>((resolve) => {
+  server.listen(0, "127.0.0.1", resolve);
+});
+
+const address = server.address();
+if (!address || typeof address === "string") {
+  throw new Error("address_unavailable");
+}
+
+const target = `http://127.0.0.1:${address.port}/health`;
+const factory = new ProxyAgentFactory({
+  env: {
+    http_proxy: "http://proxy.local:8080",
+    no_proxy: "127.0.0.1,localhost"
+  }
+});
 
 try {
-  const { agent } = factory.resolve(target);
-
-  const response = await axios.get(target, {
+  const localRouting = factory.resolve(target);
+  const response = await axios.get<{ service: string }>(target, {
     proxy: false,
-    httpAgent: agent ?? undefined,
-    httpsAgent: agent ?? undefined,
-    timeout: 10_000
+    httpAgent: localRouting.agent ?? undefined,
+    httpsAgent: localRouting.agent ?? undefined,
+    timeout: 5_000
   });
 
-  console.log(response.status, response.data.url);
+  const cacheProbeFirst = factory.resolve("http://public.example.com");
+  const cacheProbeSecond = factory.resolve("http://public.example.com");
+
+  console.log(
+    JSON.stringify(
+      {
+        status: response.status,
+        service: response.data.service,
+        localRouting: {
+          viaProxy: localRouting.viaProxy,
+          proxyUrl: localRouting.proxyUrl,
+          fromCache: localRouting.fromCache
+        },
+        cacheProbe: {
+          firstFromCache: cacheProbeFirst.fromCache,
+          secondFromCache: cacheProbeSecond.fromCache
+        }
+      },
+      null,
+      2
+    )
+  );
 } finally {
   factory.destroy();
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
 }
+TS
 ```
 
-## Why `proxy: false`?
+## Expected output snapshot
 
-Axios has built-in proxy handling. Disable it so `@commandrelay/proxy-agent` is the single routing source.
+Snapshot file: [`./snapshots/axios.expected.json`](./snapshots/axios.expected.json)
+
+```json
+{
+  "status": 200,
+  "service": "axios-example",
+  "localRouting": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  },
+  "cacheProbe": {
+    "firstFromCache": false,
+    "secondFromCache": true
+  }
+}
+```

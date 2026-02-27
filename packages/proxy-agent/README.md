@@ -65,6 +65,15 @@ export function resolveAgent(target: string | URL) {
 - Got: [docs/examples/got.md](./docs/examples/got.md)
 - Fetch (Node.js): [docs/examples/fetch.md](./docs/examples/fetch.md)
 
+## Usage Matrix
+
+| Integration context | Recommended package | Reason |
+| --- | --- | --- |
+| Axios, Got, or custom `http`/`https` clients that accept Node agents | `@commandrelay/proxy-agent` | Returns protocol-correct `http.Agent`/`https.Agent` with cache + env routing |
+| Node `fetch`/Undici code expecting a `dispatcher` | Prefer `@termina/proxy-undici` or `@termina/proxy-fetch` | Those integrations are dispatcher-native |
+| Need SOCKS or PAC proxy URL support in Node clients | `@commandrelay/proxy-agent` | Supports `socks*` and `pac+*` schemes |
+| Need policy-only decision logic without creating agents | Prefer `@commandrelay/proxy-core` | Keeps routing logic decoupled from transport runtime |
+
 ## API
 
 ```ts
@@ -110,6 +119,21 @@ Also exported:
 - `NO_PROXY` supports domain/host rules, wildcard-style entries, IPv4/IPv6, and optional ports
 - Do not log proxy URLs containing credentials
 - PAC URLs are executable policy; only use trusted PAC sources
+
+## Migration and Compatibility
+
+- Runtime baseline: Node.js `>=18`, npm `>=9`, ESM package usage.
+- If migrating from client-specific proxy flags, centralize routing with one `ProxyAgentFactory`.
+- Disable overlapping built-in proxy layers in clients (for example Axios `proxy: false`) to avoid double-proxy behavior.
+- Use root imports only (`@commandrelay/proxy-agent`); deep imports are not compatibility-safe.
+- While pre-`1.0`, pin minor versions (`~0.1.x`) before production rollouts.
+
+## Troubleshooting
+
+- Traffic unexpectedly direct (`viaProxy=false`): verify `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` and `NO_PROXY` rules for the target.
+- Axios requests fail or ignore agent: ensure request config sets `proxy: false` when passing agents.
+- Settings changed but behavior did not: call `reloadFromEnvironment()` and/or `clear()` to refresh cache decisions.
+- PAC/SOCKS proxy not working: confirm proxy URL scheme is valid and supported (`pac+*`, `socks*`, `http`, `https`).
 
 ## Performance
 

@@ -1,6 +1,6 @@
 # Proxy Ecosystem Roadmap
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 
 This roadmap expands `@commandrelay/proxy-*` for external reuse in other projects (`termina/*`, proxy-agents-style stacks, service SDKs).
 
@@ -56,6 +56,17 @@ Priority scale:
 2. `@termina/cli-proxy`: complete and internally ready.
 3. `@termina/proxy-fetch`: complete and internally ready.
 4. `P2` can proceed (`proxy-axios`, `proxy-got`) once publish/release gates are cleared.
+
+## Milestone Decision Mirror 2026-02-27 CR-P1-002
+
+This section mirrors the 2026-02-27 weekly evidence-lane decisions into the proxy roadmap without claiming blocked execution steps as complete.
+
+| Decision | Date | Status | Evidence | Blocker/Next Step |
+| --- | --- | --- | --- | --- |
+| W2 Track B docs/examples pack for `@commandrelay/proxy-*` remains complete. | 2026-02-27 | `done` | [TODO B2 status](./TODO.md#b2-productization-readiness), [package docs coverage matrix](./proxy/package-docs-matrix.md) | Maintain coverage as package APIs change. |
+| W2 publish dry-run evidence contains selector + dist-tag, but remains blocked from clean dry-run success. | 2026-02-27 | `partial` | [2026-02-27 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md), [TODO W2 acceptance status](./TODO.md#milestone-w2-2026-03-09-to-2026-03-15) | Clear local npm cache ownership issue (`EACCES`) and rerun `npm pack/publish --dry-run` artifact capture. |
+| W2 replay-ordering acceptance is now proven by a fixture-harness pass artifact. | 2026-02-27 | `done` | [2026-02-27 fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md), [tmux fixture runbook](../scripts/tmux-fixtures/README.md), [TODO W2 acceptance status](./TODO.md#milestone-w2-2026-03-09-to-2026-03-15) | Keep run in weekly checkpoint rotation and alert on assertion regressions. |
+| CR-P1-002 docs synchronization is complete for this cycle. | 2026-02-27 | `done` | [CR-P1-002 ticket status](./execution-owned-tickets.md#cr-p1-002-update-weekly-checkpoint--mirror-milestone-decisions), [2026-02-27 weekly evidence lane artifact](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md) | Re-open next cycle if milestones change. |
 
 ## Package Discovery and Use Strategy
 

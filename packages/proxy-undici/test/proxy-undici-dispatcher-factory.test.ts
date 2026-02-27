@@ -26,6 +26,139 @@ function createFakeDispatcher(id: string, destroyed: string[]): FakeDispatcher {
   };
 }
 
+function createNoopDispatcher(): FakeDispatcher {
+  return {
+    id: "noop",
+    destroy: () => {},
+    close: () => {}
+  };
+}
+
+test("interoperability matrix resolves deterministic env proxy routing for http/https targets", () => {
+  interface MatrixCase {
+    name: string;
+    env: Record<string, string>;
+    target: string;
+    expectedProxyUrl: string | null;
+  }
+
+  const cases: MatrixCase[] = [
+    {
+      name: "no proxy vars -> direct for http target",
+      env: {},
+      target: "http://service.local",
+      expectedProxyUrl: null
+    },
+    {
+      name: "http_proxy routes http target",
+      env: { http_proxy: "http://proxy-http.local:8080" },
+      target: "http://service.local",
+      expectedProxyUrl: "http://proxy-http.local:8080/"
+    },
+    {
+      name: "http_proxy fallback routes https target",
+      env: { http_proxy: "http://proxy-http.local:8080" },
+      target: "https://service.local",
+      expectedProxyUrl: "http://proxy-http.local:8080/"
+    },
+    {
+      name: "https_proxy does not route http target",
+      env: { https_proxy: "http://proxy-https.local:8443" },
+      target: "http://service.local",
+      expectedProxyUrl: null
+    },
+    {
+      name: "https_proxy routes https target",
+      env: { https_proxy: "http://proxy-https.local:8443" },
+      target: "https://service.local",
+      expectedProxyUrl: "http://proxy-https.local:8443/"
+    },
+    {
+      name: "all_proxy routes http target",
+      env: { all_proxy: "http://proxy-all.local:9000" },
+      target: "http://service.local",
+      expectedProxyUrl: "http://proxy-all.local:9000/"
+    },
+    {
+      name: "all_proxy routes https target",
+      env: { all_proxy: "http://proxy-all.local:9000" },
+      target: "https://service.local",
+      expectedProxyUrl: "http://proxy-all.local:9000/"
+    },
+    {
+      name: "https_proxy takes precedence over http_proxy for https target",
+      env: {
+        http_proxy: "http://proxy-http.local:8080",
+        https_proxy: "http://proxy-https.local:8443"
+      },
+      target: "https://service.local",
+      expectedProxyUrl: "http://proxy-https.local:8443/"
+    },
+    {
+      name: "http_proxy takes precedence over all_proxy for http target",
+      env: {
+        http_proxy: "http://proxy-http.local:8080",
+        all_proxy: "http://proxy-all.local:9000"
+      },
+      target: "http://service.local",
+      expectedProxyUrl: "http://proxy-http.local:8080/"
+    },
+    {
+      name: "lowercase proxy variable wins over uppercase",
+      env: {
+        http_proxy: "http://proxy-lower.local:8080",
+        HTTP_PROXY: "http://proxy-upper.local:8080"
+      },
+      target: "http://service.local",
+      expectedProxyUrl: "http://proxy-lower.local:8080/"
+    },
+    {
+      name: "cgi REQUEST_METHOD ignores uppercase HTTP_PROXY",
+      env: {
+        REQUEST_METHOD: "GET",
+        HTTP_PROXY: "http://proxy-upper.local:8080"
+      },
+      target: "http://service.local",
+      expectedProxyUrl: null
+    },
+    {
+      name: "no_proxy bypass wins over matching proxy",
+      env: {
+        https_proxy: "http://proxy-https.local:8443",
+        no_proxy: "service.local"
+      },
+      target: "https://service.local",
+      expectedProxyUrl: null
+    }
+  ];
+
+  for (const matrixCase of cases) {
+    let directCreateCount = 0;
+    let proxyCreateCount = 0;
+    const factory = new ProxyUndiciDispatcherFactory({
+      env: matrixCase.env,
+      adapter: {
+        createDirect: () => {
+          directCreateCount += 1;
+          return createNoopDispatcher() as unknown as never;
+        },
+        createProxy: () => {
+          proxyCreateCount += 1;
+          return createNoopDispatcher() as unknown as never;
+        }
+      }
+    });
+
+    const result = factory.resolve(matrixCase.target);
+    const expectProxy = matrixCase.expectedProxyUrl !== null;
+    assert.equal(result.fromCache, false, matrixCase.name);
+    assert.equal(result.viaProxy, expectProxy, matrixCase.name);
+    assert.equal(result.proxyUrl, matrixCase.expectedProxyUrl, matrixCase.name);
+    assert.equal(directCreateCount, expectProxy ? 0 : 1, matrixCase.name);
+    assert.equal(proxyCreateCount, expectProxy ? 1 : 0, matrixCase.name);
+  }
+});
+
 test("resolve returns direct dispatcher when no proxy is configured", () => {
   const destroyed: string[] = [];
   let directCreated = 0;
@@ -223,4 +356,37 @@ test("throws typed errors for invalid targets and unsupported protocols", () => 
     () => invalidProxyFactory.resolve("http://service.local"),
     (error: unknown) => error instanceof InvalidProxyUrlError
   );
+});
+
+test("socks and pac proxies are explicitly unsupported (chaining not supported)", () => {
+  const baseAdapter: UndiciDispatcherAdapter = {
+    createDirect: () => createNoopDispatcher() as unknown as never,
+    createProxy: () => createNoopDispatcher() as unknown as never
+  };
+
+  const socksFactory = new ProxyUndiciDispatcherFactory({
+    settings: loadProxySettings({
+      http_proxy: "socks5://proxy.local:1080"
+    }),
+    adapter: baseAdapter
+  });
+
+  assert.throws(() => socksFactory.resolve("http://service.local"), (error: unknown) => {
+    assert.ok(error instanceof UnsupportedProxyProtocolError);
+    assert.equal(error.message, "unsupported_proxy_protocol:socks5:");
+    return true;
+  });
+
+  const pacFactory = new ProxyUndiciDispatcherFactory({
+    settings: loadProxySettings({
+      http_proxy: "pac+http://proxy-config.local/proxy.pac"
+    }),
+    adapter: baseAdapter
+  });
+
+  assert.throws(() => pacFactory.resolve("http://service.local"), (error: unknown) => {
+    assert.ok(error instanceof UnsupportedProxyProtocolError);
+    assert.equal(error.message, "unsupported_proxy_protocol:pac+http:");
+    return true;
+  });
 });

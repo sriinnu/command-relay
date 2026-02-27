@@ -1,0 +1,22 @@
+{
+  "httpProxy": "http://edge-proxy.local:8080/",
+  "httpsProxy": "http://secure-proxy.local:8443/",
+  "allProxy": null,
+  "noProxy": [
+    {
+      "host": "internal.local",
+      "port": null,
+      "matchSubdomains": true
+    },
+    {
+      "host": "svc.cluster.local",
+      "port": null,
+      "matchSubdomains": true
+    },
+    {
+      "host": "127.0.0.1",
+      "port": 8080,
+      "matchSubdomains": false
+    }
+  ]
+}

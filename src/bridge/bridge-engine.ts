@@ -9,6 +9,21 @@ export interface BridgePaneEvent {
   streamSeq: number;
 }
 
+/**
+ * Metadata describing how attach replay resolution was handled.
+ */
+export interface BridgeAttachReplayMetadata {
+  paneId: string;
+  requestedLastSeq: number | null;
+  latestSeq: number;
+  oldestHistorySeq: number | null;
+  latestHistorySeq: number | null;
+  replayedCount: number;
+  replayUsed: boolean;
+  fallbackToSnapshot: boolean;
+  replayGapDetected: boolean;
+}
+
 interface PaneWatcher {
   subscribers: Set<string>;
   lastOutput: string;
@@ -86,7 +101,11 @@ export class BridgeEngine {
   /**
    * Attaches a client to a pane and pushes replay/snapshot state.
    */
-  async attach(clientId: string, paneId: string, sinceSeq: number | null = null): Promise<void> {
+  async attach(
+    clientId: string,
+    paneId: string,
+    sinceSeq: number | null = null
+  ): Promise<BridgeAttachReplayMetadata> {
     let watcher = this.panes.get(paneId);
     if (!watcher) {
       watcher = {
@@ -99,20 +118,55 @@ export class BridgeEngine {
     }
 
     watcher.subscribers.add(clientId);
+    const requestedLastSeq = Number.isInteger(sinceSeq) ? Number(sinceSeq) : null;
 
     try {
-      if (watcher.streamSeq > 0 && Number.isInteger(sinceSeq)) {
-        const replayed = watcher.history
-          .filter((event) => event.streamSeq > Number(sinceSeq))
-          .sort((a, b) => a.streamSeq - b.streamSeq);
+      if (watcher.streamSeq > 0 && requestedLastSeq !== null) {
+        const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
+        const oldestHistorySeq = historyBySeq.at(0)?.streamSeq ?? null;
+        const latestHistorySeq = historyBySeq.at(-1)?.streamSeq ?? null;
+        const replayed = historyBySeq.filter((event) => event.streamSeq > requestedLastSeq);
+        const replayGapDetected =
+          replayed.length > 0
+            ? replayed[0].streamSeq !== requestedLastSeq + 1
+            : requestedLastSeq < watcher.streamSeq;
 
-        if (replayed.length > 0) {
+        if (replayed.length > 0 && !replayGapDetected) {
           for (const event of replayed) {
             this.onOutput(clientId, event);
           }
           this.ensureStarted();
-          return;
+          return {
+            paneId,
+            requestedLastSeq,
+            latestSeq: watcher.streamSeq,
+            oldestHistorySeq,
+            latestHistorySeq,
+            replayedCount: replayed.length,
+            replayUsed: true,
+            fallbackToSnapshot: false,
+            replayGapDetected: false
+          };
         }
+
+        this.onOutput(clientId, {
+          mode: "snapshot",
+          paneId,
+          chunk: watcher.lastOutput,
+          streamSeq: watcher.streamSeq
+        });
+        this.ensureStarted();
+        return {
+          paneId,
+          requestedLastSeq,
+          latestSeq: watcher.streamSeq,
+          oldestHistorySeq,
+          latestHistorySeq,
+          replayedCount: 0,
+          replayUsed: false,
+          fallbackToSnapshot: true,
+          replayGapDetected
+        };
       }
 
       if (watcher.streamSeq > 0) {
@@ -123,18 +177,45 @@ export class BridgeEngine {
           streamSeq: watcher.streamSeq
         });
         this.ensureStarted();
-        return;
+        const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
+        return {
+          paneId,
+          requestedLastSeq,
+          latestSeq: watcher.streamSeq,
+          oldestHistorySeq: historyBySeq.at(0)?.streamSeq ?? null,
+          latestHistorySeq: historyBySeq.at(-1)?.streamSeq ?? null,
+          replayedCount: 0,
+          replayUsed: false,
+          fallbackToSnapshot: false,
+          replayGapDetected: false
+        };
       }
 
       const snapshot = await this.tmux.capturePane(paneId, this.replayLines);
       watcher.lastOutput = snapshot;
       const event = this.nextEvent(watcher, paneId, "snapshot", snapshot);
       this.onOutput(clientId, event);
+      const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
+      this.ensureStarted();
+      return {
+        paneId,
+        requestedLastSeq,
+        latestSeq: watcher.streamSeq,
+        oldestHistorySeq: historyBySeq.at(0)?.streamSeq ?? null,
+        latestHistorySeq: historyBySeq.at(-1)?.streamSeq ?? null,
+        replayedCount: 0,
+        replayUsed: false,
+        fallbackToSnapshot: false,
+        replayGapDetected: false
+      };
     } catch (error) {
-      this.onError(clientId, paneId, error);
+      watcher.subscribers.delete(clientId);
+      if (watcher.subscribers.size === 0 && watcher.streamSeq === 0) {
+        this.panes.delete(paneId);
+      }
+      this.stopIfIdle();
+      throw error;
     }
-
-    this.ensureStarted();
   }
 
   /**

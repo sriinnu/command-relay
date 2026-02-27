@@ -1,0 +1,5 @@
+{
+  "viaProxy": true,
+  "proxyUrl": "http://secure-proxy.local:8443/",
+  "fromCache": false
+}
