@@ -327,16 +327,11 @@ Kill-switch toggle guidance (runtime config sanity):
 COMMANDRELAY_INPUT_KILL_SWITCH must be one of: 1,true,yes,on,0,false,no,off
 ```
 
-## Controlled-Input Operator Runbook
+## Controlled-Input Safety Incident Runbook
 
-This runbook verifies:
+Use this runbook for operator incidents in the write path: `kill-switch engaged unexpectedly` and `lane lockout` (`input_lane_conflict` blocks intended writer).
 
-1. `enable_input` can transition policy to input-enabled when kill switch is off.
-2. `input` is accepted only while input-enabled.
-3. `disable_input` returns policy to read-only and blocks later `input`.
-4. Kill switch blocks `enable_input` and all `input`.
-
-### A) Contract and policy gate (fast verification)
+### A) Fast policy verification gate
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
@@ -345,50 +340,42 @@ node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge
 
 Pass signal:
 
-1. Test run ends with `# fail 0`.
-2. `ws-contract-matrix` includes `enable -> input -> disable` and kill-switch policy assertions.
+1. Run ends with `# fail 0`.
+2. Suites cover `enable -> input -> disable`, kill-switch enforcement, and lane/takeover policy behavior.
 
-### B) Live smoke with kill switch off (input should work)
+### B) Incident: kill switch is blocking input
 
-Terminal 1:
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-COMMANDRELAY_INPUT_KILL_SWITCH=off npm run start
-```
-
-Terminal 2:
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-npm run bench:input -- --iterations 5
-```
-
-Pass signal:
-
-1. Benchmark exits `0`.
-2. Output includes input ack latency summary.
-
-### C) Live smoke with kill switch on (input must be blocked)
-
-Terminal 1 (restart bridge):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-COMMANDRELAY_INPUT_KILL_SWITCH=on npm run start
-```
-
-Terminal 2:
+1. Contain: restart bridge with `COMMANDRELAY_INPUT_KILL_SWITCH=on` to freeze all writers while triaging.
+2. Verify block:
 
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 npm run bench:input -- --iterations 3
 ```
 
-Pass signal:
+3. Pass signal: benchmark exits non-zero and reports input disabled after `enable_input`.
+4. Recover: only after explicit operator approval, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=off` and re-run `npm run bench:input -- --iterations 5` (must exit `0`).
 
-1. Benchmark exits non-zero.
-2. Failure message reports that input remained disabled after `enable_input` (kill switch effective).
+### C) Incident: lane lockout (`input_lane_conflict`)
+
+1. Identify owner from conflict payload (`ownerClientId`) and request owner handoff (`disable_input` then `detach`/disconnect).
+2. If owner is stale, wait for lease expiry (`COMMANDRELAY_INPUT_LANE_LEASE_MS`) or perform explicit takeover per policy.
+3. If lockout persists across reconnects, temporarily freeze writes with kill switch (`on`), clear stale clients, then resume with kill switch (`off`).
+4. Verification gate:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+node --import tsx --test src/server/bridge-server.policy.test.ts
+```
+
+5. Pass signal: lane conflict and takeover paths pass (`# fail 0`) and intended writer can send input after handoff.
+
+### D) Evidence to record in checkpoint artifacts
+
+1. Incident UTC timestamp, active commit SHA, and trigger symptom.
+2. Containment action (`kill switch on/off`, handoff/takeover path) and operator identity.
+3. Verification commands executed and pass/fail outcome.
+4. Link the incident note in `scripts/checkpoints/runs/*-checkpoint.md`.
 
 ## iOS Protocol Mock Package Usage
 

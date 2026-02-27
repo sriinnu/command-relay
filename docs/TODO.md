@@ -53,7 +53,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Controlled-input baseline exists (`enable_input`, `input`, `disable_input`, kill switch, size/rate limit payload metadata).
 - [x] Add host-side input audit log record (actor, pane, command hash/preview policy, timestamp, result) ([runtime audit writes](../src/server/bridge-server.ts), [audit timestamp envelope](../src/server/audit-log.ts), [policy audit assertions](../src/server/bridge-server.policy.test.ts), [e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts)).
 - [x] Add policy tests for default read-only on reconnect, lane lease expiry, and takeover audit event ([policy tests](../src/server/bridge-server.policy.test.ts), [arbiter lease tests](../src/server/bridge-server-utils.test.ts)).
-- [ ] Add operator safety runbook for kill-switch and lane lockout incidents.
+- [x] Add operator safety runbook for kill-switch and lane lockout incidents ([runbook](./operations.md#controlled-input-safety-incident-runbook), [checkpoint evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#operator-safety-runbook-evidence)).
 
 ### A5) Observability
 
@@ -64,7 +64,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - input ack latency
   - lane conflict frequency
   - kill-switch blocks
-- [ ] Add structured logs for lifecycle events (connect, attach, replay resume, input enabled/disabled, takeover, policy reject).
+- [x] Add structured logs for lifecycle events (connect, attach, replay resume, input enabled/disabled, takeover, policy reject) ([connect audit emit](../src/server/bridge-server.ts), [lifecycle log assertions](../src/server/bridge-server.lifecycle-logging.test.ts)).
 - [x] Replay resume/fallback behavior is implemented and currently test-covered ([bridge replay unit](../src/bridge/bridge-engine.replay.test.ts), [bridge replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
 - [x] Dedicated replay audit actions `replay_resume` and `replay_gap_snapshot_fallback` are emitted from attach flow and asserted in replay e2e coverage ([audit contract](./controlled-input-audit.md), [attach audit writes](../src/server/bridge-server.ts), [replay audit assertions](../src/server/bridge-server.replay.e2e.test.ts)).
 - [ ] Set minimum evidence pack for weekly checkpoint artifacts.

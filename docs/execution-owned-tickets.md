@@ -121,6 +121,25 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 - Evidence:
   - [2026-02-27 validation checkpoint](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
 
+### CR-P1-004 Publish Operator Safety Runbook (Kill-Switch + Lane Lockout)
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `docs/operations.md`
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+  - `scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md`
+- Acceptance criteria:
+  - [x] Operations doc includes a concrete incident runbook for kill-switch and lane lockout paths.
+  - [x] TODO safety lane links to the runbook section and checkpoint evidence.
+  - [x] Checkpoint artifact records latest validation baseline commit and runbook evidence links.
+- Evidence:
+  - [Controlled-input safety incident runbook](./operations.md#controlled-input-safety-incident-runbook)
+  - [TODO safety reference](./TODO.md#a4-safety)
+  - [2026-02-27 validation checkpoint](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
+
 ### CR-P1-002 Update Weekly Checkpoint + Mirror Milestone Decisions
 
 - Owner: `@owner-tbd`

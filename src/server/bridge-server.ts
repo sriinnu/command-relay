@@ -157,6 +157,17 @@ export async function startBridgeServer(deps) {
       attachedPanes: new Set()
     };
     clients.set(client.id, client);
+    void audit.write({
+      action: "connect",
+      clientId: client.id,
+      details: {
+        result: "allowed",
+        reason: "socket_open",
+        requiresAuth: Boolean(config.authToken),
+        inputEnabled: false,
+        globalInputDisabled: config.globalInputDisabled
+      }
+    });
     send(
       socket,
       envelope("hello", {
