@@ -123,7 +123,8 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Pane write ownership is acquired on first successful `input`.
 4. Handoff: old writer `disable_input` then `detach`/`disconnect`; new writer `enable_input` and send first command.
 5. Optional hardening: set `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off` to block forced ownership takeover.
-6. Emergency freeze: restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`; resume by restarting with it off.
+6. Lease tuning: set `COMMANDRELAY_INPUT_LANE_LEASE_MS` (default `30000`, bounds `1000..300000`) to control stale-lane expiry timing.
+7. Emergency freeze: restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`; resume by restarting with it off.
 
 ## Keyboard/Input Operational Notes
 

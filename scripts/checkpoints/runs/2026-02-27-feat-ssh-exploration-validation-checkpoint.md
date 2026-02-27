@@ -23,4 +23,4 @@
 
 ## Next Blockers
 
-- Publish dry-run evidence for `@commandrelay/proxy-*` is still required to close P1.
+- Publish dry-run evidence now exists at [2026-02-27-proxy-publish-dry-run.md](./2026-02-27-proxy-publish-dry-run.md), but dry-run publish commands are still blocked by local npm cache `EACCES` on `/home/sriinnu/.npm`.

@@ -52,7 +52,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 - [x] Controlled-input baseline exists (`enable_input`, `input`, `disable_input`, kill switch, size/rate limit payload metadata).
 - [ ] Add host-side input audit log record (actor, pane, command hash/preview policy, timestamp, result).
-- [ ] Add policy tests for default read-only on reconnect, lane lease expiry, and takeover audit event.
+- [x] Add policy tests for default read-only on reconnect, lane lease expiry, and takeover audit event ([policy tests](../src/server/bridge-server.policy.test.ts), [arbiter lease tests](../src/server/bridge-server-utils.test.ts)).
 - [ ] Add operator safety runbook for kill-switch and lane lockout incidents.
 
 ### A5) Observability

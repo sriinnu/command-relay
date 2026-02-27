@@ -271,9 +271,10 @@ Use this when two or more clients/tabs may attach to the same pane.
 2. Keep observer tabs read-only by not calling `enable_input` (or calling `disable_input` after diagnostics).
 3. First successful `input` claims that pane's write lane for the writer client; other clients get `error.code=input_lane_conflict`.
 4. For handoff, current writer calls `disable_input` and then `detach` or `disconnect`; next writer calls `enable_input` and sends first `input`.
-5. If you want to block forced takeovers, run with `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off`.
-6. If command collisions are suspected, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable one writer.
-7. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
+5. Tune stale lane expiry with `COMMANDRELAY_INPUT_LANE_LEASE_MS` (default `30000`, bounds `1000..300000`) for your environment.
+6. If you want to block forced takeovers, run with `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off`.
+7. If command collisions are suspected, restart with `COMMANDRELAY_INPUT_KILL_SWITCH=on`, verify no input is accepted, then restart with `off` and re-enable one writer.
+8. During incident review, correlate `clientId` from `hello` with audit log `enable_input`/`disable_input`/`input` entries.
 
 ## iOS Live Environment
 
