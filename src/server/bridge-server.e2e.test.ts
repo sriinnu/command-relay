@@ -16,11 +16,7 @@ interface Envelope {
 
 interface WsProbe {
   socket: WebSocket;
-  sendRequest: (
-    type: string,
-    requestId: string,
-    payload: Record<string, unknown>
-  ) => void;
+  sendRequest: (type: string, requestId: string, payload: Record<string, unknown>) => void;
   sendRaw: (raw: string) => void;
   next: (predicate: (message: Envelope) => boolean, timeoutMs?: number) => Promise<Envelope>;
 }
@@ -35,26 +31,22 @@ interface FakeTmux {
   capturePane: (paneId: string, lines: number) => Promise<string>;
 }
 
+interface CapturedAuditEvent {
+  action: string;
+  clientId: string;
+  details: Record<string, unknown>;
+  ts: number;
+}
+
 const HOST = "127.0.0.1";
 const DEFAULT_TIMEOUT_MS = 2_500;
 
-/**
- * Waits for a short duration.
- *
- * @param ms Sleep duration in milliseconds.
- * @returns Promise that resolves after the delay.
- */
 async function sleep(ms: number): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
-/**
- * Reserves a free loopback TCP port.
- *
- * @returns Available port number.
- */
 async function reservePort(): Promise<number> {
   return await new Promise<number>((resolve, reject) => {
     const server = createNetServer();
@@ -76,11 +68,6 @@ async function reservePort(): Promise<number> {
   });
 }
 
-/**
- * Checks whether this runtime can bind loopback TCP ports for e2e tests.
- *
- * @returns True when loopback bind/listen is available.
- */
 async function canBindLoopback(): Promise<boolean> {
   try {
     const port = await reservePort();
@@ -95,11 +82,6 @@ async function canBindLoopback(): Promise<boolean> {
   }
 }
 
-/**
- * Creates a fake tmux adapter with call recorders.
- *
- * @returns Fake tmux implementation.
- */
 function createFakeTmux(): FakeTmux {
   const sentInputs: Array<{ paneId: string; input: string }> = [];
 
@@ -126,12 +108,6 @@ function createFakeTmux(): FakeTmux {
   };
 }
 
-/**
- * Connects a websocket probe and records inbound envelopes.
- *
- * @param url WebSocket URL.
- * @returns Connected probe utilities.
- */
 async function createWsProbe(url: string): Promise<WsProbe> {
   const socket = new WebSocket(url);
   const queue: Envelope[] = [];
@@ -192,12 +168,6 @@ async function createWsProbe(url: string): Promise<WsProbe> {
   };
 }
 
-/**
- * Closes a websocket probe safely.
- *
- * @param socket Probe socket.
- * @returns Resolves after socket closes.
- */
 async function closeWs(socket: WebSocket): Promise<void> {
   if (socket.readyState === WebSocket.CLOSED) {
     return;
@@ -222,7 +192,7 @@ async function closeWs(socket: WebSocket): Promise<void> {
   });
 }
 
-test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t) => {
+test("startBridgeServer e2e covers hello/auth/list/attach/enable-input/input/disable-input flow", async (t) => {
   if (!(await canBindLoopback())) {
     t.skip("loopback bind not permitted in this runtime");
     return;
@@ -230,6 +200,7 @@ test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t)
 
   const port = await reservePort();
   const tmux = createFakeTmux();
+  const auditEvents: CapturedAuditEvent[] = [];
   const runtime = await startBridgeServer({
     config: {
       host: HOST,
@@ -258,7 +229,14 @@ test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t)
         return await tmux.capturePane(paneId, lines);
       }
     },
-    logger: { info: () => {}, warn: () => {}, error: () => {} }
+    logger: {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      audit: (event: CapturedAuditEvent) => {
+        auditEvents.push(event);
+      }
+    }
   });
 
   const probe = await createWsProbe(`ws://${HOST}:${port}/ws`);
@@ -322,10 +300,7 @@ test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t)
     assert.equal(policyUpdate.payload.globalInputDisabled, false);
 
     const inputPayload = "echo ok\n";
-    probe.sendRequest("input", "input-1", {
-      paneId: "%1",
-      data: inputPayload
-    });
+    probe.sendRequest("input", "input-1", { paneId: "%1", data: inputPayload });
 
     const inputAck = await probe.next(
       (message) => message.type === "ack" && message.payload.action === "input"
@@ -333,6 +308,26 @@ test("startBridgeServer e2e covers hello/auth/list/attach/input flow", async (t)
     assert.equal(inputAck.requestId, "input-1");
     assert.equal(inputAck.payload.paneId, "%1");
     assert.equal(inputAck.payload.bytes, inputPayload.length);
+
+    probe.sendRequest("disable_input", "policy-2", {});
+    const disabledPolicyUpdate = await probe.next(
+      (message) => message.type === "policy_update" && message.requestId === "policy-2"
+    );
+    assert.equal(disabledPolicyUpdate.payload.inputEnabled, false);
+    assert.equal(disabledPolicyUpdate.payload.globalInputDisabled, false);
+
+    const policyInputActions = auditEvents
+      .filter((event) => event.action === "enable_input" || event.action === "input" || event.action === "disable_input")
+      .map((event) => event.action);
+    assert.deepEqual(policyInputActions, ["enable_input", "input", "disable_input"]);
+    const inputAuditEvent = auditEvents.find((event) => event.action === "input");
+    const inputAuditDetails = (inputAuditEvent?.details ?? {}) as Record<string, unknown>;
+    assert.equal(inputAuditEvent?.clientId, hello.payload.clientId);
+    assert.equal(inputAuditDetails.paneId, "%1");
+    assert.equal(inputAuditDetails.bytes, inputPayload.length);
+    assert.equal("data" in inputAuditDetails, false);
+    assert.equal("input" in inputAuditDetails, false);
+    assert.equal(JSON.stringify(inputAuditDetails).includes(inputPayload), false);
 
     assert.deepEqual(tmux.sentInputs, [{ paneId: "%1", input: inputPayload }]);
     assert.equal(tmux.listPanesCalls, 1);

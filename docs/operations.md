@@ -115,43 +115,15 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Very large pasted payloads can fail with `input_too_large` (default `maxInputBytes=4096`).
 4. Rapid key/send loops can fail with `input_rate_limited` (`COMMANDRELAY_MAX_INPUT_PER_MIN`).
 
+## Controlled-Input Audit Behavior
+
+1. Controlled-input events are metadata-only (no raw command payloads).
+2. Current action contract is documented in [controlled-input-audit.md](controlled-input-audit.md).
+
 ## Local Chitragupta Bootstrap + Health
 
-Use the local scripts in `scripts/chitragupta` to validate and run MCP safely.
-
-Bootstrap (dependencies + entrypoint readiness):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/bootstrap.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-```
-
-Health diagnostics (includes `--check` from MCP entrypoint):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/health.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-```
-
-Start command (EPERM-safe, uses `node --import tsx`):
-
-```bash
-cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
-scripts/chitragupta/start-mcp.sh \
-  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/chitragupta \
-  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
-  --name terminal
-```
-
-Operational notes:
-
-1. `start-mcp.sh` avoids direct `tsx` execution to prevent `EPERM`.
-2. If `tsx` is unavailable, it falls back to `packages/cli/dist/mcp-entry.js` when present.
-3. Keep `CHITRAGUPTA_MCP_AGENT=true` and `CHITRAGUPTA_MCP_PROJECT=/mnt/c/sriinnu/personal/Kaala-brahma/terminal`.
+Use scripts in `scripts/chitragupta` for bootstrap, health checks, and start flows.
+Operational details are maintained with the script implementations to avoid drift.
 
 ## Distilled Capsule + Brief + Dispatch Operations
 

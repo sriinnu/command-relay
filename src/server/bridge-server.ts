@@ -2,7 +2,7 @@
  * @file HTTP/WebSocket bridge server for CommandRelay.
  */
 import { createServer } from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
@@ -364,37 +364,31 @@ export async function handleClientMessage(ctx) {
     case "enable_input": {
       const nextInputEnabled = !config.globalInputDisabled;
       client.inputEnabled = nextInputEnabled;
-      await audit.write({
-        action: nextInputEnabled ? "enable_input" : "enable_input_blocked",
-        clientId: client.id,
-        details: nextInputEnabled ? {} : { reason: "global_input_kill_switch" }
-      });
+      await audit.write({ action: "enable_input", clientId: client.id, details: { result: nextInputEnabled ? "allowed" : "denied", reason: nextInputEnabled ? "client_enabled" : "global_input_kill_switch" } });
       sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
     case "disable_input": {
       client.inputEnabled = false;
-      await audit.write({ action: "disable_input", clientId: client.id, details: {} });
+      await audit.write({ action: "disable_input", clientId: client.id, details: { result: "allowed", reason: "client_disabled" } });
       sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
       return;
     }
     case "input": {
+      const paneId = parseNonEmptyString(payload.paneId);
+      const data = typeof payload.data === "string" ? payload.data : "";
+      const inputBytes = Buffer.byteLength(data, "utf8");
       const inputRate = inputLimiter.consume(client.id);
       if (!inputRate.allowed) {
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "rate_limited", bytes: inputBytes } });
         send(client.socket, envelope("error", { code: "input_rate_limited", retryAfterMs: inputRate.retryAfterMs, limit: inputRate.limit, windowMs: inputRate.windowMs }, requestId));
         return;
       }
-      if (
-        !isInputAllowed({
-          clientInputEnabled: client.inputEnabled,
-          globalInputDisabled: config.globalInputDisabled
-        })
-      ) {
+      if (!isInputAllowed({ clientInputEnabled: client.inputEnabled, globalInputDisabled: config.globalInputDisabled })) {
+        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "policy_blocked", bytes: inputBytes } });
         send(client.socket, envelope("error", { code: "input_disabled" }, requestId));
         return;
       }
-      const paneId = parseNonEmptyString(payload.paneId);
-      const data = typeof payload.data === "string" ? payload.data : "";
       if (!paneId || !data) {
         send(client.socket, envelope("error", { code: "invalid_input" }, requestId));
         return;
@@ -403,7 +397,6 @@ export async function handleClientMessage(ctx) {
         send(client.socket, envelope("error", { code: "pane_not_attached" }, requestId));
         return;
       }
-      const inputBytes = Buffer.byteLength(data, "utf8");
       if (inputBytes > config.maxInputBytes) {
         send(client.socket, envelope("error", { code: "input_too_large", maxInputBytes: config.maxInputBytes, receivedBytes: inputBytes }, requestId));
         return;
@@ -412,6 +405,7 @@ export async function handleClientMessage(ctx) {
       const claimResult = claimPaneInputOwnership(paneInputOwnerState, paneId, client.id, overrideRequested, laneOverrideAllowed);
       if (claimResult?.ok === false) {
         const { ownerClientId, overrideAllowed } = claimResult;
+        await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes } });
         send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed }, requestId));
         return;
       }
@@ -422,13 +416,15 @@ export async function handleClientMessage(ctx) {
         details: {
           paneId,
           bytes: inputBytes,
-          sha256: createHash("sha256").update(data).digest("hex"),
-          overrideRequested,
-          laneOverridden: claimResult?.ok ? claimResult.overridden : false
+          result: "allowed",
+          reason: "ok"
         }
       });
+      if (claimResult?.ok && claimResult.overridden) {
+        await audit.write({ action: "input_takeover", clientId: client.id, details: { paneId, result: "allowed", reason: "override", bytes: inputBytes } });
+      }
       telemetry?.recordInputAckLatency(Date.now() - startedAtMs);
-      send(client.socket, envelope("ack", { action: "input", paneId, bytes: data.length }, requestId));
+      send(client.socket, envelope("ack", { action: "input", paneId, bytes: inputBytes }, requestId));
       return;
     }
     case "heartbeat": {

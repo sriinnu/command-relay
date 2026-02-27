@@ -142,7 +142,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - complete docs/examples pack for `@commandrelay/proxy-*`
   - execute publish workflow dry-run and archive artifacts
 - Acceptance criteria:
-  - [ ] Audit log records are emitted for enable/disable/input/takeover flows.
+  - [x] Audit log records are emitted for enable/disable/input/takeover flows.
   - [ ] Replay ordering suite passes under fixture harness without manual intervention.
   - [ ] Dry-run artifacts contain selected package set, dist-tag, and no publish-policy blockers.
 
