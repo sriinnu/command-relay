@@ -57,7 +57,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### A5) Observability
 
-- [ ] Define metrics contract and dashboards:
+- [x] Define metrics contract and dashboards ([metrics contract v1](./observability-evidence-contract.md#metrics-contract-v1), [dashboard baseline v1](./observability-evidence-contract.md#dashboard-baseline-v1), [operations weekly flow](./operations.md#weekly-observability-baseline-and-evidence-pack)):
   - connect latency
   - replay lag
   - reconnect count
@@ -67,7 +67,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Add structured logs for lifecycle events (connect, attach, replay resume, input enabled/disabled, takeover, policy reject) ([connect audit emit](../src/server/bridge-server.ts), [lifecycle log assertions](../src/server/bridge-server.lifecycle-logging.test.ts)).
 - [x] Replay resume/fallback behavior is implemented and currently test-covered ([bridge replay unit](../src/bridge/bridge-engine.replay.test.ts), [bridge replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
 - [x] Dedicated replay audit actions `replay_resume` and `replay_gap_snapshot_fallback` are emitted from attach flow and asserted in replay e2e coverage ([audit contract](./controlled-input-audit.md), [attach audit writes](../src/server/bridge-server.ts), [replay audit assertions](../src/server/bridge-server.replay.e2e.test.ts)).
-- [ ] Set minimum evidence pack for weekly checkpoint artifacts.
+- [x] Set minimum evidence pack for weekly checkpoint artifacts ([minimum artifact set](./observability-evidence-contract.md#minimum-weekly-evidence-pack-v1), [command-to-evidence mapping](./observability-evidence-contract.md#command-to-evidence-mapping-v1), [operations weekly flow](./operations.md#weekly-observability-baseline-and-evidence-pack)).
 
 ### A6) Release Criteria (Track A)
 
@@ -86,8 +86,8 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - `@commandrelay/proxy-agent`
   - `@commandrelay/proxy-http-client`
 - [ ] Complete API stability review and public surface lock for v0.1.
-- [ ] Add negative tests for malformed proxy URLs, auth variants, NO_PROXY edge cases, PAC failures, and fallback behavior.
-- [ ] Add interoperability matrix validation (Node fetch/undici/http(s), env var permutations, proxy chaining expectations).
+- [x] Add negative tests for malformed proxy URLs, auth variants, NO_PROXY edge cases, PAC failures, and fallback behavior ([proxy factory negative + PAC suite](../src/net/proxy-agent-factory.test.ts), [proxy router malformed + NO_PROXY suite](../src/net/proxy-router.test.ts), [expected-vs-actual malformed input report](../scripts/checkpoints/runs/proxy-negative-input-report-2026-02-27.md)).
+- [ ] Add interoperability matrix validation (Node fetch/undici/http(s), env var permutations, proxy chaining expectations). Routing/env permutation matrix coverage is now in place ([proxy interoperability matrix suite](../src/net/proxy-interoperability-matrix.test.ts)); concrete `fetch`/`undici`/`http(s)` adapter interoperability + chaining assertions still need coverage.
 
 ### B2) Productization Readiness
 

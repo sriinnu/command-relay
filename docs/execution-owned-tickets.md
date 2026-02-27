@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work + latest evidence check)
+Last updated: 2026-02-27 (status reconciliation after merged SSH/proxy/host-state work + observability/evidence contract baseline)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -93,6 +93,28 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [PAC fail-closed behavior matrix](./proxy/package-model.md#failure-mode-matrix)
   - [Proxy hardening roadmap intent](./proxy-ecosystem-roadmap.md)
 
+### CR-P0-005 Validate Proxy Interoperability Matrix Coverage
+
+- Owner: `@owner-tbd`
+- Priority: `P0`
+- Status: `in_progress`
+- File scope:
+  - `src/net/proxy-interoperability-matrix.test.ts`
+  - `src/net/proxy-agent-factory.test.ts`
+  - `src/net/proxy-router.test.ts`
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+- Acceptance criteria:
+  - [x] Interoperability matrix covers env permutations across `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY` with uppercase/lowercase precedence scenarios.
+  - [x] Matrix assertions validate resolved proxy URL behavior across `http`/`https`/`ws`/`wss`.
+  - [x] Matrix assertions validate direct-vs-proxy outcomes and expected proxy agent class selection.
+  - [ ] Matrix coverage extends to concrete Node client adapters (`fetch`, `undici`, `http(s)`) and proxy-chaining expectations.
+  - [x] Current matrix + negative suites are passing in targeted validation (`node --import tsx --test src/net/proxy-interoperability-matrix.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`).
+- Evidence:
+  - [Proxy interoperability matrix suite](../src/net/proxy-interoperability-matrix.test.ts)
+  - [Proxy routing malformed env + NO_PROXY tests](../src/net/proxy-router.test.ts)
+  - [Proxy agent malformed credential/fallback tests](../src/net/proxy-agent-factory.test.ts)
+
 ## P1 Tickets (This week)
 
 ### CR-P1-001 Run + Archive Core Validation Suites
@@ -139,6 +161,30 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [Controlled-input safety incident runbook](./operations.md#controlled-input-safety-incident-runbook)
   - [TODO safety reference](./TODO.md#a4-safety)
   - [2026-02-27 validation checkpoint](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
+
+### CR-P1-005 Define Observability Metrics Contract + Weekly Evidence Pack Minimum
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `docs/observability-evidence-contract.md`
+  - `docs/operations.md`
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+- Acceptance criteria:
+  - [x] Six canonical observability metrics are documented with schema, labels, and rollup semantics.
+  - [x] Dashboard baseline panel set and weekly threshold table are documented.
+  - [x] Weekly checkpoint minimum evidence pack is defined with concrete artifact paths.
+  - [x] Command-to-evidence mapping is documented with pass signals.
+  - [x] TODO observability items are marked complete with direct references.
+- Evidence:
+  - [Metrics contract v1](./observability-evidence-contract.md#metrics-contract-v1)
+  - [Dashboard baseline v1](./observability-evidence-contract.md#dashboard-baseline-v1)
+  - [Minimum weekly evidence pack v1](./observability-evidence-contract.md#minimum-weekly-evidence-pack-v1)
+  - [Command-to-evidence mapping v1](./observability-evidence-contract.md#command-to-evidence-mapping-v1)
+  - [Operations weekly evidence flow](./operations.md#weekly-observability-baseline-and-evidence-pack)
+  - [TODO observability lane](./TODO.md#a5-observability)
 
 ### CR-P1-002 Update Weekly Checkpoint + Mirror Milestone Decisions
 

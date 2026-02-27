@@ -406,6 +406,23 @@ What this validates:
 4. Input dispatch latency.
 5. Reconnect and replay success rate.
 
+## Weekly Observability Baseline and Evidence Pack
+
+Use [`docs/observability-evidence-contract.md`](./observability-evidence-contract.md) as the normative weekly checkpoint contract.
+
+Required weekly artifact flow:
+
+1. Keep all artifacts in `scripts/checkpoints/runs/` using date-prefixed filenames.
+2. Produce these files for each weekly checkpoint:
+   - `YYYY-MM-DD-weekly-cross-platform-checkpoint.md`
+   - `YYYY-MM-DD-command-evidence.md`
+   - `YYYY-MM-DD-observability-metrics.json`
+   - `YYYY-MM-DD-dashboard-baseline.md`
+   - `YYYY-MM-DD-soak-or-incident.md`
+3. Use canonical metric names exactly as specified (`cr_connect_latency_ms`, `cr_replay_lag_events`, `cr_reconnect_total`, `cr_input_ack_latency_ms`, `cr_lane_conflict_total`, `cr_kill_switch_block_total`).
+4. Record command outputs and pass signals in the command evidence file using the mapping table in the contract doc.
+5. Any missing artifact must be explicitly marked `not-run` with owner and next action in the checkpoint summary.
+
 ## Logs
 
 Minimum log fields:
