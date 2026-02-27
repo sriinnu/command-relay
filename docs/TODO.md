@@ -65,6 +65,8 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - lane conflict frequency
   - kill-switch blocks
 - [ ] Add structured logs for lifecycle events (connect, attach, replay resume, input enabled/disabled, takeover, policy reject).
+- [x] Replay resume/fallback behavior is implemented and currently test-covered ([bridge replay unit](../src/bridge/bridge-engine.replay.test.ts), [bridge replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
+- [x] Dedicated replay audit actions `replay_resume` and `replay_gap_snapshot_fallback` are emitted from attach flow and asserted in replay e2e coverage ([audit contract](./controlled-input-audit.md), [attach audit writes](../src/server/bridge-server.ts), [replay audit assertions](../src/server/bridge-server.replay.e2e.test.ts)).
 - [ ] Set minimum evidence pack for weekly checkpoint artifacts.
 
 ### A6) Release Criteria (Track A)
@@ -194,6 +196,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - `npm run test:ci:all`
   - `node --import tsx --test src/server/ws-contract-matrix.test.ts src/server/bridge-server.policy.test.ts src/server/input-policy.test.ts`
   - `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`
+- [x] Validate replay resume/fallback behavior and current audit coverage for this branch (`node --import tsx --test src/bridge/bridge-engine.replay.test.ts src/server/bridge-server.replay.e2e.test.ts src/server/bridge-server.audit.test.ts`).
 - [ ] Update weekly checkpoint artifact and mirror milestone decisions into roadmap docs.
 - [x] Run publish dry-run for `@commandrelay/proxy-*` and capture artifact links ([proxy publish checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md); local dry-run blocked by npm cache `EACCES`, blocker documented in [release runbook](./release/proxy-publish.md)).
 

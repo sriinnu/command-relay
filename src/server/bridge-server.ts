@@ -1,27 +1,17 @@
-/**
- * @file HTTP/WebSocket bridge server for CommandRelay.
- */
 import { createServer } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
 import { envelope, parseMessage } from "../protocol.js";
-import { BridgeEngine } from "../bridge/bridge-engine.js";
+import { BridgeEngine, type BridgeAttachReplayMetadata } from "../bridge/bridge-engine.js";
 import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
 import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
-/**
- * @typedef {object} ClientState
- * @property {string} id Client identifier.
- * @property {import("ws").WebSocket} socket Client WebSocket instance.
- * @property {boolean} authenticated Whether auth is satisfied.
- * @property {boolean} inputEnabled Whether remote input is enabled.
- * @property {Set<string>} attachedPanes Subscribed tmux panes.
- */
+/** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
 const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -31,12 +21,7 @@ const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon"
 };
-/**
- * Starts the CommandRelay bridge server.
- *
- * @param {object} deps Runtime dependencies.
- * @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown.
- */
+/** Starts the CommandRelay bridge server. @param {object} deps Runtime dependencies. @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown. */
 export async function startBridgeServer(deps) {
   const { config, tmux } = deps;
   const logger = deps.logger ?? console;
@@ -79,7 +64,8 @@ export async function startBridgeServer(deps) {
     onError: (clientId, paneId, error) => {
       const client = clients.get(clientId);
       if (!client) return;
-      pendingAttachLag.delete(`${clientId}:${paneId}`);
+      const lagKey = `${clientId}:${paneId}`;
+      pendingAttachLag.delete(lagKey);
       send(client.socket, envelope("error", {
         code: "pane_poll_failed",
         paneId,
@@ -213,7 +199,8 @@ export async function startBridgeServer(deps) {
           inputOwnershipArbiter,
           allowInputOwnershipOverride: config.allowInputOwnershipOverride ?? true,
           trackAttachLag: (clientId, paneId, startedAtMs) => {
-            pendingAttachLag.set(`${clientId}:${paneId}`, startedAtMs);
+            const lagKey = `${clientId}:${paneId}`;
+            pendingAttachLag.set(lagKey, startedAtMs);
           }
         });
       } catch (error) {
@@ -244,9 +231,7 @@ export async function startBridgeServer(deps) {
       for (const client of clients.values()) {
         try {
           client.socket.close();
-        } catch {
-          // Ignore close race during shutdown.
-        }
+        } catch {}
       }
       await new Promise<void>((resolve) => {
         wsServer.close(() => resolve());
@@ -260,22 +245,23 @@ export async function startBridgeServer(deps) {
     }
   };
 }
-/**
- * Parses an incoming client websocket frame using configured protocol strictness.
- *
- * @param {string} raw UTF-8 JSON message text.
- * @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled.
- * @returns {import("../protocol.js").ParseMessageResult} Parse result.
- */
+/** Parses an incoming client websocket frame using configured protocol strictness.
+ * @param {string} raw UTF-8 JSON message text. @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled. @returns {import("../protocol.js").ParseMessageResult} Parse result. */
 export function parseIncomingClientMessage(raw, strictProtocolParsing) {
   return parseMessage(raw, strictProtocolParsing ? { strictV1: true } : undefined);
 }
-/**
- * Handles a single parsed client message.
- *
- * @param {object} ctx Message context.
- * @returns {Promise<void>} Completion signal.
- */
+
+function classifyReplaySnapshotFallbackReason(
+  replayMetadata: BridgeAttachReplayMetadata
+): "ahead_of_stream" | "outside_retained_window" | "empty_resume_window" {
+  const { requestedLastSeq, latestSeq, oldestHistorySeq, replayGapDetected } = replayMetadata;
+  if (requestedLastSeq === null) return "empty_resume_window";
+  if (requestedLastSeq > latestSeq) return "ahead_of_stream";
+  if (replayGapDetected || (oldestHistorySeq !== null && requestedLastSeq < oldestHistorySeq - 1)) return "outside_retained_window";
+  return "empty_resume_window";
+}
+
+/** Handles a single parsed client message. @param {object} ctx Message context. @returns {Promise<void>} Completion signal. */
 export async function handleClientMessage(ctx) {
   const {
     client,
@@ -341,7 +327,14 @@ export async function handleClientMessage(ctx) {
       const lastSeq = parseOptionalInt(payload.lastSeq);
       client.attachedPanes.add(paneId);
       trackAttachLag?.(client.id, paneId, startedAtMs);
-      await engine.attach(client.id, paneId, lastSeq);
+      const attachReplayMetadata = await engine.attach(client.id, paneId, lastSeq);
+      if (lastSeq !== null && attachReplayMetadata?.replayUsed && attachReplayMetadata.replayedCount > 0) {
+        const replayStartSeq = lastSeq + 1;
+        const replayEndSeq = lastSeq + attachReplayMetadata.replayedCount;
+        await audit.write({ action: "replay_resume", clientId: client.id, details: { paneId, lastSeq, replayedCount: attachReplayMetadata.replayedCount, replayStartSeq, replayEndSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: "resume" } });
+      } else if (lastSeq !== null && attachReplayMetadata?.fallbackToSnapshot) {
+        await audit.write({ action: "replay_gap_snapshot_fallback", clientId: client.id, details: { paneId, lastSeq, streamSeq: attachReplayMetadata.latestSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: classifyReplaySnapshotFallbackReason(attachReplayMetadata) } });
+      }
       await audit.write({ action: "attach", clientId: client.id, details: { paneId, lastSeq } });
       const attachLatencyMs = Date.now() - startedAtMs;
       telemetry?.recordAttachLatency(attachLatencyMs);

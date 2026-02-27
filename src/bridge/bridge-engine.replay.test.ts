@@ -4,7 +4,11 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BridgeEngine, type BridgePaneEvent } from "./bridge-engine.js";
+import {
+  BridgeEngine,
+  type BridgeAttachReplayMetadata,
+  type BridgePaneEvent
+} from "./bridge-engine.js";
 
 interface CapturePaneMock {
   calls: Array<{ paneId: string; lines: number }>;
@@ -71,7 +75,7 @@ test("attach(lastSeq) replays only missing events with no duplicates", async (t)
   await engine.pollOnce();
   await engine.pollOnce();
 
-  await engine.attach("reconnect-client", "%1", 2);
+  const metadata = await engine.attach("reconnect-client", "%1", 2);
 
   const replayed = outputEvents
     .filter((entry) => entry.clientId === "reconnect-client")
@@ -82,6 +86,17 @@ test("attach(lastSeq) replays only missing events with no duplicates", async (t)
   assert.ok(replayed.every((event) => event.streamSeq > 2));
   assert.equal(new Set(replayed.map((event) => event.streamSeq)).size, replayed.length);
   assertStrictlyIncreasing(replayed.map((event) => event.streamSeq));
+  assert.deepEqual(metadata, {
+    paneId: "%1",
+    requestedLastSeq: 2,
+    latestSeq: 4,
+    oldestHistorySeq: 1,
+    latestHistorySeq: 4,
+    replayedCount: 2,
+    replayUsed: true,
+    fallbackToSnapshot: false,
+    replayGapDetected: false
+  } satisfies BridgeAttachReplayMetadata);
 });
 
 test("replay output stays ordered even if watcher history storage is out-of-order", async (t) => {
@@ -117,7 +132,7 @@ test("replay output stays ordered even if watcher history storage is out-of-orde
   // Emulate a corrupted internal ordering and verify replay re-sorts by seq.
   watcher.history = [watcher.history[3], watcher.history[1], watcher.history[2], watcher.history[0]];
 
-  await engine.attach("reconnect-client", "%9", 1);
+  const metadata = await engine.attach("reconnect-client", "%9", 1);
   const replayed = outputEvents
     .filter((entry) => entry.clientId === "reconnect-client")
     .map((entry) => entry.event);
@@ -127,4 +142,62 @@ test("replay output stays ordered even if watcher history storage is out-of-orde
   assert.ok(replayed.every((event) => event.streamSeq > 1));
   assert.equal(new Set(seqs).size, seqs.length);
   assertStrictlyIncreasing(seqs);
+  assert.deepEqual(metadata, {
+    paneId: "%9",
+    requestedLastSeq: 1,
+    latestSeq: 4,
+    oldestHistorySeq: 1,
+    latestHistorySeq: 4,
+    replayedCount: 3,
+    replayUsed: true,
+    fallbackToSnapshot: false,
+    replayGapDetected: false
+  } satisfies BridgeAttachReplayMetadata);
+});
+
+test("attach(lastSeq) falls back to snapshot metadata when replay history has a gap", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const capture = createCapturePaneMock(["a", "ab", "abc", "abcd"]);
+  const outputEvents: RecordedOutput[] = [];
+
+  const engine = new BridgeEngine({
+    tmux: { capturePane: capture.capturePane },
+    replayLines: 80,
+    pollIntervalMs: 25,
+    maxHistoryEvents: 2,
+    onOutput: (clientId, event) => outputEvents.push({ clientId, event }),
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("seed-client", "%2");
+  await engine.pollOnce();
+  await engine.pollOnce();
+  await engine.pollOnce();
+
+  const metadata = await engine.attach("reconnect-client", "%2", 1);
+  const reconnectEvents = outputEvents
+    .filter((entry) => entry.clientId === "reconnect-client")
+    .map((entry) => entry.event);
+
+  assert.deepEqual(reconnectEvents, [
+    {
+      mode: "snapshot",
+      paneId: "%2",
+      chunk: "abcd",
+      streamSeq: 4
+    }
+  ]);
+  assert.deepEqual(metadata, {
+    paneId: "%2",
+    requestedLastSeq: 1,
+    latestSeq: 4,
+    oldestHistorySeq: 3,
+    latestHistorySeq: 4,
+    replayedCount: 0,
+    replayUsed: false,
+    fallbackToSnapshot: true,
+    replayGapDetected: true
+  } satisfies BridgeAttachReplayMetadata);
 });

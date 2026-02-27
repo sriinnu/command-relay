@@ -1,6 +1,8 @@
 # Controlled Input Audit Contract
 
-This document defines the structured audit metadata emitted for controlled input operations.
+Last updated: 2026-02-27
+
+This document defines the structured audit metadata contract for controlled input operations and replay reconnect audit actions.
 
 ## Event Shape
 
@@ -35,8 +37,40 @@ This document defines the structured audit metadata emitted for controlled input
    - disconnect/close path: `details.releasedPanes`, `details.result=allowed`, `details.reason` in:
      - `disconnect`
      - `socket_close`
+6. `replay_resume` (contract):
+   - emitted on `attach` when `lastSeq` is provided and replay emits one or more historical events
+   - includes:
+     - `details.paneId`
+     - `details.lastSeq`
+     - `details.replayedCount`
+     - `details.replayStartSeq`
+     - `details.replayEndSeq`
+     - `details.result=allowed`
+     - `details.reason=resume`
+7. `replay_gap_snapshot_fallback` (contract):
+   - emitted on `attach` when `lastSeq` is provided but replay cannot be served as a continuous resume window and host falls back to snapshot delivery
+   - includes:
+     - `details.paneId`
+     - `details.lastSeq`
+     - `details.streamSeq` (current host sequence at fallback)
+     - `details.result=allowed`
+     - `details.reason` in:
+       - `ahead_of_stream`
+       - `outside_retained_window`
+       - `empty_resume_window`
 
 ## Sanitization
 
 1. Raw command payload text is never persisted in `details`.
 2. Metadata-only capture is enforced (`paneId`, byte count, result, reason, `commandHash`, `previewPolicy`).
+
+## Implementation Status (2026-02-27)
+
+1. `replay_resume`: runtime emission is implemented from attach flow when replay resumes with one or more historical events.
+   - Current emitted details: `{ paneId, lastSeq, replayedCount, latestSeq }` ([`src/server/bridge-server.ts`](../src/server/bridge-server.ts)).
+2. `replay_gap_snapshot_fallback`: runtime emission is implemented from attach flow for ahead-of-stream fallback.
+   - Current emitted details: `{ paneId, lastSeq, latestSeq }` ([`src/server/bridge-server.ts`](../src/server/bridge-server.ts)).
+3. Runtime assertions for both replay audit actions are in replay e2e coverage:
+   - `replay_resume` assertions ([`src/server/bridge-server.replay.e2e.test.ts`](../src/server/bridge-server.replay.e2e.test.ts))
+   - `replay_gap_snapshot_fallback` assertions ([`src/server/bridge-server.replay.e2e.test.ts`](../src/server/bridge-server.replay.e2e.test.ts))
+4. Remaining gap to close against the full contract above: normalize emitted replay audit payload fields (`result`/`reason`, and replay range fields) if that schema is required for downstream consumers.

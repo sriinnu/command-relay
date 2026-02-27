@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import { handleClientMessage } from "./bridge-server.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
+import type { BridgeAttachReplayMetadata } from "../bridge/bridge-engine.js";
 
 interface SentEnvelope {
   type: string;
@@ -101,6 +102,23 @@ function createAuditHarness(): AuditHarness {
       paneInputOwners,
       paneInputOwnership: paneInputOwners
     } as unknown as Parameters<typeof handleClientMessage>[0]
+  };
+}
+
+function createReplayMetadata(
+  overrides: Partial<BridgeAttachReplayMetadata>
+): BridgeAttachReplayMetadata {
+  return {
+    paneId: "pane-1",
+    requestedLastSeq: null,
+    latestSeq: 0,
+    oldestHistorySeq: null,
+    latestHistorySeq: null,
+    replayedCount: 0,
+    replayUsed: false,
+    fallbackToSnapshot: false,
+    replayGapDetected: false,
+    ...overrides
   };
 }
 
@@ -206,3 +224,103 @@ test("disconnect emits lane_owner_released audit event when ownership existed", 
   assert.equal(laneReleasedEvent.details.result, "allowed");
   assert.equal(laneReleasedEvent.details.releasedPanes, 1);
 });
+
+test("attach emits replay_resume audit action with explicit reason fields", async () => {
+  const harness = createAuditHarness();
+  harness.ctx.engine.attach = async () =>
+    createReplayMetadata({
+      requestedLastSeq: 2,
+      latestSeq: 4,
+      oldestHistorySeq: 1,
+      latestHistorySeq: 4,
+      replayedCount: 2,
+      replayUsed: true
+    });
+
+  const ack = await dispatch(harness, "attach", "attach-resume", {
+    paneId: "pane-1",
+    lastSeq: 2
+  });
+  assert.equal(ack.type, "ack");
+  assert.equal(ack.payload.action, "attach");
+
+  const replayResumeEvent = harness.auditEvents.find((event) => event.action === "replay_resume");
+  assert.ok(replayResumeEvent);
+  assert.equal(replayResumeEvent.details.paneId, "pane-1");
+  assert.equal(replayResumeEvent.details.lastSeq, 2);
+  assert.equal(replayResumeEvent.details.replayedCount, 2);
+  assert.equal(replayResumeEvent.details.replayStartSeq, 3);
+  assert.equal(replayResumeEvent.details.replayEndSeq, 4);
+  assert.equal(replayResumeEvent.details.latestSeq, 4);
+  assert.equal(replayResumeEvent.details.result, "allowed");
+  assert.equal(replayResumeEvent.details.reason, "resume");
+});
+
+const replayFallbackCases: Array<{
+  name: string;
+  lastSeq: number;
+  metadata: BridgeAttachReplayMetadata;
+  expectedReason: string;
+}> = [
+  {
+    name: "ahead_of_stream",
+    lastSeq: 99,
+    metadata: createReplayMetadata({
+      requestedLastSeq: 99,
+      latestSeq: 3,
+      oldestHistorySeq: 1,
+      latestHistorySeq: 3,
+      fallbackToSnapshot: true
+    }),
+    expectedReason: "ahead_of_stream"
+  },
+  {
+    name: "outside_retained_window",
+    lastSeq: 2,
+    metadata: createReplayMetadata({
+      requestedLastSeq: 2,
+      latestSeq: 12,
+      oldestHistorySeq: 6,
+      latestHistorySeq: 12,
+      fallbackToSnapshot: true,
+      replayGapDetected: true
+    }),
+    expectedReason: "outside_retained_window"
+  },
+  {
+    name: "empty_resume_window",
+    lastSeq: 12,
+    metadata: createReplayMetadata({
+      requestedLastSeq: 12,
+      latestSeq: 12,
+      oldestHistorySeq: 6,
+      latestHistorySeq: 12,
+      fallbackToSnapshot: true
+    }),
+    expectedReason: "empty_resume_window"
+  }
+];
+
+for (const fallbackCase of replayFallbackCases) {
+  test(`attach emits replay_gap_snapshot_fallback with reason ${fallbackCase.name}`, async () => {
+    const harness = createAuditHarness();
+    harness.ctx.engine.attach = async () => fallbackCase.metadata;
+
+    const ack = await dispatch(harness, "attach", `attach-fallback-${fallbackCase.name}`, {
+      paneId: "pane-1",
+      lastSeq: fallbackCase.lastSeq
+    });
+    assert.equal(ack.type, "ack");
+    assert.equal(ack.payload.action, "attach");
+
+    const fallbackEvent = harness.auditEvents.find(
+      (event) => event.action === "replay_gap_snapshot_fallback"
+    );
+    assert.ok(fallbackEvent);
+    assert.equal(fallbackEvent.details.paneId, "pane-1");
+    assert.equal(fallbackEvent.details.lastSeq, fallbackCase.lastSeq);
+    assert.equal(fallbackEvent.details.streamSeq, fallbackCase.metadata.latestSeq);
+    assert.equal(fallbackEvent.details.result, "allowed");
+    assert.equal(fallbackEvent.details.reason, fallbackCase.expectedReason);
+  });
+}

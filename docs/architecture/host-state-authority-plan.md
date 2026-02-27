@@ -1,7 +1,7 @@
 # Host-State Authority Implementation Plan
 
 Last updated: 2026-02-27
-Status: Implementation-ready
+Status: In progress (replay behavior and replay attach-audit actions landed)
 Owner lane: host runtime (`src/server/*`, `src/bridge/*`)
 
 ## Goal
@@ -68,7 +68,7 @@ Attach replay algorithm:
 Operational guarantees:
 1. `streamSeq` is monotonic per pane watcher.
 2. Replay never emits duplicates for a single attach operation.
-3. If requested `lastSeq` is older than retained history, host falls back to snapshot and records a replay-gap audit event.
+3. If replay cannot be served from host history, host falls back to snapshot delivery and emits `replay_gap_snapshot_fallback` from attach flow.
 
 ## Audit Schema (`src/server/audit-log.ts`)
 
@@ -102,6 +102,15 @@ Required actions:
 6. `replay_resume` (with `lastSeq`, replayed count)
 7. `replay_gap_snapshot_fallback` (requested seq outside retained window)
 
+## Implementation Snapshot (2026-02-27)
+
+| Scope | Status | Evidence |
+| --- | --- | --- |
+| Replay resume semantics (`streamSeq > lastSeq`) | Implemented + tested | [`src/bridge/bridge-engine.ts`](../../src/bridge/bridge-engine.ts), [`src/bridge/bridge-engine.replay.test.ts`](../../src/bridge/bridge-engine.replay.test.ts), [`src/server/bridge-server.replay.e2e.test.ts`](../../src/server/bridge-server.replay.e2e.test.ts) |
+| Snapshot fallback on reconnect cursor mismatch | Implemented + tested | [`src/bridge/bridge-engine.ts`](../../src/bridge/bridge-engine.ts), [`src/server/bridge-server.replay.e2e.test.ts`](../../src/server/bridge-server.replay.e2e.test.ts) |
+| `replay_resume` audit action emission | Implemented + tested | attach path emits `replay_resume` when replay resumes from `lastSeq` ([`src/server/bridge-server.ts`](../../src/server/bridge-server.ts), [`src/server/bridge-server.replay.e2e.test.ts`](../../src/server/bridge-server.replay.e2e.test.ts)) |
+| `replay_gap_snapshot_fallback` audit action emission | Implemented + tested | attach path emits `replay_gap_snapshot_fallback` on ahead-of-stream fallback ([`src/server/bridge-server.ts`](../../src/server/bridge-server.ts), [`src/server/bridge-server.replay.e2e.test.ts`](../../src/server/bridge-server.replay.e2e.test.ts)) |
+
 ## Failure and Recovery Flows
 
 | Failure | Detection | Host action | Client-visible result | Recovery |
@@ -109,7 +118,7 @@ Required actions:
 | Auth reject | invalid token | no state mutation | `auth_error` | re-authenticate |
 | Transport drop | socket close | release lane + detach panes + clear limiter state | disconnected/reconnecting UX | reconnect, `attach(lastSeq)` |
 | Stale lane owner | lease expired | auto-release before claim | previous owner loses lane silently | next writer claims or explicit takeover |
-| Replay window exceeded | `lastSeq < historyStartSeq` | snapshot fallback, emit replay-gap audit | output snapshot continuity reset | client resets local buffer baseline |
+| Replay window exceeded | `lastSeq < historyStartSeq` | snapshot fallback (attach flow also emits replay-gap fallback audit when cursor is ahead of stream) | output snapshot continuity reset | client resets local buffer baseline |
 | tmux poll failure | `capturePane` throws | emit `pane_poll_failed` | error event + degraded state | retry attach/reconnect with backoff |
 | Audit file append failure | logger write exception | warn + continue runtime path | none (internal) | operator fixes filesystem and monitors warning rate |
 
@@ -124,7 +133,7 @@ Required actions:
    - Emit `lane_owner_released` audit records.
    - Exit: ownership conflict/takeover behavior remains protocol-compatible.
 3. Phase 2: Replay offset authority hardening.
-   - Add replay-gap detection and `replay_resume`/`replay_gap_snapshot_fallback` audit events.
+   - Replay-gap detection and `replay_resume`/`replay_gap_snapshot_fallback` attach-audit events are landed.
    - Preserve current `attach` + `output` wire contract.
    - Exit: reconnect behavior unchanged for clients, with new audit observability.
 4. Phase 3: Failure/recovery enforcement.
