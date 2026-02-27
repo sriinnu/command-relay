@@ -1,15 +1,21 @@
 ## SSH Transport Contract (CommandRelay)
 
-Status: Draft baseline for SSH-first track.
+Status: Active runtime contract.
 
 This contract defines runtime and client behavior when CommandRelay is operated over SSH transport.
 
 ## Transport assumptions
 1. SSH is the only transport from bridge to backend; tmux sockets are never exposed directly.
-2. Connection targets are resolved from server-side backend profiles (`host`, `port`, `user`, auth mode).
-3. SSH execution is non-interactive and bounded by connection and command timeouts.
-4. Transport carries terminal stream data and control messages only; file transfer is out of scope.
-5. Host key verification policy is explicit per environment, with strict checking in production.
+2. Connection target is `COMMANDRELAY_SSH_TARGET` and must match `[user@]host` (hostname or bracketed IPv6).
+3. SSH command is `COMMANDRELAY_SSH_COMMAND` (`ssh` default) and is used for startup preflight and runtime execution.
+4. Host key verification policy is explicit per environment; production must keep strict checking enabled.
+5. SSH execution is non-interactive and bounded by connection and command timeouts.
+6. Transport carries terminal stream data and control messages only; file transfer is out of scope.
+
+## Startup/runtime constraints
+1. `COMMANDRELAY_TRANSPORT_MODE=ssh` requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+2. Runtime operations in `ssh` mode execute tmux commands on the remote SSH target.
+3. Startup preflight must validate SSH client availability (`<COMMANDRELAY_SSH_COMMAND> -V`) before runtime starts.
 
 ## Session and runtime model (tmux persistence)
 1. tmux is long-lived and survives bridge/client disconnects.

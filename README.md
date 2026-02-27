@@ -91,13 +91,15 @@ Optional SSH startup wiring (remote profile orchestration contract):
 export COMMANDRELAY_TRANSPORT_MODE=ssh
 export COMMANDRELAY_SSH_PROFILE=primary
 export COMMANDRELAY_SSH_TARGET="dev@relay-host"
+export COMMANDRELAY_SSH_COMMAND=ssh
 export COMMANDRELAY_SSH_PORT=22
 export COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true
 npm start
 ```
 
-Current runtime data path remains the WS server (`/ws`) with tmux backends.
-In `ssh` mode, startup now hardens env inputs (`COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`) and runs an SSH client preflight (`ssh -V` must succeed and return a version string). After preflight passes, startup still exits with a not-implemented SSH runtime error.
+Current runtime data path remains the WS server (`/ws`) plus tmux runtime control.
+In `ssh` mode, the bridge runs tmux operations on the remote target over SSH after startup preflight passes.
+`ssh` mode is tmux-only: set `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Default local endpoints (current runtime path):
 
@@ -110,11 +112,12 @@ Default local endpoints (current runtime path):
 | Variable | Purpose |
 | --- | --- |
 | `COMMANDRELAY_AUTH_TOKEN` | Token auth for non-loopback binds |
-| `COMMANDRELAY_RUNTIME_BACKENDS` | Runtime backends (`tmux` default, optional `tmux,cmux`) |
+| `COMMANDRELAY_RUNTIME_BACKENDS` | Runtime backends (`tmux` default, optional `tmux,cmux`). Must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`. |
 | `COMMANDRELAY_CMUX_COMMAND` | Optional `cmux` command/path override |
-| `COMMANDRELAY_TRANSPORT_MODE` | Startup transport selector (`ws` default, `ssh` enables SSH target contract checks) |
+| `COMMANDRELAY_TRANSPORT_MODE` | Startup transport selector (`ws` default, `ssh` enables remote tmux execution over SSH) |
 | `COMMANDRELAY_SSH_PROFILE` | SSH profile name (`primary` when unset). If set, must be non-empty and match `[A-Za-z0-9._-]+`. |
 | `COMMANDRELAY_SSH_TARGET` | SSH target (required in `ssh` mode) in `[user@]host` format, where host is `name` or bracketed IPv6 (`[2001:db8::1]`). |
+| `COMMANDRELAY_SSH_COMMAND` | SSH executable/command override used for preflight and runtime SSH execution (`ssh` default). |
 | `COMMANDRELAY_SSH_PORT` | SSH target port override (`22` default) |
 | `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` | SSH strict host key checking policy (`true` default) |
 | `COMMANDRELAY_INPUT_KILL_SWITCH` | Global input disable switch |

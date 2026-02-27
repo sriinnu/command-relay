@@ -46,6 +46,7 @@ Notes:
 4. `COMMANDRELAY_CMUX_COMMAND` is trimmed at startup; blank values fall back to `cmux`.
 5. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
 6. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
+7. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
 
 ## SSH Transport Environment
 
@@ -54,8 +55,10 @@ Use these env vars for SSH transport startup:
 1. `COMMANDRELAY_TRANSPORT_MODE`: transport mode selector. Allowed values are `ws` (default) and `ssh`.
 2. `COMMANDRELAY_SSH_PROFILE`: SSH profile name. Defaults to `primary` only when unset. If set, it must be non-empty and contain only `A-Z`, `a-z`, `0-9`, `.`, `_`, `-`.
 3. `COMMANDRELAY_SSH_TARGET`: SSH destination string. Required when `COMMANDRELAY_TRANSPORT_MODE=ssh`. Format must be `[user@]host`, where `host` is `letters/numbers/._-` or bracketed IPv6.
-4. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
-5. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
+4. `COMMANDRELAY_SSH_COMMAND`: SSH executable/command override. Defaults to `ssh`; used for startup preflight and runtime SSH execution.
+5. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
+6. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
+7. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
 
 SSH target examples:
 
@@ -69,9 +72,9 @@ SSH profile examples:
 
 Startup preflight in `ssh` mode:
 
-1. Runs `ssh -V` at startup.
+1. Runs `<COMMANDRELAY_SSH_COMMAND> -V` at startup.
 2. Fails fast if `ssh` is missing/unusable or returns no version text.
-3. After preflight passes, startup still exits with the explicit not-implemented SSH runtime error.
+3. After preflight passes, runtime executes tmux commands on the remote SSH target.
 
 Copy-paste startup example (`ssh` mode):
 
@@ -80,8 +83,10 @@ cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 COMMANDRELAY_TRANSPORT_MODE=ssh \
 COMMANDRELAY_SSH_PROFILE=primary \
 COMMANDRELAY_SSH_TARGET=relay@example.internal \
+COMMANDRELAY_SSH_COMMAND=ssh \
 COMMANDRELAY_SSH_PORT=22 \
 COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true \
+COMMANDRELAY_RUNTIME_BACKENDS=tmux \
 npm run start
 ```
 

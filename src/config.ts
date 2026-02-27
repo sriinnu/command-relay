@@ -14,6 +14,7 @@ export interface BridgeConfig {
   sshProfileName: string;
   sshTarget: string | null;
   sshPort: number;
+  sshCommand: string;
   sshStrictHostKeyChecking: boolean;
   strictProtocolParsing: boolean;
   appStaticEnabled: boolean;
@@ -305,6 +306,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       { min: 1, max: 65535 },
       "COMMANDRELAY_SSH_PORT"
     ),
+    sshCommand: parseStringEnv(env.COMMANDRELAY_SSH_COMMAND, "ssh"),
     sshStrictHostKeyChecking: parseBooleanEnv(
       env.COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING,
       true,
@@ -359,6 +361,14 @@ export function validateStartupConfig(config: BridgeConfig): void {
   if (config.transportMode === "ssh" && !config.sshTarget) {
     throw new Error(
       "COMMANDRELAY_SSH_TARGET is required when COMMANDRELAY_TRANSPORT_MODE is ssh"
+    );
+  }
+  if (
+    config.transportMode === "ssh" &&
+    (config.runtimeBackends.length !== 1 || config.runtimeBackends[0] !== "tmux")
+  ) {
+    throw new Error(
+      `COMMANDRELAY_RUNTIME_BACKENDS must be tmux when COMMANDRELAY_TRANSPORT_MODE is ssh (received "${config.runtimeBackends.join(",")}")`
     );
   }
 }

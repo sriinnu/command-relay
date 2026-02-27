@@ -41,7 +41,7 @@ export async function startBridgeServer(deps) {
   const { config, tmux } = deps;
   const logger = deps.logger ?? console;
   if (!(await tmux.isAvailable())) {
-    throw new Error("tmux not available in PATH; bridge cannot start");
+    throw new Error("runtime backend is unavailable; bridge cannot start");
   }
   const startupTs = Date.now();
   const audit = new AuditLogger({ path: config.auditLogPath, logger });

@@ -85,6 +85,7 @@ test("defaults transport to ws with ssh-safe defaults", () => {
   assert.equal(config.transportMode, "ws");
   assert.equal(config.sshProfileName, "primary");
   assert.equal(config.sshPort, 22);
+  assert.equal(config.sshCommand, "ssh");
   assert.equal(config.sshStrictHostKeyChecking, true);
 });
 
@@ -103,6 +104,14 @@ test("parses ssh transport mode", () => {
   const config = loadConfig({ COMMANDRELAY_TRANSPORT_MODE: "ssh" });
 
   assert.equal(config.transportMode, "ssh");
+});
+
+test("parses and trims ssh command env value", () => {
+  const custom = loadConfig({ COMMANDRELAY_SSH_COMMAND: "  /usr/bin/ssh  " });
+  const blank = loadConfig({ COMMANDRELAY_SSH_COMMAND: "   " });
+
+  assert.equal(custom.sshCommand, "/usr/bin/ssh");
+  assert.equal(blank.sshCommand, "ssh");
 });
 
 test("rejects invalid transport mode values", () => {
@@ -127,6 +136,19 @@ test("accepts ssh transport mode when ssh target is provided", () => {
   });
 
   validateStartupConfig(config);
+});
+
+test("rejects non-tmux runtime backends when transport mode is ssh", () => {
+  const config = loadConfig({
+    COMMANDRELAY_TRANSPORT_MODE: "ssh",
+    COMMANDRELAY_SSH_TARGET: "relay@example.internal",
+    COMMANDRELAY_RUNTIME_BACKENDS: "tmux,cmux"
+  });
+
+  assert.throws(
+    () => validateStartupConfig(config),
+    /COMMANDRELAY_RUNTIME_BACKENDS.*COMMANDRELAY_TRANSPORT_MODE/
+  );
 });
 
 test("rejects invalid ssh target format when provided", () => {

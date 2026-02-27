@@ -19,6 +19,7 @@ Runtime backend selection is controlled by `COMMANDRELAY_RUNTIME_BACKENDS`:
 2. Multi-backend example: `tmux,cmux`
 3. Supported backend values: `tmux`, `cmux`
 4. In multi-backend mode, pane IDs are backend-namespaced (for example `tmux:%1`, `cmux:<pane-id>`). tmux-only mode keeps existing tmux pane IDs.
+5. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
 
 `cmux` executable override:
 
@@ -37,10 +38,12 @@ SSH transport startup env contract:
 1. `COMMANDRELAY_TRANSPORT_MODE` accepts `ws` (default) or `ssh`.
 2. `COMMANDRELAY_SSH_PROFILE` selects the SSH profile name; default is `primary` only when unset. If provided, it must be non-empty and match `[A-Za-z0-9._-]+`.
 3. `COMMANDRELAY_SSH_TARGET` is required when `COMMANDRELAY_TRANSPORT_MODE=ssh`; format must match `[user@]host` where host is `letters/numbers/._-` or bracketed IPv6.
-4. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
-5. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
-6. Startup preflight for `ssh` mode runs `ssh -V` and requires a version string; missing/unusable `ssh` fails startup.
-7. Current behavior after passing preflight: `ssh` mode still exits with a not-implemented runtime error until SSH execution path lands.
+4. `COMMANDRELAY_SSH_COMMAND` overrides the SSH executable/command; default is `ssh`.
+5. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
+6. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
+7. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
+8. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target.
+9. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Format examples:
 

@@ -12,6 +12,7 @@ import {
 } from "./config.js";
 import { TmuxAdapter } from "./tmux/tmux-adapter.js";
 import { CmuxAdapter } from "./runtime/cmux-adapter.js";
+import { SshTmuxAdapter } from "./runtime/ssh-tmux-adapter.js";
 import { RuntimeMultiplexer } from "./runtime/runtime-multiplexer.js";
 import type { RuntimeBackend as RuntimeBackendContract } from "./runtime/runtime-backend.js";
 import { startBridgeServer } from "./server/bridge-server.js";
@@ -36,29 +37,58 @@ interface StartupTransportConfig {
   sshProfile: string;
   sshTarget: string | null;
   sshPort: number;
+  sshCommand: string;
   sshStrictHostKeyChecking: boolean;
+}
+
+interface RuntimeBackendFactoryConfig {
+  cmuxCommand: string;
+  transportConfig: StartupTransportConfig;
 }
 
 /**
  * Creates runtime backend adapters from configured backend ids.
  *
  * @param runtimeBackends Ordered backend list from config.
- * @param cmuxCommand Configured cmux executable/command.
+ * @param factoryConfig Runtime backend factory configuration.
  * @returns Runtime backend adapters with stable identifiers.
  */
 function createRuntimeBackends(
   runtimeBackends: RuntimeBackendId[],
-  cmuxCommand: string
+  factoryConfig: RuntimeBackendFactoryConfig
 ): RuntimeBackendContract[] {
+  const { cmuxCommand, transportConfig } = factoryConfig;
   const adapters: RuntimeBackendContract[] = [];
   for (const backend of runtimeBackends) {
     if (backend === "tmux") {
-      adapters.push(wrapRuntimeBackend(backend, new TmuxAdapter()));
+      adapters.push(wrapRuntimeBackend(backend, createTmuxRuntimeAdapter(transportConfig)));
       continue;
     }
     adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter({ cmuxCommand })));
   }
   return adapters;
+}
+
+/**
+ * Creates the tmux runtime adapter for the configured transport mode.
+ *
+ * @param transportConfig Startup transport configuration.
+ * @returns Local or SSH tmux runtime adapter.
+ */
+function createTmuxRuntimeAdapter(transportConfig: StartupTransportConfig): RuntimeAdapter {
+  if (transportConfig.mode !== "ssh") {
+    return new TmuxAdapter();
+  }
+  if (!transportConfig.sshTarget) {
+    throw new Error("COMMANDRELAY_SSH_TARGET is required when COMMANDRELAY_TRANSPORT_MODE is ssh");
+  }
+
+  return new SshTmuxAdapter({
+    sshTarget: transportConfig.sshTarget,
+    sshPort: transportConfig.sshPort,
+    sshCommand: transportConfig.sshCommand,
+    strictHostKeyChecking: transportConfig.sshStrictHostKeyChecking
+  });
 }
 
 /**
@@ -171,6 +201,7 @@ function resolveStartupTransportConfig(config: BridgeConfig): StartupTransportCo
     sshProfile: config.sshProfileName,
     sshTarget: config.sshTarget,
     sshPort: config.sshPort,
+    sshCommand: config.sshCommand,
     sshStrictHostKeyChecking: config.sshStrictHostKeyChecking
   };
 }
@@ -190,23 +221,8 @@ function logStartupTransportConfig(transportConfig: StartupTransportConfig): voi
   console.info(`[bridge] ssh profile: ${transportConfig.sshProfile}`);
   console.info(`[bridge] ssh target: ${transportConfig.sshTarget ?? "(unset)"}`);
   console.info(`[bridge] ssh port: ${transportConfig.sshPort}`);
+  console.info(`[bridge] ssh command: ${transportConfig.sshCommand}`);
   console.info(`[bridge] ssh strict host key: ${transportConfig.sshStrictHostKeyChecking ? "enabled" : "disabled"}`);
-}
-
-/**
- * Throws when startup requests an unsupported transport mode.
- *
- * @param transportConfig Normalized startup transport configuration.
- * @returns Nothing.
- */
-function assertSupportedTransportMode(transportConfig: StartupTransportConfig): void {
-  if (transportConfig.mode === "ws") {
-    return;
-  }
-
-  throw new Error(
-    'Transport mode "ssh" is configured but SSH runtime execution is not implemented yet. Set COMMANDRELAY_TRANSPORT_MODE=ws.'
-  );
 }
 
 /**
@@ -220,10 +236,15 @@ async function preflightSshTransport(transportConfig: StartupTransportConfig): P
     return;
   }
 
-  const availability = await checkSshClientAvailability();
+  const availability = await checkSshClientAvailability({
+    sshCommand: transportConfig.sshCommand
+  });
   if (!availability.available) {
     throw new Error(
-      `SSH startup preflight failed: ${formatSshPreflightFailureReason(availability.reason)}`
+      `SSH startup preflight failed: ${formatSshPreflightFailureReason(
+        availability.reason,
+        transportConfig.sshCommand
+      )}`
     );
   }
   if (!availability.version) {
@@ -237,12 +258,13 @@ async function preflightSshTransport(transportConfig: StartupTransportConfig): P
  * Maps SSH preflight reason keys to startup-safe error text.
  *
  * @param reason Preflight reason key.
+ * @param sshCommand SSH executable command.
  * @returns Human-readable startup failure reason.
  */
-function formatSshPreflightFailureReason(reason: string | null): string {
+function formatSshPreflightFailureReason(reason: string | null, sshCommand: string): string {
   switch (reason) {
     case "ssh_command_not_found":
-      return 'SSH client binary "ssh" was not found in PATH.';
+      return `SSH client binary "${sshCommand}" was not found in PATH.`;
     case "ssh_version_check_timeout":
       return "SSH client version check timed out.";
     case "ssh_version_check_failed":
@@ -272,10 +294,12 @@ async function main() {
   }
   logStartupTransportConfig(transportConfig);
   await preflightSshTransport(transportConfig);
-  assertSupportedTransportMode(transportConfig);
   console.info(`[bridge] runtime backends: ${config.runtimeBackends.join(",")}`);
 
-  const runtimeBackends = createRuntimeBackends(config.runtimeBackends, config.cmuxCommand);
+  const runtimeBackends = createRuntimeBackends(config.runtimeBackends, {
+    cmuxCommand: config.cmuxCommand,
+    transportConfig
+  });
   const backendAvailability = await checkRuntimeBackendAvailability(runtimeBackends);
   const availableBackends = logRuntimeBackendAvailability(backendAvailability);
   if (availableBackends === 0 && !isTmuxOnly(config.runtimeBackends)) {
