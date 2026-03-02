@@ -76,6 +76,8 @@ export interface StartupTransportConfig {
   sshCommand: string;
   sshConnectTimeoutSeconds: number;
   sshStrictHostKeyChecking: boolean;
+  sshKnownHostsFile: string | null;
+  sshExpectedFingerprintSha256: string | null;
 }
 
 /**
@@ -189,7 +191,9 @@ export function resolveStartupTransportConfig(config: BridgeConfig): StartupTran
     sshPort: config.sshPort,
     sshCommand: config.sshCommand,
     sshConnectTimeoutSeconds: config.sshConnectTimeoutSeconds,
-    sshStrictHostKeyChecking: config.sshStrictHostKeyChecking
+    sshStrictHostKeyChecking: config.sshStrictHostKeyChecking,
+    sshKnownHostsFile: normalizeOptionalTransportString(config.sshKnownHostsFile),
+    sshExpectedFingerprintSha256: normalizeOptionalTransportString(config.sshExpectedFingerprintSha256)
   };
 }
 
@@ -212,8 +216,16 @@ export function createTmuxRuntimeAdapter(transportConfig: StartupTransportConfig
     sshPort: transportConfig.sshPort,
     sshCommand: transportConfig.sshCommand,
     commandTimeoutMs: transportConfig.sshConnectTimeoutSeconds * 1000,
-    strictHostKeyChecking: transportConfig.sshStrictHostKeyChecking
+    strictHostKeyChecking: transportConfig.sshStrictHostKeyChecking,
+    knownHostsFile: transportConfig.sshKnownHostsFile,
+    expectedFingerprintSha256: transportConfig.sshExpectedFingerprintSha256
   });
+}
+
+function normalizeOptionalTransportString(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
 /**

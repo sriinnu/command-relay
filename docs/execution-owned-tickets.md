@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (CR-P1-009 host-authoritative runtime metadata for session_list)
+Last updated: 2026-03-02 (CR-P1-010 ssh trust model docs hardening slice)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -331,3 +331,33 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [Replay offset snapshot helpers](../src/bridge/bridge-engine.ts)
   - [Runtime metadata e2e coverage](../src/server/bridge-server.runtime-metadata.e2e.test.ts)
   - [Protocol session_list runtime metadata contract](./protocol-v1.md#33-list_sessions-c-s-and-session_list-s-c)
+
+### CR-P1-010 SSH Trust Model Docs Hardening Slice
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `docs/ssh-transport-contract.md`
+  - `docs/protocol-v1.md`
+  - `docs/getting-started.md`
+  - `docs/operations.md`
+  - `docs/TODO.md`
+  - `docs/execution-owned-tickets.md`
+- Acceptance criteria:
+  - [x] Document known_hosts file selection behavior and strict host key interaction for SSH transport.
+  - [x] Document optional expected SHA256 host fingerprint verification and fail-fast mismatch behavior.
+  - [x] Update SSH env var and startup preflight narratives in operator-facing docs.
+  - [x] Link trust-model docs to concrete runtime/startup code and test anchors where available.
+- Evidence:
+  - [SSH trust controls contract](./ssh-transport-contract.md#ssh-host-trust-controls)
+  - [Strict host key + fingerprint interplay](./ssh-transport-contract.md#strict-host-key--fingerprint-interplay)
+  - [SSH env quickstart updates](./getting-started.md#ssh-transport-environment)
+  - [SSH operations env contract updates](./operations.md#ssh-transport-startup-env-contract)
+  - [Protocol startup trust bootstrap semantics](./protocol-v1.md#51-ssh-trust-bootstrap-semantics)
+  - [SSH runtime host key option wiring](../src/runtime/ssh-tmux-adapter.ts)
+  - [Startup SSH env parsing/validation coverage](../src/server/startup-validation.test.ts)
+  - [SSH preflight availability coverage](../src/ssh/ssh-preflight.test.ts)
+- Operational note:
+  - Co-orchestrator health check default path failed (`scripts/chitragupta/health.sh --project ...` -> missing `../chitragupta`), explicit path health check passed (`--chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta`).
+  - Co-orchestrator delegation attempt for this slice failed (`chitragupta_prompt`: provider spawn `E2BIG` / no available provider path); doc updates proceeded with local evidence-only anchors.

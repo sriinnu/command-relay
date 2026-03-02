@@ -42,10 +42,13 @@ SSH transport startup env contract:
 5. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
 6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` sets SSH connect/runtime command timeout in seconds; default is `8`, valid range is `1..60`.
 7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
-8. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
-9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
-10. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
-11. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+8. `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` optionally selects the known_hosts file used for host key checks in strict mode.
+9. `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` optionally pins host trust to one fingerprint (`SHA256:<base64>`).
+10. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
+11. Startup preflight validates trust controls and fails fast for malformed fingerprint values or unreadable known_hosts file paths.
+12. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+13. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
+14. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Format examples:
 
@@ -53,6 +56,14 @@ Format examples:
 2. Invalid SSH targets: `relay target`, `relay@@example`, `ops@`.
 3. Valid SSH profiles: `primary`, `primary.ops-1_2`.
 4. Invalid SSH profiles: `primary/profile`, `   `.
+
+SSH trust model interplay and failure actions:
+
+1. `strict=true` + no expected fingerprint: host trust comes from known_hosts verification (`COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` when set, SSH defaults when unset).
+2. `strict=true` + expected fingerprint: both host key verification and fingerprint match must pass.
+3. `strict=false` + no expected fingerprint: use only in controlled diagnostics; host identity is not strongly verified.
+4. `strict=false` + expected fingerprint: invalid configuration; startup rejects because fingerprint pinning requires strict host key checking.
+5. Treat `known_hosts_unreadable`, `host_key_verification_failed`, `expected_fingerprint_mismatch`, and `expected_fingerprint_unavailable` as fail-fast startup errors requiring operator intervention.
 
 ## SSH-First Tunnel Runbook
 
@@ -115,6 +126,7 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Rotate tokens by updating env and restarting the bridge process.
 4. Keep token values out of shell history and operator notes; audit logs store auth outcomes, not submitted token values.
 5. SSH runtime hardening is always non-interactive (`-T`, `BatchMode=yes`); if strict host key checking is off, known_hosts writes are suppressed (`UserKnownHostsFile=/dev/null`).
+6. For production, keep `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true` and pin `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` when host-key rotation process is documented.
 
 ## Multi-Tab Safe Writer Operations
 

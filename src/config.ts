@@ -2,6 +2,7 @@
  * @file Runtime configuration loader for the CommandRelay bridge server.
  */
 
+import { accessSync, constants as fsConstants } from "node:fs";
 import { isValidSshProfileName, parseSshTarget } from "./ssh/ssh-target.js";
 
 /** Runtime bridge configuration values. */
@@ -17,6 +18,8 @@ export interface BridgeConfig {
   sshCommand: string;
   sshConnectTimeoutSeconds: number;
   sshStrictHostKeyChecking: boolean;
+  sshKnownHostsFile: string | null;
+  sshExpectedFingerprintSha256: string | null;
   strictProtocolParsing: boolean;
   appStaticEnabled: boolean;
   appStaticDir: string;
@@ -36,6 +39,7 @@ export interface BridgeConfig {
 
 const SUPPORTED_RUNTIME_BACKENDS = ["tmux", "cmux"] as const;
 const SUPPORTED_TRANSPORT_MODES = ["ws", "ssh"] as const;
+const SSH_SHA256_FINGERPRINT_PATTERN = /^SHA256:[A-Za-z0-9+/]{43}=?$/;
 
 /**
  * Supported backend identifiers for runtime pane operations.
@@ -153,6 +157,23 @@ function parseOptionalStringEnv(raw: string | undefined): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   return trimmed ? trimmed : null;
+}
+
+/**
+ * Parses and validates optional SSH SHA256 fingerprint env value.
+ *
+ * @param raw Raw env value.
+ * @param envName Environment variable name for error messages.
+ * @returns Trimmed SHA256 fingerprint token or null.
+ */
+function parseOptionalSshFingerprintSha256Env(raw: string | undefined, envName: string): string | null {
+  const parsed = parseOptionalStringEnv(raw);
+  if (!parsed) return null;
+  if (!SSH_SHA256_FINGERPRINT_PATTERN.test(parsed)) {
+    throw new Error(`${envName} must match SHA256:<base64> format (received "${raw}")`);
+  }
+
+  return parsed;
 }
 
 /**
@@ -320,6 +341,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       true,
       "COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING"
     ),
+    sshKnownHostsFile: parseOptionalStringEnv(env.COMMANDRELAY_SSH_KNOWN_HOSTS_FILE),
+    sshExpectedFingerprintSha256: parseOptionalSshFingerprintSha256Env(
+      env.COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256,
+      "COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256"
+    ),
     strictProtocolParsing: parseBooleanEnvWithAlias(
       env,
       "COMMANDRELAY_STRICT_PROTOCOL_PARSING",
@@ -382,6 +408,20 @@ export function validateStartupConfig(config: BridgeConfig): void {
   ) {
     throw new Error(
       `COMMANDRELAY_RUNTIME_BACKENDS must be tmux when COMMANDRELAY_TRANSPORT_MODE is ssh (received "${config.runtimeBackends.join(",")}")`
+    );
+  }
+  if (config.transportMode === "ssh" && config.sshKnownHostsFile) {
+    try {
+      accessSync(config.sshKnownHostsFile, fsConstants.R_OK);
+    } catch {
+      throw new Error(
+        `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE must reference a readable file when COMMANDRELAY_TRANSPORT_MODE=ssh (received "${config.sshKnownHostsFile}")`
+      );
+    }
+  }
+  if (!config.sshStrictHostKeyChecking && config.sshExpectedFingerprintSha256) {
+    throw new Error(
+      "COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256 requires COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true and must be unset when strict host key checking is disabled"
     );
   }
 }

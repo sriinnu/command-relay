@@ -1,6 +1,6 @@
 # CommandRelay Execution TODO (SSH-First + Proxy Hardening)
 
-Last reviewed: 2026-02-27
+Last reviewed: 2026-03-02
 Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by host.
 
 ## Vision Reset (SSH-First)
@@ -23,7 +23,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 ### A1) Transport
 
 - [ ] Finalize SSH transport contract for connect/auth/list/attach/replay/input/ack/error with explicit reconnect semantics.
-- [ ] Specify host identity + trust model (host key verification mode, fingerprint surfacing, rotation handling).
+- [x] Specify host identity + trust model (host key verification mode, fingerprint surfacing, rotation handling). Status: `done` ([SSH trust controls contract](./ssh-transport-contract.md#ssh-host-trust-controls), [strict/fingerprint interplay](./ssh-transport-contract.md#strict-host-key--fingerprint-interplay), [SSH env startup guide](./getting-started.md#ssh-transport-environment), [operations trust runbook](./operations.md#ssh-transport-startup-env-contract), [runtime strict-host-key args](../src/runtime/ssh-tmux-adapter.ts), [startup env parsing tests](../src/server/startup-validation.test.ts)).
 - [ ] Lock protocol compatibility matrix for SSH transport and existing WebSocket transport.
 - [ ] Add transport conformance tests covering:
   - happy path attach + replay resume

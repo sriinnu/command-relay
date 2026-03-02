@@ -4,7 +4,12 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { loadConfig, validateStartupConfig } from "../config.js";
+
+const VALID_SSH_FINGERPRINT_SHA256 = "SHA256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU";
 
 test("parses global input kill switch truthy and falsy values", () => {
   const enabled = loadConfig({ COMMANDRELAY_INPUT_KILL_SWITCH: "true" });
@@ -102,6 +107,8 @@ test("defaults transport to ws with ssh-safe defaults", () => {
   assert.equal(config.sshCommand, "ssh");
   assert.equal(config.sshConnectTimeoutSeconds, 8);
   assert.equal(config.sshStrictHostKeyChecking, true);
+  assert.equal(config.sshKnownHostsFile, null);
+  assert.equal(config.sshExpectedFingerprintSha256, null);
 });
 
 test("parses and validates ssh profile names", () => {
@@ -224,4 +231,96 @@ test("parses strict host key env and rejects invalid values", () => {
     () => loadConfig({ COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING: "sometimes" }),
     /COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING/
   );
+});
+
+test("parses and trims ssh trust env values", () => {
+  const config = loadConfig({
+    COMMANDRELAY_SSH_KNOWN_HOSTS_FILE: "  /etc/ssh/ssh_known_hosts  ",
+    COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: `  ${VALID_SSH_FINGERPRINT_SHA256}  `
+  });
+
+  assert.equal(config.sshKnownHostsFile, "/etc/ssh/ssh_known_hosts");
+  assert.equal(config.sshExpectedFingerprintSha256, VALID_SSH_FINGERPRINT_SHA256);
+});
+
+test("normalizes blank ssh trust env values to null", () => {
+  const config = loadConfig({
+    COMMANDRELAY_SSH_KNOWN_HOSTS_FILE: "   ",
+    COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: "   "
+  });
+
+  assert.equal(config.sshKnownHostsFile, null);
+  assert.equal(config.sshExpectedFingerprintSha256, null);
+});
+
+test("rejects invalid ssh fingerprint format", () => {
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: "sha256:abc" }),
+    /COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: "SHA256:not_base64_" }),
+    /COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256/
+  );
+  assert.throws(
+    () =>
+      loadConfig({
+        COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: `${VALID_SSH_FINGERPRINT_SHA256}==`
+      }),
+    /COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256/
+  );
+});
+
+test("rejects ssh fingerprint when strict host key checking is disabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING: "false",
+    COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: VALID_SSH_FINGERPRINT_SHA256
+  });
+
+  assert.throws(
+    () => validateStartupConfig(config),
+    /COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256.*COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING/
+  );
+});
+
+test("accepts ssh fingerprint when strict host key checking is enabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256: VALID_SSH_FINGERPRINT_SHA256
+  });
+
+  validateStartupConfig(config);
+});
+
+test("rejects unreadable known_hosts file in ssh mode", () => {
+  const missingKnownHosts = join(
+    tmpdir(),
+    `commandrelay-missing-known-hosts-${Date.now().toString(36)}`
+  );
+  const config = loadConfig({
+    COMMANDRELAY_TRANSPORT_MODE: "ssh",
+    COMMANDRELAY_SSH_TARGET: "relay@example.internal",
+    COMMANDRELAY_SSH_KNOWN_HOSTS_FILE: missingKnownHosts
+  });
+
+  assert.throws(
+    () => validateStartupConfig(config),
+    /COMMANDRELAY_SSH_KNOWN_HOSTS_FILE must reference a readable file/
+  );
+});
+
+test("accepts readable known_hosts file in ssh mode", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "commandrelay-known-hosts-"));
+  const knownHostsPath = join(tempDir, "known_hosts");
+  writeFileSync(knownHostsPath, "example.internal ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI\n");
+
+  try {
+    const config = loadConfig({
+      COMMANDRELAY_TRANSPORT_MODE: "ssh",
+      COMMANDRELAY_SSH_TARGET: "relay@example.internal",
+      COMMANDRELAY_SSH_KNOWN_HOSTS_FILE: knownHostsPath
+    });
+    validateStartupConfig(config);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
