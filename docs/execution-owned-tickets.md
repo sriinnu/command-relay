@@ -1,6 +1,6 @@
 # Execution-Owned Tickets (Immediate P0/P1)
 
-Last updated: 2026-02-27 (CR-P1-002 weekly evidence lane + A2 runtime failure-mode hardening)
+Last updated: 2026-02-27 (CR-P1-009 host-authoritative runtime metadata for session_list)
 Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
 
 ## Ticket Conventions
@@ -302,3 +302,32 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [Runtime failure classifier tests](../src/server/bridge-runtime-failures.test.ts)
   - [Failure-mode e2e tests](../src/server/bridge-server.failure-modes.e2e.test.ts)
   - [Protocol error-code matrix update](./protocol-v1.md#8-error-codes-and-validation-contract)
+
+### CR-P1-009 Host-Authoritative Session Runtime Metadata
+
+- Owner: `@owner-tbd`
+- Priority: `P1`
+- Status: `done`
+- File scope:
+  - `src/server/session-list-runtime-metadata.ts`
+  - `src/server/bridge-server.ts`
+  - `src/server/bridge-server-utils.ts`
+  - `src/bridge/bridge-engine.ts`
+  - `src/server/bridge-server.runtime-metadata.e2e.test.ts`
+  - `src/server/bridge-server-utils.test.ts`
+  - `src/bridge/bridge-engine.test.ts`
+  - `docs/TODO.md`
+  - `docs/protocol-v1.md`
+- Acceptance criteria:
+  - [x] `session_list` response includes host-authored runtime metadata envelope (`source`, `generatedAt`, `capabilities`, per-pane runtime rows).
+  - [x] Lane owner values are derived from host lane arbitration state, not from runtime pane rows.
+  - [x] Replay offsets are derived from host bridge replay state, not from runtime pane rows.
+  - [x] Capability flags are emitted by host runtime policy (`laneOwnership`, `replayOffset`, `inputOwnershipOverride`).
+  - [x] E2E coverage verifies runtime metadata overrides stale pane-row metadata and remains request-correlated.
+- Evidence:
+  - [Runtime metadata builder](../src/server/session-list-runtime-metadata.ts)
+  - [Bridge `list_sessions` host metadata wiring](../src/server/bridge-server.ts)
+  - [Lane ownership snapshot helpers](../src/server/bridge-server-utils.ts)
+  - [Replay offset snapshot helpers](../src/bridge/bridge-engine.ts)
+  - [Runtime metadata e2e coverage](../src/server/bridge-server.runtime-metadata.e2e.test.ts)
+  - [Protocol session_list runtime metadata contract](./protocol-v1.md#33-list_sessions-c-s-and-session_list-s-c)

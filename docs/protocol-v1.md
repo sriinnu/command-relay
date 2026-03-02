@@ -111,6 +111,10 @@ Behavior:
 1. `list_sessions` has no required payload fields.
 2. Response `session_list` includes `payload.panes` and grouped `payload.sessions`.
 3. In multi-backend runtime mode (`tmux,cmux`), each `payload.sessions[]` row can include optional `backendId` and is grouped by `(backendId, sessionName)`.
+4. Response `session_list` includes host runtime metadata in `payload.runtime`:
+   - `source: "host"` and `generatedAt` timestamp.
+   - `capabilities` (`laneOwnership`, `replayOffset`, `inputOwnershipOverride`).
+   - `panes[]` runtime rows with host-authoritative `laneOwnerClientId` and `replayOffset`.
 
 ### 3.4 `attach` (`C->S`)
 

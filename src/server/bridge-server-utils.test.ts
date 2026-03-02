@@ -4,7 +4,11 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { groupSessionsByName, PaneInputOwnershipArbiter } from "./bridge-server-utils.js";
+import {
+  groupSessionsByName,
+  PaneInputOwnershipArbiter,
+  snapshotPaneInputOwnership
+} from "./bridge-server-utils.js";
 
 test("groupSessionsByName groups panes by session name for single backend rows", () => {
   const grouped = groupSessionsByName([
@@ -186,4 +190,96 @@ test("PaneInputOwnershipArbiter expires stale owners before releasePaneIfOwnedBy
     ok: true,
     overridden: false
   });
+});
+
+test("PaneInputOwnershipArbiter snapshot reports deterministic lane ownership rows", () => {
+  let nowMs = 0;
+  const arbiter = new PaneInputOwnershipArbiter({
+    leaseDurationMs: 50,
+    now: () => nowMs
+  });
+
+  assert.deepEqual(arbiter.claim("pane-b", "client-b", false, false), {
+    ok: true,
+    overridden: false
+  });
+  nowMs = 10;
+  assert.deepEqual(arbiter.claim("pane-a", "client-a", false, false), {
+    ok: true,
+    overridden: false
+  });
+
+  nowMs = 20;
+  assert.deepEqual(arbiter.snapshot(), [
+    {
+      paneId: "pane-a",
+      ownerClientId: "client-a",
+      expiresAtMs: 60
+    },
+    {
+      paneId: "pane-b",
+      ownerClientId: "client-b",
+      expiresAtMs: 50
+    }
+  ]);
+});
+
+test("PaneInputOwnershipArbiter snapshot excludes expired lane owners", () => {
+  let nowMs = 0;
+  const arbiter = new PaneInputOwnershipArbiter({
+    leaseDurationMs: 10,
+    now: () => nowMs
+  });
+  assert.deepEqual(arbiter.claim("pane-1", "client-a", false, false), {
+    ok: true,
+    overridden: false
+  });
+
+  nowMs = 10;
+  assert.deepEqual(arbiter.snapshot(), []);
+});
+
+test("snapshotPaneInputOwnership serializes legacy ownership maps", () => {
+  const legacy = new Map<string, string>([
+    ["pane-b", "client-b"],
+    ["pane-a", "client-a"]
+  ]);
+
+  assert.deepEqual(snapshotPaneInputOwnership(legacy), [
+    {
+      paneId: "pane-a",
+      ownerClientId: "client-a",
+      expiresAtMs: null
+    },
+    {
+      paneId: "pane-b",
+      ownerClientId: "client-b",
+      expiresAtMs: null
+    }
+  ]);
+});
+
+test("snapshotPaneInputOwnership returns empty rows when arbitration is off", () => {
+  assert.deepEqual(snapshotPaneInputOwnership(undefined), []);
+});
+
+test("snapshotPaneInputOwnership uses arbiter snapshot rows", () => {
+  let nowMs = 0;
+  const arbiter = new PaneInputOwnershipArbiter({
+    leaseDurationMs: 25,
+    now: () => nowMs
+  });
+  assert.deepEqual(arbiter.claim("pane-1", "client-a", false, false), {
+    ok: true,
+    overridden: false
+  });
+
+  nowMs = 5;
+  assert.deepEqual(snapshotPaneInputOwnership(arbiter), [
+    {
+      paneId: "pane-1",
+      ownerClientId: "client-a",
+      expiresAtMs: 25
+    }
+  ]);
 });

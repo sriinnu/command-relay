@@ -210,3 +210,60 @@ test("attach propagates capture failures and does not invoke poll error callback
   assert.equal(onErrorCalls, 0);
   assert.equal(engine.getStats().watchedPanes, 0);
 });
+
+test("getReplayOffsetsSnapshot returns empty rows before any pane attaches", () => {
+  const engine = new BridgeEngine({
+    tmux: { capturePane: async () => "" },
+    replayLines: 40,
+    pollIntervalMs: 25,
+    onOutput: () => undefined,
+    onError: () => undefined
+  });
+
+  assert.deepEqual(engine.getReplayOffsetsSnapshot(), []);
+});
+
+test("getReplayOffsetsSnapshot reports latest replay offset per watched pane", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const captureMock = createCapturePaneMock(["a", "ab", "abc", "abcd"]);
+  const engine = new BridgeEngine({
+    tmux: { capturePane: captureMock.capturePane },
+    replayLines: 40,
+    pollIntervalMs: 25,
+    maxHistoryEvents: 2,
+    onOutput: () => undefined,
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("client-a", "%1");
+  await engine.attach("client-b", "%1");
+  await engine.pollOnce();
+  await engine.pollOnce();
+  await engine.pollOnce();
+
+  assert.deepEqual(engine.getReplayOffsetsSnapshot(), [{ paneId: "%1", replayOffset: 4 }]);
+});
+
+test("getReplayOffsetsSnapshot rows are sorted by paneId", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const captureMock = createCapturePaneMock(["a", "b"]);
+  const engine = new BridgeEngine({
+    tmux: { capturePane: captureMock.capturePane },
+    replayLines: 40,
+    pollIntervalMs: 25,
+    onOutput: () => undefined,
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("client-a", "%2");
+  await engine.attach("client-a", "%1");
+
+  assert.deepEqual(engine.getReplayOffsetsSnapshot(), [
+    { paneId: "%1", replayOffset: 1 },
+    { paneId: "%2", replayOffset: 1 }
+  ]);
+});
