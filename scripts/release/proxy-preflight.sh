@@ -14,6 +14,7 @@ RUNBOOK_PATH="docs/release/proxy-publish.md"
 CHECKPOINT_FILE=""
 DRY_RUN_ARTIFACT_DIR=""
 GOVERNANCE_ARTIFACT_DIR=""
+ROOT_TAP_EVIDENCE=""
 
 print_help() {
   cat <<'EOF'
@@ -39,6 +40,8 @@ Options:
                                          (default: artifacts/<batch>-proxy-publish-dry-run)
       --governance-artifact-dir <path>   Governance artifacts directory
                                          (default: artifacts/<batch>-proxy-publish-governance)
+      --root-tap-evidence <path>         Root TAP evidence file
+                                         (default: artifacts/tap-local/root.tap)
   -h, --help                             Show this help
 
 Exit codes:
@@ -169,6 +172,11 @@ while (($# > 0)); do
       GOVERNANCE_ARTIFACT_DIR="$2"
       shift 2
       ;;
+    --root-tap-evidence)
+      require_value "$1" "${2:-}"
+      ROOT_TAP_EVIDENCE="$2"
+      shift 2
+      ;;
     -h|--help)
       print_help
       exit "$EXIT_OK"
@@ -189,6 +197,9 @@ if [[ -z "$DRY_RUN_ARTIFACT_DIR" ]]; then
 fi
 if [[ -z "$GOVERNANCE_ARTIFACT_DIR" ]]; then
   GOVERNANCE_ARTIFACT_DIR="artifacts/${BATCH_DATE}-proxy-publish-governance"
+fi
+if [[ -z "$ROOT_TAP_EVIDENCE" ]]; then
+  ROOT_TAP_EVIDENCE="artifacts/tap-local/root.tap"
 fi
 
 cd "$REPO_ROOT"
@@ -254,7 +265,7 @@ assert_non_empty_file "${GOVERNANCE_ARTIFACT_DIR}/npm-publish-environment.txt" "
 assert_non_empty_file "${GOVERNANCE_ARTIFACT_DIR}/default-branch-protection.json" "governance artifact"
 
 assert_non_empty_file "$CHECKPOINT_FILE" "dry-run checkpoint"
-assert_non_empty_file "artifacts/tap-local/root.tap" "root TAP evidence"
+assert_non_empty_file "$ROOT_TAP_EVIDENCE" "root TAP evidence"
 
 mapfile -t selected_packages < <(collect_selected_packages)
 if ((${#selected_packages[@]} == 0)); then

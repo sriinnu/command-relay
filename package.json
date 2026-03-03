@@ -13,7 +13,7 @@
     "capsule:build": "node --import tsx scripts/orchestration/build-task-capsule.ts",
     "capsule:brief": "node --import tsx scripts/orchestration/build-agent-brief.ts",
     "capsule:dispatch": "node --import tsx scripts/orchestration/build-agent-dispatch.ts",
-    "orchestration:plan-audit": "scripts/orchestration/plan-mode-audit.sh",
+    "orchestration:plan-audit": "bash scripts/orchestration/plan-mode-audit.sh",
     "discover:skills": "node --import tsx scripts/extensions/list-discoverable-skills.ts",
     "discover:skills:json": "node --import tsx scripts/extensions/list-discoverable-skills.ts --format json",
     "discover:apps": "node --import tsx scripts/extensions/list-discoverable-apps.ts",
@@ -44,8 +44,9 @@
     "bench:input": "node --import tsx scripts/perf/input-ack-roundtrip.ts",
     "bench:soak:flaky": "node --import tsx scripts/checkpoints/run-flaky-network-soak.ts",
     "release:proxy:lockstep": "node --import tsx scripts/release/check-proxy-lockstep-versions.ts",
-    "release:proxy:preflight": "scripts/release/proxy-preflight.sh",
-    "release:proxy:deterministic-validate": "scripts/release/deterministic-validate.sh",
+    "release:proxy:capture-governance": "bash scripts/release/capture-governance-evidence.sh",
+    "release:proxy:preflight": "bash scripts/release/proxy-preflight.sh",
+    "release:proxy:deterministic-validate": "bash scripts/release/deterministic-validate.sh",
     "release:proxy:guardrails": "npm run release:proxy:lockstep && npm run release:proxy:preflight --"
   },
   "dependencies": {
