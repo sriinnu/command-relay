@@ -71,8 +71,9 @@ export async function startBridgeServer(deps) {
   const appStaticRoot = resolve(config.appStaticDir ?? "apps/web");
   const httpServer = createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/health") {
+      const telemetrySnapshot = telemetry.getSafeSnapshot(clients.size);
       const payload = {
-        status: "ok",
+        status: telemetrySnapshot.status.overall,
         uptimeMs: Date.now() - startupTs,
         clients: clients.size,
         panesAttached: Array.from(clients.values()).reduce((sum, client) => sum + client.attachedPanes.size, 0),
@@ -80,7 +81,7 @@ export async function startBridgeServer(deps) {
         runtimeBackends: config.runtimeBackends,
         globalInputDisabled: config.globalInputDisabled,
         engine: engine.getStats(),
-        telemetry: telemetry.getSafeSnapshot(clients.size),
+        telemetry: telemetrySnapshot,
         timestamp: Date.now()
       };
       res.writeHead(200, { "content-type": "application/json" });

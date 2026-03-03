@@ -155,6 +155,47 @@ curl -i http://127.0.0.1:8787/does-not-exist
 Use scripts in `scripts/chitragupta` for bootstrap, health checks, and start flows.
 Operational details are maintained with the script implementations to avoid drift.
 
+Delegation readiness preflight (provider/auth/timeouts) is available via:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/delegation-preflight.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+```
+
+Smoke check (end-to-end provider execution):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/delegation-preflight.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --smoke \
+  --timeout-seconds 45
+```
+
+Expected signals:
+
+1. Pass signal: output includes `Delegation preflight: PASS` or `Delegation smoke check: PASS`.
+2. Fail signal: output starts with `Delegation preflight failed` or `Delegation smoke check failed` plus actionable fixes.
+
+Health integration (optional, backward-compatible default behavior):
+
+```bash
+scripts/chitragupta/health.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --check-delegation
+```
+
+Troubleshooting quick map:
+
+1. `provider credentials are not configured`: set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or use authenticated CLI providers.
+2. `request timed out`: raise `--timeout-seconds` and re-run smoke.
+3. `filesystem permissions blocked provider execution`: fix write access for `~/.chitragupta` in the launch environment.
+4. `no provider signal detected`: authenticate at least one CLI provider, set API keys, or start `ollama serve`.
+
 ## Distilled Capsule + Brief + Dispatch Operations
 
 Use capsule + brief + dispatch generation to reduce token cost and prevent context leakage.
@@ -212,6 +253,12 @@ npm run capsule:dispatch -- \
 ```
 
 `capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload; `capsule:dispatch` packages the brief for agent handoff.
+
+Contract + read-only audit entrypoints:
+
+1. Agent roles, ownership boundaries, and handoff structure: [orchestration/subagent-contract.md](orchestration/subagent-contract.md).
+2. Plan-mode audit wrapper: `npm run orchestration:plan-audit -- --step <n> --label "<text>" -- <read-only command...>`.
+3. Deterministic pass marker emitted by plan-mode audit: `[DONE:<n>] <label>`.
 
 ## Missing `tsx` Recovery
 
@@ -434,6 +481,48 @@ Required weekly artifact flow:
 3. Use canonical metric names exactly as specified (`cr_connect_latency_ms`, `cr_replay_lag_events`, `cr_reconnect_total`, `cr_input_ack_latency_ms`, `cr_lane_conflict_total`, `cr_kill_switch_block_total`).
 4. Record command outputs and pass signals in the command evidence file using the mapping table in the contract doc.
 5. Any missing artifact must be explicitly marked `not-run` with owner and next action in the checkpoint summary.
+
+Weekly checkpoint template format:
+
+1. Use compact sections only: `Goal`, `Constraints`, `Done`, `In Progress`, `Blocked`, `Next Steps`, `Files/Artifacts`.
+2. Keep each section concise and evidence-oriented; put long logs in artifact files and link them from `Files/Artifacts`.
+
+Generate a weekly checkpoint file:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/checkpoints/generate-weekly-checkpoint.sh --date 2026-03-06 --facilitator "Platform Lead"
+```
+
+## Deterministic Validation and Safety Gate
+
+Run deterministic validation (credentials scrubbed by default):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/release/deterministic-validate.sh
+```
+
+Additional options:
+
+1. Include build phase: `./scripts/release/deterministic-validate.sh --with-build`
+2. Skip check phase: `./scripts/release/deterministic-validate.sh --skip-check`
+3. Keep current credentials (opt-out): `./scripts/release/deterministic-validate.sh --keep-credentials`
+
+Safety gate utility:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/release/safety-gate.sh npm run ci:test
+./scripts/release/safety-gate.sh --command "rm -rf artifacts/"
+```
+
+Safety gate protections:
+
+1. Rejects `sudo`.
+2. Rejects `rm -rf` / `rm --recursive --force` variants.
+3. Rejects broad `chown`/`chmod` patterns (recursive scope and unsafe modes such as `777`, `666`, `000`).
+4. Rejects commands that reference protected paths: `.env*`, `.git/`, `node_modules/`, `artifacts/`, `scripts/checkpoints/runs/`.
 
 ## Logs
 

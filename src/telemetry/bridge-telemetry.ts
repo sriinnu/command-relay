@@ -2,6 +2,17 @@
  * @file Safe in-process telemetry collector for bridge server health snapshots.
  */
 
+import {
+  buildBridgeStatusSnapshot,
+  type BridgeStatusSnapshot
+} from "./bridge-status.js";
+
+export type {
+  BridgeStatusIssue,
+  BridgeStatusLayerSnapshot,
+  BridgeStatusSeverity
+} from "./bridge-status.js";
+
 const DEFAULT_WINDOW_SIZE = 256;
 
 /**
@@ -42,6 +53,7 @@ export interface BridgeTelemetrySnapshot {
     inputAck: LatencyMetricSnapshot;
     streamLag: LatencyMetricSnapshot;
   };
+  status: BridgeStatusSnapshot;
 }
 
 interface LatencyWindow {
@@ -161,28 +173,36 @@ export class BridgeTelemetryCollector {
    * @returns Redacted aggregate telemetry payload.
    */
   getSafeSnapshot(activeClients: number): BridgeTelemetrySnapshot {
+    const counters = {
+      connectionsOpened: this.connectionsOpened,
+      connectionsClosed: this.connectionsClosed,
+      listRequests: this.listRequests,
+      attachRequests: this.attachRequests,
+      reconnectAttaches: this.reconnectAttaches,
+      inputAcks: this.inputAcks,
+      streamLagSamples: this.streamLagSamples
+    };
+    const latenciesMs = {
+      connect: snapshotLatency(this.connect),
+      reconnect: snapshotLatency(this.reconnect),
+      list: snapshotLatency(this.list),
+      attach: snapshotLatency(this.attach),
+      inputAck: snapshotLatency(this.inputAck),
+      streamLag: snapshotLatency(this.streamLag)
+    };
     return {
       schema: "bridge.telemetry.v1",
       generatedAt: Date.now(),
       activeClients,
       windowSize: this.windowSize,
-      counters: {
-        connectionsOpened: this.connectionsOpened,
-        connectionsClosed: this.connectionsClosed,
-        listRequests: this.listRequests,
-        attachRequests: this.attachRequests,
-        reconnectAttaches: this.reconnectAttaches,
-        inputAcks: this.inputAcks,
-        streamLagSamples: this.streamLagSamples
-      },
-      latenciesMs: {
-        connect: snapshotLatency(this.connect),
-        reconnect: snapshotLatency(this.reconnect),
-        list: snapshotLatency(this.list),
-        attach: snapshotLatency(this.attach),
-        inputAck: snapshotLatency(this.inputAck),
-        streamLag: snapshotLatency(this.streamLag)
-      }
+      counters,
+      latenciesMs,
+      status: buildBridgeStatusSnapshot({
+        activeClients,
+        windowSize: this.windowSize,
+        counters,
+        latenciesMs
+      })
     };
   }
 

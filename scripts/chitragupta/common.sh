@@ -70,9 +70,47 @@ dist_entry_path() {
   echo "${chitragupta_dir}/packages/cli/dist/mcp-entry.js"
 }
 
+cli_src_entry_path() {
+  local chitragupta_dir="$1"
+  echo "${chitragupta_dir}/packages/cli/src/cli.ts"
+}
+
+cli_dist_entry_path() {
+  local chitragupta_dir="$1"
+  echo "${chitragupta_dir}/packages/cli/dist/cli.js"
+}
+
 tsx_is_available() {
   local chitragupta_dir="$1"
   pnpm --dir "${chitragupta_dir}" exec node -p "require.resolve('tsx/package.json')" >/dev/null 2>&1
+}
+
+nonempty_env_var() {
+  local name="$1"
+  local value="${!name:-}"
+  [[ -n "${value//[[:space:]]/}" ]]
+}
+
+is_numeric() {
+  local value="$1"
+  [[ "${value}" =~ ^[0-9]+$ ]]
+}
+
+validate_numeric_range() {
+  local label="$1"
+  local value="$2"
+  local min="$3"
+  local max="$4"
+
+  if ! is_numeric "${value}"; then
+    print_error "${label} must be numeric. Found: ${value}"
+    return 1
+  fi
+
+  if (( value < min || value > max )); then
+    print_error "${label} must be in range ${min}-${max}. Found: ${value}"
+    return 1
+  fi
 }
 
 show_missing_tsx_recovery() {

@@ -1,0 +1,15 @@
+{
+  "startedAtUtc": "2026-03-03T14:23:25.848Z",
+  "endedAtUtc": "2026-03-03T14:53:25.980Z",
+  "durationMinutes": 30.002,
+  "configuredDurationMinutes": 30,
+  "cycles": 1451,
+  "reconnects": 1450,
+  "outputEventsSeen": 22423,
+  "lastObservedStreamSeq": 22423,
+  "replayResumeCount": 1381,
+  "replayGapSnapshotFallbackCount": 69,
+  "maxReplayLag": 3,
+  "replayMismatchCount": 0,
+  "pass": true
+}
