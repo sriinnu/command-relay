@@ -111,6 +111,10 @@ Behavior:
 1. `list_sessions` has no required payload fields.
 2. Response `session_list` includes `payload.panes` and grouped `payload.sessions`.
 3. In multi-backend runtime mode (`tmux,cmux`), each `payload.sessions[]` row can include optional `backendId` and is grouped by `(backendId, sessionName)`.
+4. Response `session_list` includes host runtime metadata in `payload.runtime`:
+   - `source: "host"` and `generatedAt` timestamp.
+   - `capabilities` (`laneOwnership`, `replayOffset`, `inputOwnershipOverride`).
+   - `panes[]` runtime rows with host-authoritative `laneOwnerClientId` and `replayOffset`.
 
 ### 3.4 `attach` (`C->S`)
 
@@ -254,6 +258,20 @@ When client sends `attach(paneId,lastSeq)`:
 3. Invalid auth attempts are audit logged as `auth_fail` with reason metadata.
 4. Token value is not included in bridge responses.
 
+## 5.1 SSH Trust Bootstrap Semantics
+
+1. Trust controls are environment-driven:
+   - `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`
+   - `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` (optional)
+   - `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` (optional SHA256 pin)
+2. Startup preflight validates SSH command availability first (`<COMMANDRELAY_SSH_COMMAND> -V`), then validates trust-control shape before runtime backend init.
+3. With strict host key checking enabled, host key validation uses configured known_hosts file when set, otherwise SSH default known_hosts resolution.
+4. With strict host key checking disabled, runtime uses `StrictHostKeyChecking=no` and `UserKnownHostsFile=/dev/null`.
+5. `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` is only valid when strict host key checking is enabled.
+6. When expected fingerprint is configured, startup must compare the observed host key fingerprint and fail fast on mismatch/unavailability.
+7. Trust bootstrap failures occur before WebSocket protocol traffic and are surfaced as startup failures (not v1 `error` frames).
+8. Normative transport trust details: [SSH transport trust contract](./ssh-transport-contract.md#ssh-host-trust-controls).
+
 ## 6. Kill Switch Semantics
 
 1. Global switch is `COMMANDRELAY_INPUT_KILL_SWITCH` parsed at process startup.
@@ -339,6 +357,10 @@ Streaming/runtime failure stage:
 25. `transport_drop`
 26. `invalid_pane_target`
 27. `handler_failed`
+
+Startup/preflight note:
+
+1. SSH startup trust failures happen before WebSocket session establishment and are not emitted as protocol `error` events.
 
 Ownership note:
 

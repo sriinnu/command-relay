@@ -59,7 +59,9 @@ Use these env vars for SSH transport startup:
 5. `COMMANDRELAY_SSH_PORT`: SSH server port. Defaults to `22`; must be an integer between `1` and `65535` when set.
 6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`: SSH connect/runtime command timeout in seconds. Defaults to `8`; must be an integer between `1` and `60` when set.
 7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`: strict host key toggle. Defaults to `true`; accepts `1,true,yes,on,0,false,no,off`.
-8. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
+8. `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE`: optional known_hosts file override used for host key validation when strict host key checking is enabled.
+9. `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256`: optional expected remote host fingerprint in `SHA256:<base64>` format.
+10. `COMMANDRELAY_RUNTIME_BACKENDS` must be `tmux` when `COMMANDRELAY_TRANSPORT_MODE=ssh`.
 
 SSH target examples:
 
@@ -75,8 +77,14 @@ Startup preflight in `ssh` mode:
 
 1. Runs `<COMMANDRELAY_SSH_COMMAND> -V` at startup.
 2. Fails fast if `ssh` is missing/unusable or returns no version text.
-3. After preflight passes, runtime executes tmux commands on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
-4. If `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=false`, runtime sets `UserKnownHostsFile=/dev/null` so no known_hosts entries are written.
+3. Validates trust env shape before runtime starts:
+   - `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256`, when set, must be valid `SHA256:<base64>`.
+   - `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE`, when set, must resolve to a readable path.
+4. Applies trust policy:
+   - `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true`: use host key verification against known_hosts (selected file when set, SSH defaults when unset).
+   - `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=false`: use `StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null`.
+5. If `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` is set, startup compares observed host key fingerprint and fails on mismatch.
+6. After preflight passes, runtime executes tmux commands on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
 
 Copy-paste startup example (`ssh` mode):
 
@@ -89,6 +97,8 @@ COMMANDRELAY_SSH_COMMAND=ssh \
 COMMANDRELAY_SSH_PORT=22 \
 COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS=8 \
 COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true \
+COMMANDRELAY_SSH_KNOWN_HOSTS_FILE=/etc/commandrelay/known_hosts \
+COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256=SHA256:REPLACE_WITH_REMOTE_HOST_FINGERPRINT \
 COMMANDRELAY_RUNTIME_BACKENDS=tmux \
 npm run start
 ```

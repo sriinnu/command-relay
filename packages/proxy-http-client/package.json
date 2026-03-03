@@ -34,7 +34,9 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "SKILL.md",
+    "docs/assets/proxy-http-client-brand.svg"
   ],
   "publishConfig": {
     "access": "public"

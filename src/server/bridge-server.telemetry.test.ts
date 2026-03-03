@@ -6,7 +6,11 @@ import assert from "node:assert/strict";
 import { createServer as createNetServer } from "node:net";
 import test from "node:test";
 import WebSocket from "ws";
-import { BridgeTelemetryCollector, type BridgeTelemetrySnapshot } from "../telemetry/bridge-telemetry.js";
+import {
+  BridgeTelemetryCollector,
+  type BridgeStatusSeverity,
+  type BridgeTelemetrySnapshot
+} from "../telemetry/bridge-telemetry.js";
 import { startBridgeServer } from "./bridge-server.js";
 
 interface Envelope {
@@ -22,6 +26,7 @@ interface WsProbe {
 }
 
 interface HealthPayload {
+  status: BridgeStatusSeverity;
   telemetry: BridgeTelemetrySnapshot;
   transportMode: string;
   runtimeBackends: string[];
@@ -205,6 +210,12 @@ test("BridgeTelemetryCollector emits safe schema with aggregate-only data", () =
   assert.equal(snapshot.latenciesMs.connect.count, 1);
   assert.equal(snapshot.latenciesMs.reconnect.count, 1);
   assert.equal(snapshot.latenciesMs.streamLag.count, 1);
+  assert.equal(snapshot.status.schema, "bridge.status.v1");
+  assert.equal(snapshot.status.overall, "ok");
+  assert.equal(snapshot.status.layers.transport.severity, "ok");
+  assert.equal(snapshot.status.layers.replay.severity, "ok");
+  assert.equal(snapshot.status.layers.safety.severity, "ok");
+  assert.equal(snapshot.status.issues.length, 0);
   assert.equal(JSON.stringify(snapshot).includes("paneId"), false);
   assert.equal(JSON.stringify(snapshot).includes("clientId"), false);
 });
@@ -284,6 +295,14 @@ test("health endpoint publishes telemetry counters/latencies for connect/reconne
     assert.ok(health.telemetry.latenciesMs.reconnect.count >= 1);
     assert.ok(health.telemetry.latenciesMs.inputAck.count >= 1);
     assert.ok(health.telemetry.latenciesMs.streamLag.count >= 2);
+    assert.equal(health.telemetry.status.schema, "bridge.status.v1");
+    assert.equal(health.telemetry.status.layers.transport.severity, "ok");
+    assert.equal(health.telemetry.status.layers.runtime.severity, "ok");
+    assert.equal(health.telemetry.status.layers.replay.severity, "ok");
+    assert.equal(health.telemetry.status.layers.safety.severity, "ok");
+    assert.equal(health.telemetry.status.layers.observability.severity, "ok");
+    assert.equal(health.telemetry.status.overall, "ok");
+    assert.equal(health.status, health.telemetry.status.overall);
 
     const telemetryText = JSON.stringify(health.telemetry);
     assert.equal(telemetryText.includes("paneId"), false);

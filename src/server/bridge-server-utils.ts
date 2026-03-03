@@ -91,6 +91,15 @@ interface PaneInputOwnerLease {
 }
 
 /**
+ * Snapshot row describing the current lane owner for a pane.
+ */
+export interface PaneInputOwnershipSnapshotRow {
+  paneId: string;
+  ownerClientId: string;
+  expiresAtMs: number | null;
+}
+
+/**
  * Configures pane input ownership arbitration lease behavior.
  */
 export interface PaneInputOwnershipArbiterConfig {
@@ -199,6 +208,22 @@ export class PaneInputOwnershipArbiter {
     return released;
   }
 
+  /**
+   * Returns deterministic lane ownership rows for host introspection.
+   *
+   * @returns Current lane ownership rows sorted by pane id.
+   */
+  snapshot(): PaneInputOwnershipSnapshotRow[] {
+    this.expireStaleOwners();
+    return Array.from(this.paneOwners.entries())
+      .map(([paneId, ownerLease]) => ({
+        paneId,
+        ownerClientId: ownerLease.clientId,
+        expiresAtMs: ownerLease.expiresAtMs
+      }))
+      .sort((a, b) => a.paneId.localeCompare(b.paneId));
+  }
+
   private setOwner(paneId: string, clientId: string): void {
     this.paneOwners.set(paneId, {
       clientId,
@@ -219,6 +244,29 @@ export class PaneInputOwnershipArbiter {
  * Supported pane ownership state containers.
  */
 export type PaneInputOwnershipState = PaneInputOwnershipArbiter | Map<string, string> | undefined;
+
+/**
+ * Returns normalized lane ownership rows for arbiter or legacy map state.
+ *
+ * @param ownershipState Ownership state container.
+ * @returns Current lane ownership rows.
+ */
+export function snapshotPaneInputOwnership(
+  ownershipState: PaneInputOwnershipState
+): PaneInputOwnershipSnapshotRow[] {
+  if (!ownershipState) return [];
+  if (ownershipState instanceof PaneInputOwnershipArbiter) {
+    return ownershipState.snapshot();
+  }
+
+  return Array.from(ownershipState.entries())
+    .map(([paneId, ownerClientId]) => ({
+      paneId,
+      ownerClientId,
+      expiresAtMs: null
+    }))
+    .sort((a, b) => a.paneId.localeCompare(b.paneId));
+}
 
 /**
  * Claims pane ownership using either arbiter class or legacy shared map.

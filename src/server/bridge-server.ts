@@ -9,9 +9,10 @@ import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
-import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, tokenEquals } from "./bridge-server-utils.js";
+import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, snapshotPaneInputOwnership, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
 import { classifyBridgeRuntimeFailure, classifyReplaySnapshotFallbackReason } from "./bridge-runtime-failures.js";
+import { buildSessionListRuntimeMetadata } from "./session-list-runtime-metadata.js";
 /** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
 const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -33,19 +34,11 @@ export async function startBridgeServer(deps) {
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
   const telemetry = new BridgeTelemetryCollector();
   const pendingAttachLag = new Map<string, number>();
-  const inputOwnershipArbiter = new PaneInputOwnershipArbiter({
-    leaseDurationMs: config.inputLaneLeaseMs
-  });
+  const inputOwnershipArbiter = new PaneInputOwnershipArbiter({ leaseDurationMs: config.inputLaneLeaseMs });
   /** @type {Map<string, ClientState>} */
   const clients = new Map();
-  const messageLimiter = new SlidingWindowRateLimiter({
-    maxEvents: config.maxMessagesPerMinute,
-    windowMs: 60_000
-  });
-  const inputLimiter = new SlidingWindowRateLimiter({
-    maxEvents: config.maxInputsPerMinute,
-    windowMs: 60_000
-  });
+  const messageLimiter = new SlidingWindowRateLimiter({ maxEvents: config.maxMessagesPerMinute, windowMs: 60_000 });
+  const inputLimiter = new SlidingWindowRateLimiter({ maxEvents: config.maxInputsPerMinute, windowMs: 60_000 });
   const engine = new BridgeEngine({
     tmux,
     replayLines: config.replayLines,
@@ -78,8 +71,9 @@ export async function startBridgeServer(deps) {
   const appStaticRoot = resolve(config.appStaticDir ?? "apps/web");
   const httpServer = createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/health") {
+      const telemetrySnapshot = telemetry.getSafeSnapshot(clients.size);
       const payload = {
-        status: "ok",
+        status: telemetrySnapshot.status.overall,
         uptimeMs: Date.now() - startupTs,
         clients: clients.size,
         panesAttached: Array.from(clients.values()).reduce((sum, client) => sum + client.attachedPanes.size, 0),
@@ -87,7 +81,7 @@ export async function startBridgeServer(deps) {
         runtimeBackends: config.runtimeBackends,
         globalInputDisabled: config.globalInputDisabled,
         engine: engine.getStats(),
-        telemetry: telemetry.getSafeSnapshot(clients.size),
+        telemetry: telemetrySnapshot,
         timestamp: Date.now()
       };
       res.writeHead(200, { "content-type": "application/json" });
@@ -135,10 +129,7 @@ export async function startBridgeServer(deps) {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
   });
-  const wsServer = new WebSocketServer({
-    noServer: true,
-    maxPayload: 256 * 1024
-  });
+  const wsServer = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
   httpServer.on("upgrade", (req, socket, head) => {
     if (req.url !== "/ws") {
       socket.destroy();
@@ -318,8 +309,18 @@ export async function handleClientMessage(ctx) {
     case "list_sessions": {
       const panes = await tmux.listPanes();
       const sessions = groupSessionsByName(panes);
+      const runtime = buildSessionListRuntimeMetadata({
+        panes,
+        capabilities: {
+          laneOwnership: Boolean(paneInputOwnerState),
+          replayOffset: true,
+          inputOwnershipOverride: laneOverrideAllowed
+        },
+        laneOwnershipSnapshot: snapshotPaneInputOwnership(paneInputOwnerState),
+        replayOffsetSnapshot: engine.getReplayOffsetsSnapshot()
+      });
       telemetry?.recordListLatency(Date.now() - startedAtMs);
-      send(client.socket, envelope("session_list", { panes, sessions }, requestId));
+      send(client.socket, envelope("session_list", { panes, sessions, runtime }, requestId));
       return;
     }
     case "attach": {

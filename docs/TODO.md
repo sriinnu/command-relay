@@ -1,6 +1,6 @@
 # CommandRelay Execution TODO (SSH-First + Proxy Hardening)
 
-Last reviewed: 2026-02-27
+Last reviewed: 2026-03-03
 Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by host.
 
 ## Vision Reset (SSH-First)
@@ -22,10 +22,10 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### A1) Transport
 
-- [ ] Finalize SSH transport contract for connect/auth/list/attach/replay/input/ack/error with explicit reconnect semantics.
-- [ ] Specify host identity + trust model (host key verification mode, fingerprint surfacing, rotation handling).
-- [ ] Lock protocol compatibility matrix for SSH transport and existing WebSocket transport.
-- [ ] Add transport conformance tests covering:
+- [x] Finalize SSH transport contract for connect/auth/list/attach/replay/input/ack/error with explicit reconnect semantics. Status: `done` ([SSH transport contract](./ssh-transport-contract.md), [protocol references](./protocol-v1.md#11-contract-compatibility-test-plan-references), [contract matrix tests](../src/server/ws-contract-matrix.test.ts)).
+- [x] Specify host identity + trust model (host key verification mode, fingerprint surfacing, rotation handling). Status: `done` ([SSH trust controls contract](./ssh-transport-contract.md#ssh-host-trust-controls), [strict/fingerprint interplay](./ssh-transport-contract.md#strict-host-key--fingerprint-interplay), [SSH env startup guide](./getting-started.md#ssh-transport-environment), [operations trust runbook](./operations.md#ssh-transport-startup-env-contract), [runtime strict-host-key args](../src/runtime/ssh-tmux-adapter.ts), [startup env parsing tests](../src/server/startup-validation.test.ts)).
+- [x] Lock protocol compatibility matrix for SSH transport and existing WebSocket transport. Status: `done` ([contract matrix tests](../src/server/ws-contract-matrix.test.ts), [operation matrix](./ssh-transport-contract.md#operation-contract-matrix)).
+- [x] Add transport conformance tests covering: Status: `done` ([replay e2e](../src/server/bridge-server.replay.e2e.test.ts), [policy conflict/takeover coverage](../src/server/bridge-server.policy.test.ts), [active-lane kill-switch conformance](../src/server/bridge-server.policy.active-lane-kill-switch.test.ts)).
   - happy path attach + replay resume
   - reconnect with `lastSeq`
   - lane conflict + explicit takeover
@@ -33,7 +33,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### A2) Runtime (Host-State Ownership)
 
-- [ ] Make host runtime authoritative for session metadata, lane owner, replay offsets, and capability flags.
+- [x] Make host runtime authoritative for session metadata, lane owner, replay offsets, and capability flags. Status: `done` ([session-list runtime metadata builder](../src/server/session-list-runtime-metadata.ts), [bridge list_sessions host-state wiring](../src/server/bridge-server.ts), [lane ownership snapshots](../src/server/bridge-server-utils.ts), [replay offset snapshots](../src/bridge/bridge-engine.ts), [runtime metadata e2e](../src/server/bridge-server.runtime-metadata.e2e.test.ts)).
 - [x] Validate tmux fixture harness for deterministic replay and multi-pane ordering. Status: `done` ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture evidence runner](../scripts/tmux-fixtures/run-fixture-evidence.ts), [2026-02-27 fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md)).
 - [x] Add startup validation profile for remote host environments (Node runtime, tmux availability, permissions, env policy). Status: `done` ([startup profile checks](../src/startup/startup-profile.ts), [startup profile tests](../src/startup/startup-profile.test.ts), [remote runtime validator script](../scripts/ssh/validate-remote-runtime.sh), [runtime validator runbook](./operations.md#ssh-runtime-validator-reference), [validation checkpoint command evidence](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md#command-evidence)).
 - [x] Ensure runtime failure modes are explicit and recoverable (auth reject, transport drop, tmux session loss, stale lane owner). Status: `done` ([runtime failure classifier](../src/server/bridge-runtime-failures.ts), [bridge handler wiring](../src/server/bridge-server.ts), [bridge attach failure propagation](../src/bridge/bridge-engine.ts), [failure-mode e2e tests](../src/server/bridge-server.failure-modes.e2e.test.ts), [classifier unit tests](../src/server/bridge-runtime-failures.test.ts)).
@@ -68,11 +68,12 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Replay resume/fallback behavior is implemented and currently test-covered ([bridge replay unit](../src/bridge/bridge-engine.replay.test.ts), [bridge replay e2e](../src/server/bridge-server.replay.e2e.test.ts)).
 - [x] Dedicated replay audit actions `replay_resume` and `replay_gap_snapshot_fallback` are emitted from attach flow and asserted in replay e2e coverage ([audit contract](./controlled-input-audit.md), [attach audit writes](../src/server/bridge-server.ts), [replay audit assertions](../src/server/bridge-server.replay.e2e.test.ts)).
 - [x] Set minimum evidence pack for weekly checkpoint artifacts ([minimum artifact set](./observability-evidence-contract.md#minimum-weekly-evidence-pack-v1), [command-to-evidence mapping](./observability-evidence-contract.md#command-to-evidence-mapping-v1), [operations weekly flow](./operations.md#weekly-observability-baseline-and-evidence-pack)).
+- [x] Publish layered telemetry status in `/health` (transport/runtime/replay/safety/observability severity + issue list). Status: `done` ([status derivation module](../src/telemetry/bridge-status.ts), [telemetry snapshot collector](../src/telemetry/bridge-telemetry.ts), [/health integration](../src/server/bridge-server.ts), [telemetry health tests](../src/server/bridge-server.telemetry.test.ts)).
 
 ### A6) Release Criteria (Track A)
 
 - [ ] 7-day stability window with no Sev-1 SSH transport regressions in checkpoint evidence.
-- [ ] 30-minute flaky-network stream test passes with replay correctness.
+- [x] 30-minute flaky-network stream test passes with replay correctness. Status: `done` ([soak runner](../scripts/checkpoints/run-flaky-network-soak.ts), [30-minute soak summary](../scripts/checkpoints/runs/2026-03-03-flaky-network-soak-summary.json), [A6 evidence checkpoint](../scripts/checkpoints/runs/2026-03-03-a6-flaky-network-soak-and-live-bench.md)).
 - [ ] Controlled input remains opt-in on every reconnect path.
 - [ ] Full parity checklist is green across active clients.
 - [ ] On-call incident/runbook document is complete and reviewed.
@@ -94,7 +95,8 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Complete docs pack per package: README usage matrix, NOTES, migration/compat notes, troubleshooting. Status: `done` ([coverage matrix](./proxy/package-docs-matrix.md)); evidence confirms all six packages now satisfy this set.
 - [x] Add runnable examples with expected output snapshots. Status: `done` ([coverage matrix](./proxy/package-docs-matrix.md)); evidence confirms all six packages now include runnable examples plus expected snapshot artifacts.
 - [x] Ensure CI gates are explicit and reproducible (`check`, `build`, `test`) at root and per package ([root scripts](../package.json), [cli-proxy scripts](../packages/cli-proxy/package.json), [proxy-core scripts](../packages/proxy-core/package.json), [proxy-agent scripts](../packages/proxy-agent/package.json), [proxy-fetch scripts](../packages/proxy-fetch/package.json), [proxy-http-client scripts](../packages/proxy-http-client/package.json), [proxy-undici scripts](../packages/proxy-undici/package.json)).
-- [ ] Confirm publish workflow dry-run path with selector and dist-tag policy. Status: `partial` ([workflow dispatch + selector/dist-tag logic](../.github/workflows/publish-proxy-packages.yml), [release runbook](./release/proxy-publish.md), [2026-02-27 local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md)); remaining gaps: rerun dry-run in an unblocked environment and archive successful `npm pack/publish --dry-run` artifacts.
+- [x] Confirm local publish dry-run path with selector and dist-tag policy. Status: `done` ([workflow dispatch + selector/dist-tag logic](../.github/workflows/publish-proxy-packages.yml), [release runbook](./release/proxy-publish.md), [2026-03-03 local dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [dry-run artifacts](../artifacts/2026-03-03-proxy-publish-dry-run)); GitHub Actions dry-run remains a separate pending governance/release step.
+- [x] Add release guardrail scripts for proxy lockstep/version evidence preflight (`release:proxy:lockstep`, `release:proxy:preflight`, `release:proxy:guardrails`) and document expected pass/fail outputs ([root scripts](../package.json), [preflight script](../scripts/release/proxy-preflight.sh), [lockstep script](../scripts/release/check-proxy-lockstep-versions.ts), [release runbook](./release/proxy-publish.md#release-guardrails-commands)).
 - [ ] Validate npm publish governance (`NPM_TOKEN`, `npm-publish` environment reviewers, branch protections). Status: `partial` ([workflow token/env guards](../.github/workflows/publish-proxy-packages.yml), [governance checklist](./release/proxy-publish.md#required-github-configuration)); remaining gaps: repository-level verification of secret presence, environment reviewers, and branch protection settings is not evidenced in-repo yet.
 
 ### B3) Parallel Ecosystem Wave
@@ -112,6 +114,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### B4) Release Criteria (Track B)
 
+- [ ] Gate 0: `npm run release:proxy:guardrails -- --batch-date <YYYY-MM-DD> --package-selector <current-batch-selector>` is green with evidence files present.
 - [ ] Gate 1: version and changelog readiness confirmed for all release candidates.
 - [ ] Gate 2: `check/build/test` green on designated Mac validation environment.
 - [ ] Gate 3: publish dry-run green with expected selector + dist-tag.
@@ -146,7 +149,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - Acceptance criteria:
   - [x] Audit log records are emitted for enable/disable/input/takeover flows, and `input` records include command metadata policy fields (`commandHash`, `previewPolicy`) ([runtime audit writes](../src/server/bridge-server.ts), [e2e audit flow assertions](../src/server/bridge-server.e2e.test.ts), [policy audit assertions](../src/server/bridge-server.policy.test.ts)).
   - [x] Replay ordering suite passes under fixture harness without manual intervention ([tmux fixture harness runbook](../scripts/tmux-fixtures/README.md), [fixture harness evidence run](../scripts/checkpoints/runs/2026-02-27-a2-tmux-fixture-harness-evidence.md), [CR-P1-002 weekly evidence lane checkpoint](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md)).
-  - [ ] Dry-run artifacts contain selected package set, dist-tag, and no publish-policy blockers. Status: `partial` ([2026-02-27 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md), [CR-P1-002 weekly evidence lane checkpoint](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md)); remaining gaps: selected package set + dist-tag evidence exists, but `npm pack/publish --dry-run` remains blocked by local npm cache `EACCES`.
+- [x] Dry-run artifacts contain selected package set, dist-tag, and no publish-policy blockers. Status: `done` ([2026-03-03 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [pack dry-run artifacts](../artifacts/2026-03-03-proxy-publish-dry-run), [A6/soak + command evidence](../scripts/checkpoints/runs/2026-03-03-a6-flaky-network-soak-and-live-bench.md)).
 
 ### Milestone W3 (2026-03-16 to 2026-03-22)
 
@@ -188,7 +191,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 
 ### P1 (This week)
 
-- Latest checkpoint evidence: [2026-02-27-cr-p1-002-weekly-evidence-lane.md](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md), [2026-02-27-feat-ssh-exploration-validation-checkpoint.md](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
+- Latest checkpoint evidence: [2026-03-03-proxy-publish-dry-run.md](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [2026-03-03-a6-flaky-network-soak-and-live-bench.md](../scripts/checkpoints/runs/2026-03-03-a6-flaky-network-soak-and-live-bench.md), [2026-02-27-cr-p1-002-weekly-evidence-lane.md](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md), [2026-02-27-feat-ssh-exploration-validation-checkpoint.md](../scripts/checkpoints/runs/2026-02-27-feat-ssh-exploration-validation-checkpoint.md)
 
 - [x] Run and archive core validation suites:
   - `npm run check`
@@ -198,7 +201,7 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
   - `node --import tsx --test src/control-plane/control-plane-client.test.ts src/net/proxy-agent-factory.test.ts src/net/proxy-router.test.ts`
 - [x] Validate replay resume/fallback behavior and current audit coverage for this branch (`node --import tsx --test src/bridge/bridge-engine.replay.test.ts src/server/bridge-server.replay.e2e.test.ts src/server/bridge-server.audit.test.ts`).
 - [x] Update weekly checkpoint artifact and mirror milestone decisions into roadmap docs. Status: `done` for the docs evidence lane on 2026-02-27; tracked milestone outcomes remain `partial` where execution blockers persist ([CR-P1-002 weekly evidence lane checkpoint](../scripts/checkpoints/runs/2026-02-27-cr-p1-002-weekly-evidence-lane.md), [proxy roadmap decision mirror](./proxy-ecosystem-roadmap.md#milestone-decision-mirror-2026-02-27-cr-p1-002)).
-- [x] Run publish dry-run for `@commandrelay/proxy-*` and capture artifact links ([proxy publish checkpoint](../scripts/checkpoints/runs/2026-02-27-proxy-publish-dry-run.md); local dry-run blocked by npm cache `EACCES`, blocker documented in [release runbook](./release/proxy-publish.md)).
+- [x] Run publish dry-run for `@commandrelay/proxy-*` and capture artifact links ([proxy publish checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [artifact logs](../artifacts/2026-03-03-proxy-publish-dry-run)).
 
 ### P2 (Next 2 weeks)
 
@@ -216,6 +219,9 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - [x] Controlled-input runtime baseline is implemented and test-covered.
 - [x] iOS controlled-input baseline exists with safety gate wiring.
 - [x] Weekly checkpoint workflow script/template exists.
+- [x] Deterministic validation wrapper exists for reproducible `check/test` runs with default credential scrubbing ([deterministic validator](../scripts/release/deterministic-validate.sh)).
+- [x] Command safety gate exists for high-risk command/pathed-asset blocking ([safety gate](../scripts/release/safety-gate.sh)).
+- [x] Weekly checkpoint template uses compact section contract (`Goal`, `Constraints`, `Done`, `In Progress`, `Blocked`, `Next Steps`, `Files/Artifacts`) ([template](../scripts/checkpoints/templates/weekly-cross-platform-checkpoint.md)).
 - [x] Distilled capsule build/brief/dispatch wiring is documented.
 
 ### Open Dependencies and Risks
@@ -238,3 +244,5 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 - `docs/release/proxy-publish.md`
 - `scripts/checkpoints/generate-weekly-checkpoint.sh`
 - `scripts/checkpoints/templates/weekly-cross-platform-checkpoint.md`
+- `scripts/release/deterministic-validate.sh`
+- `scripts/release/safety-gate.sh`

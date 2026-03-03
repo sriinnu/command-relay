@@ -22,9 +22,23 @@ interface RunCommandMockCall {
   timeoutMs: number;
 }
 
+interface RunCommandWithInputMockCall {
+  command: string;
+  args: string[];
+  input: string;
+  timeoutMs: number;
+}
+
 interface RunCommandMock {
   calls: RunCommandMockCall[];
+  withInputCalls: RunCommandWithInputMockCall[];
   runCommandImpl: (command: string, args: string[], timeoutMs?: number) => Promise<string>;
+  runCommandWithInputImpl: (
+    command: string,
+    args: string[],
+    input: string,
+    timeoutMs?: number
+  ) => Promise<string>;
 }
 
 /**
@@ -33,17 +47,39 @@ interface RunCommandMock {
  * @param outcomes Ordered command outcomes.
  * @returns Mock command runner and call log.
  */
-function createRunCommandMock(outcomes: Array<{ stdout?: string; error?: unknown }>): RunCommandMock {
+function createRunCommandMock(
+  outcomes: Array<{ stdout?: string; error?: unknown }>,
+  withInputOutcomes: Array<{ stdout?: string; error?: unknown }> = []
+): RunCommandMock {
   const queue = [...outcomes];
   const calls: RunCommandMockCall[] = [];
+  const withInputQueue = [...withInputOutcomes];
+  const withInputCalls: RunCommandWithInputMockCall[] = [];
 
   return {
     calls,
+    withInputCalls,
     async runCommandImpl(command: string, args: string[], timeoutMs = 5000): Promise<string> {
       calls.push({ command, args, timeoutMs });
       const next = queue.shift();
       if (!next) {
         throw new Error("runCommand called with no queued outcome");
+      }
+      if (next.error) {
+        throw next.error;
+      }
+      return next.stdout ?? "";
+    },
+    async runCommandWithInputImpl(
+      command: string,
+      args: string[],
+      input: string,
+      timeoutMs = 5000
+    ): Promise<string> {
+      withInputCalls.push({ command, args, input, timeoutMs });
+      const next = withInputQueue.shift();
+      if (!next) {
+        throw new Error("runCommandWithInput called with no queued outcome");
       }
       if (next.error) {
         throw next.error;
@@ -148,6 +184,88 @@ test("isAvailable adds UserKnownHostsFile override when strict host key checking
 
   assert.equal(mock.calls[0].args.includes("StrictHostKeyChecking=no"), true);
   assert.equal(mock.calls[0].args.includes("UserKnownHostsFile=/dev/null"), true);
+});
+
+test("knownHostsFile override is honored when strict host key checking is disabled", async () => {
+  const mock = createRunCommandMock([{ stdout: "tmux 3.4" }]);
+  const adapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    strictHostKeyChecking: false,
+    knownHostsFile: "/tmp/known_hosts",
+    runCommandImpl: mock.runCommandImpl
+  });
+
+  await adapter.isAvailable();
+
+  assert.equal(mock.calls[0].args.includes("StrictHostKeyChecking=no"), true);
+  assert.equal(mock.calls[0].args.includes("UserKnownHostsFile=/tmp/known_hosts"), true);
+  assert.equal(mock.calls[0].args.includes("UserKnownHostsFile=/dev/null"), false);
+});
+
+test("isAvailable verifies expected host fingerprint before tmux ssh command", async () => {
+  const keyscanOutput = "host.example ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBASEKEY";
+  const mock = createRunCommandMock(
+    [{ stdout: keyscanOutput }, { stdout: "tmux 3.4" }],
+    [{ stdout: "256 SHA256:matchFp123 host.example (ED25519)" }]
+  );
+  const adapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    sshPort: 2201,
+    expectedFingerprintSha256: "SHA256:matchFp123",
+    runCommandImpl: mock.runCommandImpl,
+    runCommandWithInputImpl: mock.runCommandWithInputImpl
+  });
+
+  assert.equal(await adapter.isAvailable(), true);
+  assert.deepEqual(mock.calls[0], {
+    command: "ssh-keyscan",
+    args: ["-T", "8", "-p", "2201", "host.example"],
+    timeoutMs: 6000
+  });
+  assert.deepEqual(mock.withInputCalls[0], {
+    command: "ssh-keygen",
+    args: ["-lf", "-"],
+    input: keyscanOutput,
+    timeoutMs: 6000
+  });
+  assert.equal(mock.calls[1].command, "ssh");
+});
+
+test("capturePane fails closed on expected fingerprint mismatch", async () => {
+  const mock = createRunCommandMock(
+    [{ stdout: "host.example ssh-ed25519 AAAAC3NzaMismatch" }],
+    [{ stdout: "256 SHA256:wrongFp123 host.example (ED25519)" }]
+  );
+  const adapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    expectedFingerprintSha256: "SHA256:expectedFp123",
+    runCommandImpl: mock.runCommandImpl,
+    runCommandWithInputImpl: mock.runCommandWithInputImpl
+  });
+
+  await assert.rejects(async () => adapter.capturePane("%1", 10), /SSH host fingerprint mismatch/);
+  assert.equal(mock.calls.length, 1);
+  assert.equal(mock.calls[0].command, "ssh-keyscan");
+});
+
+test("capturePane fails closed when fingerprint cannot be resolved", async () => {
+  const mock = createRunCommandMock(
+    [{ stdout: "host.example ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ..." }],
+    [{ stdout: "malformed fingerprint output" }]
+  );
+  const adapter = new SshTmuxAdapter({
+    sshTarget: "dev@host.example",
+    expectedFingerprintSha256: "SHA256:expected-fp",
+    runCommandImpl: mock.runCommandImpl,
+    runCommandWithInputImpl: mock.runCommandWithInputImpl
+  });
+
+  await assert.rejects(
+    async () => adapter.capturePane("%1", 10),
+    /did not contain SHA256 fingerprints/
+  );
+  assert.equal(mock.calls.length, 1);
+  assert.equal(mock.calls[0].command, "ssh-keyscan");
 });
 
 test("listPanes parses tmux rows and uses escaped format argument", async () => {
@@ -305,7 +423,7 @@ test("sendInput preserves newlines and safely escapes literal segments", async (
   ]);
 });
 
-test("constructor validates required target, optional port, and connect timeout", async () => {
+test("constructor validates required target, optional port, and connect timeout", () => {
   assert.throws(() => new SshTmuxAdapter({ sshTarget: "   " }), /sshTarget must be a non-empty string/);
   assert.throws(
     () => new SshTmuxAdapter({ sshTarget: "dev@host", sshPort: 0 }),

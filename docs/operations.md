@@ -42,10 +42,13 @@ SSH transport startup env contract:
 5. `COMMANDRELAY_SSH_PORT` defaults to `22`; when set, it must be an integer in range `1..65535`.
 6. `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS` sets SSH connect/runtime command timeout in seconds; default is `8`, valid range is `1..60`.
 7. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` defaults to `true` and accepts `1,true,yes,on,0,false,no,off`.
-8. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
-9. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
-10. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
-11. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
+8. `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` optionally selects the known_hosts file used for host key checks in strict mode.
+9. `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` optionally pins host trust to one fingerprint (`SHA256:<base64>`).
+10. Startup preflight for `ssh` mode runs `<COMMANDRELAY_SSH_COMMAND> -V` and requires a version string; missing/unusable SSH command fails startup.
+11. Startup preflight validates trust controls and fails fast for malformed fingerprint values or unreadable known_hosts file paths.
+12. After preflight, `ssh` mode executes tmux runtime operations on the remote SSH target in non-interactive mode (`-T`, `BatchMode=yes`).
+13. When strict host key checking is disabled, runtime suppresses known_hosts writes (`UserKnownHostsFile=/dev/null`).
+14. `ssh` mode requires `COMMANDRELAY_RUNTIME_BACKENDS=tmux`.
 
 Format examples:
 
@@ -53,6 +56,14 @@ Format examples:
 2. Invalid SSH targets: `relay target`, `relay@@example`, `ops@`.
 3. Valid SSH profiles: `primary`, `primary.ops-1_2`.
 4. Invalid SSH profiles: `primary/profile`, `   `.
+
+SSH trust model interplay and failure actions:
+
+1. `strict=true` + no expected fingerprint: host trust comes from known_hosts verification (`COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` when set, SSH defaults when unset).
+2. `strict=true` + expected fingerprint: both host key verification and fingerprint match must pass.
+3. `strict=false` + no expected fingerprint: use only in controlled diagnostics; host identity is not strongly verified.
+4. `strict=false` + expected fingerprint: invalid configuration; startup rejects because fingerprint pinning requires strict host key checking.
+5. Treat `known_hosts_unreadable`, `host_key_verification_failed`, `expected_fingerprint_mismatch`, and `expected_fingerprint_unavailable` as fail-fast startup errors requiring operator intervention.
 
 ## SSH-First Tunnel Runbook
 
@@ -115,6 +126,7 @@ curl -i http://127.0.0.1:8787/does-not-exist
 3. Rotate tokens by updating env and restarting the bridge process.
 4. Keep token values out of shell history and operator notes; audit logs store auth outcomes, not submitted token values.
 5. SSH runtime hardening is always non-interactive (`-T`, `BatchMode=yes`); if strict host key checking is off, known_hosts writes are suppressed (`UserKnownHostsFile=/dev/null`).
+6. For production, keep `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true` and pin `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` when host-key rotation process is documented.
 
 ## Multi-Tab Safe Writer Operations
 
@@ -142,6 +154,47 @@ curl -i http://127.0.0.1:8787/does-not-exist
 
 Use scripts in `scripts/chitragupta` for bootstrap, health checks, and start flows.
 Operational details are maintained with the script implementations to avoid drift.
+
+Delegation readiness preflight (provider/auth/timeouts) is available via:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/delegation-preflight.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+```
+
+Smoke check (end-to-end provider execution):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+scripts/chitragupta/delegation-preflight.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --smoke \
+  --timeout-seconds 45
+```
+
+Expected signals:
+
+1. Pass signal: output includes `Delegation preflight: PASS` or `Delegation smoke check: PASS`.
+2. Fail signal: output starts with `Delegation preflight failed` or `Delegation smoke check failed` plus actionable fixes.
+
+Health integration (optional, backward-compatible default behavior):
+
+```bash
+scripts/chitragupta/health.sh \
+  --chitragupta-dir /mnt/c/sriinnu/personal/Kaala-brahma/AUriva/chitragupta \
+  --project /mnt/c/sriinnu/personal/Kaala-brahma/terminal \
+  --check-delegation
+```
+
+Troubleshooting quick map:
+
+1. `provider credentials are not configured`: set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`, or use authenticated CLI providers.
+2. `request timed out`: raise `--timeout-seconds` and re-run smoke.
+3. `filesystem permissions blocked provider execution`: fix write access for `~/.chitragupta` in the launch environment.
+4. `no provider signal detected`: authenticate at least one CLI provider, set API keys, or start `ollama serve`.
 
 ## Distilled Capsule + Brief + Dispatch Operations
 
@@ -200,6 +253,12 @@ npm run capsule:dispatch -- \
 ```
 
 `capsule:build` produces the constrained JSON capsule; `capsule:brief` converts that capsule into the orchestration brief payload; `capsule:dispatch` packages the brief for agent handoff.
+
+Contract + read-only audit entrypoints:
+
+1. Agent roles, ownership boundaries, and handoff structure: [orchestration/subagent-contract.md](orchestration/subagent-contract.md).
+2. Plan-mode audit wrapper: `npm run orchestration:plan-audit -- --step <n> --label "<text>" -- <read-only command...>`.
+3. Deterministic pass marker emitted by plan-mode audit: `[DONE:<n>] <label>`.
 
 ## Missing `tsx` Recovery
 
@@ -422,6 +481,48 @@ Required weekly artifact flow:
 3. Use canonical metric names exactly as specified (`cr_connect_latency_ms`, `cr_replay_lag_events`, `cr_reconnect_total`, `cr_input_ack_latency_ms`, `cr_lane_conflict_total`, `cr_kill_switch_block_total`).
 4. Record command outputs and pass signals in the command evidence file using the mapping table in the contract doc.
 5. Any missing artifact must be explicitly marked `not-run` with owner and next action in the checkpoint summary.
+
+Weekly checkpoint template format:
+
+1. Use compact sections only: `Goal`, `Constraints`, `Done`, `In Progress`, `Blocked`, `Next Steps`, `Files/Artifacts`.
+2. Keep each section concise and evidence-oriented; put long logs in artifact files and link them from `Files/Artifacts`.
+
+Generate a weekly checkpoint file:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/checkpoints/generate-weekly-checkpoint.sh --date 2026-03-06 --facilitator "Platform Lead"
+```
+
+## Deterministic Validation and Safety Gate
+
+Run deterministic validation (credentials scrubbed by default):
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/release/deterministic-validate.sh
+```
+
+Additional options:
+
+1. Include build phase: `./scripts/release/deterministic-validate.sh --with-build`
+2. Skip check phase: `./scripts/release/deterministic-validate.sh --skip-check`
+3. Keep current credentials (opt-out): `./scripts/release/deterministic-validate.sh --keep-credentials`
+
+Safety gate utility:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/release/safety-gate.sh npm run ci:test
+./scripts/release/safety-gate.sh --command "rm -rf artifacts/"
+```
+
+Safety gate protections:
+
+1. Rejects `sudo`.
+2. Rejects `rm -rf` / `rm --recursive --force` variants.
+3. Rejects broad `chown`/`chmod` patterns (recursive scope and unsafe modes such as `777`, `666`, `000`).
+4. Rejects commands that reference protected paths: `.env*`, `.git/`, `node_modules/`, `artifacts/`, `scripts/checkpoints/runs/`.
 
 ## Logs
 

@@ -4,15 +4,19 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { BridgeConfig } from "../config.js";
 import { TmuxAdapter } from "../tmux/tmux-adapter.js";
 import {
   checkRuntimeBackendAvailability,
   createTmuxRuntimeAdapter,
   logRuntimeBackendAvailability,
+  resolveStartupTransportConfig,
   type StartupTransportConfig
 } from "./runtime-adapter-factory.js";
 import { SshTmuxAdapter } from "./ssh-tmux-adapter.js";
 import type { RuntimeBackend } from "./runtime-backend.js";
+
+const SAMPLE_FINGERPRINT_SHA256 = "SHA256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU";
 
 const BASE_TRANSPORT_CONFIG: StartupTransportConfig = {
   mode: "ws",
@@ -21,7 +25,9 @@ const BASE_TRANSPORT_CONFIG: StartupTransportConfig = {
   sshPort: 22,
   sshCommand: "ssh",
   sshConnectTimeoutSeconds: 8,
-  sshStrictHostKeyChecking: true
+  sshStrictHostKeyChecking: true,
+  sshKnownHostsFile: null,
+  sshExpectedFingerprintSha256: null
 };
 
 interface ConsolePatchResult {
@@ -110,6 +116,53 @@ test("createTmuxRuntimeAdapter selects ssh tmux adapter for ssh transport", () =
   });
 
   assert.equal(adapter instanceof SshTmuxAdapter, true);
+});
+
+test("createTmuxRuntimeAdapter passes host trust settings to ssh tmux adapter", () => {
+  const adapter = createTmuxRuntimeAdapter({
+    ...BASE_TRANSPORT_CONFIG,
+    mode: "ssh",
+    sshTarget: "dev@host.example",
+    sshKnownHostsFile: "/tmp/known_hosts",
+    sshExpectedFingerprintSha256: SAMPLE_FINGERPRINT_SHA256
+  });
+
+  const internals = adapter as unknown as {
+    knownHostsFile: string | null;
+    expectedFingerprintSha256: string | null;
+  };
+
+  assert.equal(adapter instanceof SshTmuxAdapter, true);
+  assert.equal(internals.knownHostsFile, "/tmp/known_hosts");
+  assert.equal(internals.expectedFingerprintSha256, SAMPLE_FINGERPRINT_SHA256);
+});
+
+test("resolveStartupTransportConfig includes optional host trust fields", () => {
+  const config = {
+    transportMode: "ssh",
+    sshProfileName: "primary",
+    sshTarget: "dev@host.example",
+    sshPort: 2222,
+    sshCommand: "ssh-custom",
+    sshConnectTimeoutSeconds: 12,
+    sshStrictHostKeyChecking: false,
+    sshKnownHostsFile: " /tmp/known_hosts ",
+    sshExpectedFingerprintSha256: ` ${SAMPLE_FINGERPRINT_SHA256} `
+  } as BridgeConfig;
+
+  const transport = resolveStartupTransportConfig(config);
+
+  assert.deepEqual(transport, {
+    mode: "ssh",
+    sshProfile: "primary",
+    sshTarget: "dev@host.example",
+    sshPort: 2222,
+    sshCommand: "ssh-custom",
+    sshConnectTimeoutSeconds: 12,
+    sshStrictHostKeyChecking: false,
+    sshKnownHostsFile: "/tmp/known_hosts",
+    sshExpectedFingerprintSha256: SAMPLE_FINGERPRINT_SHA256
+  });
 });
 
 test("createTmuxRuntimeAdapter requires ssh target in ssh transport mode", () => {

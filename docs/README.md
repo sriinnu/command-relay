@@ -13,6 +13,7 @@ This folder contains project documentation for users, contributors, and operator
 4. Redact secrets from all capsules/prompts/logs (tokens, keys, credentials, raw `.env` values).
 5. Scope work by owned files only to avoid overlap and accidental leakage.
 6. Command examples for `capsule:build`, `capsule:brief`, and `capsule:dispatch` live in [operations.md](operations.md).
+7. Read-only audit mode: `npm run orchestration:plan-audit -- --step <n> --label "<text>" -- <read-only command...>` with role rules in [orchestration/subagent-contract.md](orchestration/subagent-contract.md).
 
 ## Runtime Snapshot
 
@@ -30,7 +31,7 @@ Local MCP note:
 2. Contributor: read [Architecture](architecture.md), then [Protocol](protocol.md).
 3. Operator: read [Operations](operations.md) and [Security](security.md).
 4. Mobile builder: read [Getting Started](getting-started.md) for `M0ProtocolMockClient`, then [iOS Swift Architecture](ios-swift-architecture.md) and [Android Architecture](android-architecture.md).
-5. Planner: read [Native Roadmap](roadmap-native.md) and [Execution TODO](TODO.md).
+5. Planner: read [Native Roadmap](roadmap-native.md), [Execution TODO](TODO.md), and [Subagent Contract](orchestration/subagent-contract.md).
 6. Release owner: read [Proxy Publish Runbook](release/proxy-publish.md) and capture outputs in weekly checkpoints.
 
 ## Quickstart References
@@ -39,6 +40,18 @@ Local MCP note:
 2. [operations.md](operations.md): operator runbook and runtime behavior details.
 3. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_COMMAND`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
 4. Tunnel helper runbook: [../scripts/ssh/README.md](../scripts/ssh/README.md).
+
+## Discoverability + Extension CLI
+
+1. List discoverable skills (table): `npm run discover:skills`.
+2. List discoverable skills (JSON): `npm run discover:skills:json`.
+3. List discoverable apps/extensions (table): `npm run discover:apps`.
+4. List discoverable apps/extensions (JSON): `npm run discover:apps:json`.
+5. List allowlisted extension actions: `npm run extension:run -- --list`.
+6. Execute an extension action: `npm run extension:run -- <extension-id> <action> [-- <args...>]`.
+7. Example package action: `npm run extension:run -- proxy-core check`.
+8. Example app metadata call: `npm run extension:run -- web info`.
+9. Example app runtime preview: `npm run extension:run -- web preview -- --port 4173`.
 
 ## Current Execution Baselines
 
@@ -73,3 +86,4 @@ Local MCP note:
 17. [ssh-transport-contract.md](ssh-transport-contract.md)
 18. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
 19. [architecture/host-state-authority-plan.md](architecture/host-state-authority-plan.md)
+20. [orchestration/subagent-contract.md](orchestration/subagent-contract.md)

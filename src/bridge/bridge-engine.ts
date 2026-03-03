@@ -24,6 +24,14 @@ export interface BridgeAttachReplayMetadata {
   replayGapDetected: boolean;
 }
 
+/**
+ * Snapshot row describing host replay offset for a watched pane.
+ */
+export interface BridgeReplayOffsetSnapshotRow {
+  paneId: string;
+  replayOffset: number;
+}
+
 interface PaneWatcher {
   subscribers: Set<string>;
   lastOutput: string;
@@ -96,6 +104,20 @@ export class BridgeEngine {
       watchedPanes: this.panes.size,
       polling: Boolean(this.pollTimer)
     };
+  }
+
+  /**
+   * Returns host-authoritative replay offsets for watched panes.
+   *
+   * @returns Replay offsets keyed by pane id.
+   */
+  getReplayOffsetsSnapshot(): BridgeReplayOffsetSnapshotRow[] {
+    return Array.from(this.panes.entries())
+      .map(([paneId, watcher]) => ({
+        paneId,
+        replayOffset: watcher.streamSeq
+      }))
+      .sort((a, b) => a.paneId.localeCompare(b.paneId));
   }
 
   /**

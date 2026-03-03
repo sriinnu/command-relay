@@ -17,12 +17,20 @@ Runs practical local diagnostics for chitragupta MCP:
 Options:
   --chitragupta-dir <path>  Path to chitragupta repo (default: ../chitragupta)
   --project <path>          Project path for MCP context (default: terminal root)
+  --check-delegation        Run provider readiness preflight
+  --delegation-smoke        Run end-to-end delegation smoke check (implies --check-delegation)
+  --delegation-provider <id>  Provider override passed to smoke check
+  --delegation-timeout-seconds <n>  Smoke timeout override
   -h, --help                Show this help
 USAGE
 }
 
 CHITRAGUPTA_DIR=""
 PROJECT_DIR=""
+CHECK_DELEGATION=false
+DELEGATION_SMOKE=false
+DELEGATION_PROVIDER=""
+DELEGATION_TIMEOUT_SECONDS=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +40,25 @@ while [[ $# -gt 0 ]]; do
       ;;
     --project)
       PROJECT_DIR="${2:-}"
+      shift 2
+      ;;
+    --check-delegation)
+      CHECK_DELEGATION=true
+      shift
+      ;;
+    --delegation-smoke)
+      CHECK_DELEGATION=true
+      DELEGATION_SMOKE=true
+      shift
+      ;;
+    --delegation-provider)
+      CHECK_DELEGATION=true
+      DELEGATION_PROVIDER="${2:-}"
+      shift 2
+      ;;
+    --delegation-timeout-seconds)
+      CHECK_DELEGATION=true
+      DELEGATION_TIMEOUT_SECONDS="${2:-}"
       shift 2
       ;;
     -h|--help)
@@ -128,6 +155,31 @@ else
   else
     print_error "tsx is missing and no dist entrypoint is available."
     show_missing_tsx_recovery "${CHITRAGUPTA_DIR}" "${PROJECT_DIR}"
+    failures=$((failures + 1))
+  fi
+fi
+
+if [[ "${CHECK_DELEGATION}" == "true" ]]; then
+  preflight_cmd=(
+    "${SCRIPT_DIR}/delegation-preflight.sh"
+    --chitragupta-dir "${CHITRAGUPTA_DIR}"
+    --project "${PROJECT_DIR}"
+  )
+
+  if [[ "${DELEGATION_SMOKE}" == "true" ]]; then
+    preflight_cmd+=(--smoke)
+  fi
+  if [[ -n "${DELEGATION_PROVIDER}" ]]; then
+    preflight_cmd+=(--provider "${DELEGATION_PROVIDER}")
+  fi
+  if [[ -n "${DELEGATION_TIMEOUT_SECONDS}" ]]; then
+    preflight_cmd+=(--timeout-seconds "${DELEGATION_TIMEOUT_SECONDS}")
+  fi
+
+  if "${preflight_cmd[@]}"; then
+    print_info "Delegation readiness check: PASS"
+  else
+    print_error "Delegation readiness check: FAIL"
     failures=$((failures + 1))
   fi
 fi

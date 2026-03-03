@@ -17,6 +17,25 @@ This contract defines runtime and client behavior when CommandRelay is operated 
 2. Runtime operations in `ssh` mode execute tmux commands on the remote SSH target.
 3. Startup preflight must validate SSH client availability (`<COMMANDRELAY_SSH_COMMAND> -V`) before runtime starts.
 
+## SSH host trust controls
+1. `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING` controls OpenSSH `StrictHostKeyChecking` (`true` default).
+2. `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` optionally selects the known_hosts file used for host key validation when strict host key checking is enabled.
+3. `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` optionally pins remote host identity to one SHA256 fingerprint (`SHA256:<base64>` format).
+4. Trust checks are startup gates in `ssh` mode; failures abort startup before runtime/backends are initialized.
+
+## Strict host key + fingerprint interplay
+1. `strict=true`, no expected fingerprint: SSH relies on host key validation against known_hosts policy (`COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` when set, SSH defaults when unset).
+2. `strict=true`, expected fingerprint set: both host key validation and fingerprint match must pass.
+3. `strict=false`, no expected fingerprint: runtime uses `StrictHostKeyChecking=no` and `UserKnownHostsFile=/dev/null`; this is diagnostics-only and not production-safe.
+4. `strict=false`, expected fingerprint set: invalid configuration; startup rejects because fingerprint pinning requires strict host key checking.
+
+## SSH trust failure modes
+1. `invalid_expected_fingerprint`: `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256` is malformed.
+2. `known_hosts_unreadable`: configured `COMMANDRELAY_SSH_KNOWN_HOSTS_FILE` path cannot be read.
+3. `host_key_verification_failed`: SSH strict host key validation fails (unknown/changed host key).
+4. `expected_fingerprint_mismatch`: observed host key fingerprint does not match `COMMANDRELAY_SSH_EXPECTED_FINGERPRINT_SHA256`.
+5. `expected_fingerprint_unavailable`: host key fingerprint cannot be collected for validation.
+
 ## Operation Contract Matrix
 1. `connect` (`C<->S`): client opens WebSocket `/ws`; server immediately emits `hello` with `clientId`, `requiresAuth`, and read-only policy baseline (`inputEnabled=false`).
 2. `auth` (`C->S`): request carries `payload.token` when token mode is enabled; server returns `auth_ok` or `auth_error(code=invalid_token)`.
@@ -76,3 +95,8 @@ This contract defines runtime and client behavior when CommandRelay is operated 
 1. `TP-WS-MATRIX-COMPAT`: align operation compatibility with [Bridge Protocol v1](./protocol-v1.md#11-contract-compatibility-test-plan-references) and enforce via `ws-contract-matrix` assertions.
 2. `TP-WS-MATRIX-RECONNECT`: align reconnect semantics with protocol `attach(lastSeq)` replay expectations and enforce via `ws-contract-matrix` assertions.
 3. `TP-WS-MATRIX-ASSERTIONS`: source-of-truth tests are in `src/server/ws-contract-matrix.test.ts`.
+
+## Code and test anchors
+1. SSH startup env parsing/validation: [src/config.ts](../src/config.ts), [src/server/startup-validation.test.ts](../src/server/startup-validation.test.ts).
+2. SSH preflight availability gate: [src/ssh/ssh-preflight.ts](../src/ssh/ssh-preflight.ts), [src/ssh/ssh-preflight.test.ts](../src/ssh/ssh-preflight.test.ts).
+3. SSH runtime arg wiring (`StrictHostKeyChecking`, `UserKnownHostsFile`): [src/runtime/ssh-tmux-adapter.ts](../src/runtime/ssh-tmux-adapter.ts), [src/runtime/ssh-tmux-adapter.test.ts](../src/runtime/ssh-tmux-adapter.test.ts).
