@@ -94,7 +94,108 @@ if [[ "${INCLUDE_ROOT}" -eq 1 ]]; then
   fi
 fi
 
-mapfile -t package_dirs < <(find "${PACKAGES_DIR}" -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort)
+if [[ "${PHASE}" == "build" ]]; then
+  mapfile -t package_dirs < <(node - "${PACKAGES_DIR}" <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const packagesDir = process.argv[2];
+const dependencyFields = ['dependencies', 'optionalDependencies', 'peerDependencies'];
+
+const packageDirs = fs
+  .readdirSync(packagesDir, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort();
+
+const workspacePackages = [];
+const packageNameToDir = new Map();
+
+for (const dirName of packageDirs) {
+  const packageJsonPath = path.join(packagesDir, dirName, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    continue;
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const packageName = typeof pkg.name === 'string' ? pkg.name : null;
+
+  workspacePackages.push({ dirName, pkg });
+  if (packageName) {
+    packageNameToDir.set(packageName, dirName);
+  }
+}
+
+const indegree = new Map();
+const dependents = new Map();
+const workspaceDirNames = workspacePackages.map((entry) => entry.dirName);
+
+for (const dirName of workspaceDirNames) {
+  indegree.set(dirName, 0);
+  dependents.set(dirName, new Set());
+}
+
+for (const { dirName, pkg } of workspacePackages) {
+  const localDeps = new Set();
+  for (const fieldName of dependencyFields) {
+    const deps = pkg[fieldName];
+    if (!deps || typeof deps !== 'object') {
+      continue;
+    }
+    for (const depName of Object.keys(deps)) {
+      const depDir = packageNameToDir.get(depName);
+      if (!depDir || depDir === dirName) {
+        continue;
+      }
+      localDeps.add(depDir);
+    }
+  }
+
+  for (const depDir of localDeps) {
+    if (dependents.get(depDir).has(dirName)) {
+      continue;
+    }
+    dependents.get(depDir).add(dirName);
+    indegree.set(dirName, indegree.get(dirName) + 1);
+  }
+}
+
+const queue = workspaceDirNames.filter((dirName) => indegree.get(dirName) === 0).sort();
+const ordered = [];
+
+while (queue.length > 0) {
+  const dirName = queue.shift();
+  ordered.push(dirName);
+
+  const dependentDirs = Array.from(dependents.get(dirName)).sort();
+  for (const dependentDir of dependentDirs) {
+    const nextDegree = indegree.get(dependentDir) - 1;
+    indegree.set(dependentDir, nextDegree);
+    if (nextDegree === 0) {
+      queue.push(dependentDir);
+      queue.sort();
+    }
+  }
+}
+
+if (ordered.length !== workspaceDirNames.length) {
+  const seen = new Set(ordered);
+  for (const dirName of [...workspaceDirNames].sort()) {
+    if (!seen.has(dirName)) {
+      ordered.push(dirName);
+    }
+  }
+}
+
+const output = ordered.map((dirName) => path.join(packagesDir, dirName)).join('\n');
+if (output.length > 0) {
+  process.stdout.write(`${output}\n`);
+}
+NODE
+)
+else
+  mapfile -t package_dirs < <(find "${PACKAGES_DIR}" -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort)
+fi
 matched_packages=0
 
 for package_dir in "${package_dirs[@]}"; do

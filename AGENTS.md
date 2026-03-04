@@ -6,6 +6,7 @@ These rules are mandatory for all code changes in this project.
 - permanent rule: always spawn agents for substantial tasks when work is parallelizable.
 - use chitragupta mcp - as a good agentic assistant.
 - permanent rule: use Chitragupta MCP agentic delegation tools in each substantial cycle.
+- permanent rule: continuously record key conversation turns to Chitragupta and append significant state updates to project memory during substantial cycles.
 - use worktress outside of the repo workspace - multiple worktrees for agents. (distilled code instead of full copy of the codebase - as long as you know what to do and how to do, you can have a copy of the the agents.md or claude.md)
 - permanent rule: always run Chitragupta co-orchestrator checks in each substantial cycle; report failures or regressions immediately.
 - branch workflow: before creating a new branch, push current work via PR, merge to `main`, then create the next branch from latest `origin/main`.
