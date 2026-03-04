@@ -39,10 +39,11 @@ Preserve end-of-day release-governance state and next execution steps for immedi
    - `contains_NPM_TOKEN=false`
    - `npm_publish_environment_present=false`
    - main branch protection endpoint returns `Branch not protected (HTTP 404)`
-2. Gate 3 GitHub Actions dry-run failed:
+2. Gate 3 GitHub Actions dry-run still failing, now in verify stage:
    - run `22669448233`: `https://github.com/sriinnu/command-relay/actions/runs/22669448233`
-   - failed step: `Discover Publish Set` -> `Select proxy packages`
-   - failure reason: heredoc termination bug (`wanted 'NODE'`, `syntax error: unexpected end of file`)
+   - failure reason (resolved): `Discover Publish Set` -> `Select proxy packages` heredoc termination bug
+   - rerun `22670212018`: `https://github.com/sriinnu/command-relay/actions/runs/22670212018`
+   - current failure: verify jobs fail before pack/publish with module-resolution/typecheck errors (`Cannot find module '@commandrelay/proxy-core'`)
 
 ## Next Steps
 
@@ -67,8 +68,9 @@ npm run release:proxy:guardrails -- \
   --package-selector @commandrelay/proxy-*
 ```
 
-4. Workflow fix is prepared in `.github/workflows/publish-proxy-packages.yml` (replace conditional heredoc with `node -e` to avoid terminator parsing failure).
-5. Trigger GitHub Actions dry-run publish again and append workflow URL/output to:
+4. Follow-up workflow fix is prepared in `.github/workflows/publish-proxy-packages.yml`:
+   - add `Build workspace packages` before package-local check/build/test in verify job
+5. Trigger GitHub Actions dry-run publish again after merging follow-up fix, then append workflow URL/output to:
    - `scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md`
 
 ## Files/Artifacts
