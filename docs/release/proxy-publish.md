@@ -76,7 +76,7 @@ npm run release:proxy:preflight -- --batch-date 2026-03-03 --package-selector @c
 Expected lockstep pass output:
 
 ```text
-PASS lockstep: 5 proxy package(s) aligned at version 0.1.0 (@commandrelay=3, @termina=2)
+PASS lockstep: 8 proxy package(s) aligned at version 0.1.0 (@commandrelay=3, @termina=5)
 ```
 
 Expected lockstep fail output:
@@ -154,16 +154,21 @@ Use this only when your release process already guarantees approval and version 
   - `@commandrelay/proxy-core@0.1.0`
   - `@commandrelay/proxy-agent@0.1.0`
   - `@commandrelay/proxy-http-client@0.1.0`
+  - `@termina/proxy-fetch@0.1.0`
+  - `@termina/proxy-undici@0.1.0`
+  - `@termina/proxy-axios@0.1.0`
+  - `@termina/proxy-got@0.1.0`
+  - `@termina/proxy-runtime@0.1.0`
 - [x] Record validation evidence for the current environment:
   - root TAP `22/22` pass ([root TAP](../../artifacts/tap-local/root.tap))
   - `proxy-core` package test summary `14/14` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-core-test.log))
   - `proxy-agent` package test summary `39/39` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-agent-test.log))
   - `proxy-http-client` package test summary `22/22` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-http-client-test.log))
 - [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
-- [ ] Trigger GitHub Actions dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`). Status (2026-03-03): local CLI dry-run evidence is green, but GitHub Actions dry-run is still pending and not validated in this evidence cycle ([Gate 0/1/3 checkpoint](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)).
-- [ ] Verify GitHub policy (`NPM_TOKEN`, `npm-publish` reviewers, default-branch protections). Status (2026-03-03): governance evidence is now captured and shows policy gaps (`NPM_TOKEN` absent, `npm-publish` environment missing, default branch protection endpoint not configured) ([governance capture log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-capture-governance.log), [npm-token evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt), [environment evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt), [branch protection evidence](../../artifacts/2026-03-03-proxy-publish-governance/default-branch-protection.json)).
+- [x] Trigger GitHub Actions dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*`, `dist_tag=latest`). Status (2026-03-04): run `22670960699` completed `success` on `main` ([Gate 0/1/3 checkpoint](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)).
+- [x] Verify GitHub policy (`NPM_TOKEN`, `npm-publish` reviewers, default-branch protections). Status (2026-03-04): governance recapture is compliant (`contains_NPM_TOKEN=true`, `npm_publish_environment_present=true`, `environment_details_status=ok`, branch protection configured) ([governance capture log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-capture-governance.log), [npm-token evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt), [environment evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt), [branch protection evidence](../../artifacts/2026-03-03-proxy-publish-governance/default-branch-protection.json)).
 - [x] Capture dry-run artifact summary in checkpoint/release notes before any publish-mode trigger. Artifact: [`scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md`](../../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md). Status: `done` (`check/build/test` passed for all selected packages; `npm pack --dry-run --json` and `npm publish --dry-run` succeeded for all selected packages with scoped cache artifacts in [`artifacts/2026-03-03-proxy-publish-dry-run`](../../artifacts/2026-03-03-proxy-publish-dry-run)).
-- [x] Capture Gate 0/1/3 status checkpoint for the batch. Artifact: [`scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md`](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md). Status: `done` (Gate 0 `partial`, Gate 1 `partial`, Gate 3 `partial`, all with command evidence links).
+- [x] Capture Gate 0/1/3 status checkpoint for the batch. Artifact: [`scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md`](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md). Status: `done` (Gate 0 `partial`, Gate 1 `partial`, Gate 3 `pass`, all with command evidence links).
 - [x] Capture governance artifacts for current batch:
   - [`artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt`](../../artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt)
   - [`artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt`](../../artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt)
@@ -180,6 +185,6 @@ This checklist is for internal `v0.1` readiness planning. It does not create git
 
 - [x] Confirm proxy package versions/changelog entries are final for this cut.
 - [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
-- [ ] Run publish workflow in `dry-run` mode for `@commandrelay/proxy-*` with target `dist_tag`.
-- [ ] Verify `NPM_TOKEN`, `npm-publish` environment reviewers, and default-branch protections.
+- [x] Run publish workflow in `dry-run` mode for `@commandrelay/proxy-*` with target `dist_tag`. Status (2026-03-04): Gate 3 run `22670960699` succeeded.
+- [x] Verify `NPM_TOKEN`, `npm-publish` environment reviewers, and default-branch protections. Status (2026-03-04): governance recapture is compliant.
 - [ ] Record dry-run artifacts and approval outcome in release notes before any publish-mode trigger.

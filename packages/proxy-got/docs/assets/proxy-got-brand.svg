@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Proxy Got Brand Mark</title>
+  <desc id="desc">Network gateway badge with directional proxy route.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#073B3A" />
+      <stop offset="100%" stop-color="#1B6F9A" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" />
+  <path d="M64 22l31 12v25c0 22-13 40-31 50-18-10-31-28-31-50V34l31-12z" fill="#E8F6FA" opacity="0.95" />
+  <path d="M42 55h44" stroke="#0A3A45" stroke-width="6" stroke-linecap="round" />
+  <path d="M42 73h26" stroke="#0A3A45" stroke-width="6" stroke-linecap="round" />
+  <circle cx="85" cy="73" r="11" fill="#D94C2A" />
+  <path d="M80 73h10M85 68l5 5-5 5" stroke="#FDF3EF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Proxy Axios Brand Mark</title>
+  <desc id="desc">Layered request cards flowing through a shielded proxy route.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#13324A" />
+      <stop offset="100%" stop-color="#17827A" />
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="24" fill="url(#bg)" />
+  <rect x="26" y="33" width="44" height="30" rx="6" fill="#D8F4F7" opacity="0.95" />
+  <rect x="58" y="50" width="44" height="30" rx="6" fill="#BDECEF" opacity="0.95" />
+  <path d="M69 47l12 0M75 41l6 6-6 6" stroke="#0D2D3F" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M64 21l23 8v18c0 17-10 32-23 40-13-8-23-23-23-40V29l23-8z" fill="none" stroke="#E7FAFB" stroke-width="4" opacity="0.88" />
+</svg>

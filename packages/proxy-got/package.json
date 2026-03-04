@@ -1,0 +1,61 @@
+{
+  "name": "@termina/proxy-got",
+  "version": "0.1.0",
+  "description": "Got-friendly proxy agent resolver and option helpers without a got runtime dependency",
+  "keywords": [
+    "termina",
+    "commandrelay",
+    "proxy",
+    "got",
+    "agent",
+    "typescript"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/proxy-got"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "SKILL.md",
+    "docs/assets/proxy-got-brand.svg"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "test": "node --import tsx --test test/**/*.test.ts"
+  },
+  "dependencies": {
+    "@commandrelay/proxy-agent": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}
