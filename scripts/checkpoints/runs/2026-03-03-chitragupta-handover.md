@@ -28,6 +28,12 @@ Preserve end-of-day release-governance state and next execution steps for immedi
    - `docs/TODO.md`
 5. Verified health/delegation readiness:
    - `artifacts/2026-03-03-proxy-governance-gates/chitragupta-health-handover.log` (`PASS`)
+6. Governance configuration is now applied:
+   - repo secret `NPM_TOKEN` present
+   - `npm-publish` environment exists with reviewer + `main` branch policy
+   - `main` branch protection enabled
+7. Gate 3 GitHub Actions dry-run publish succeeded:
+   - run `22670960699`: `https://github.com/sriinnu/command-relay/actions/runs/22670960699`
 
 ## In Progress
 
@@ -35,23 +41,21 @@ Preserve end-of-day release-governance state and next execution steps for immedi
 
 ## Blocked
 
-1. External governance policy still non-compliant (from captured artifacts):
-   - `contains_NPM_TOKEN=false`
-   - `npm_publish_environment_present=false`
-   - main branch protection endpoint returns `Branch not protected (HTTP 404)`
-2. Gate 3 GitHub Actions dry-run still failing, now in verify stage:
-   - run `22669448233`: `https://github.com/sriinnu/command-relay/actions/runs/22669448233`
-   - failure reason (resolved): `Discover Publish Set` -> `Select proxy packages` heredoc termination bug
-   - rerun `22670212018`: `https://github.com/sriinnu/command-relay/actions/runs/22670212018`
-   - current failure: verify jobs fail before pack/publish with module-resolution/typecheck errors (`Cannot find module '@commandrelay/proxy-core'`)
+1. Readiness discipline still required for guardrails execution:
+   - guardrails pass in a clean worktree
+   - current preflight fails only when checkpoint/docs files are modified pre-commit
 
 ## Next Steps
 
-1. Configure GitHub governance policy:
-   - add repo secret `NPM_TOKEN`
-   - create/protect `npm-publish` environment with reviewers/restrictions
-   - enable default branch protection for `main`
-2. Re-capture governance artifacts after policy changes:
+1. Run release guardrails only from a clean tree (checkpoint/docs committed or stashed first):
+
+```bash
+npm run release:proxy:guardrails -- \
+  --batch-date 2026-03-03 \
+  --package-selector @commandrelay/proxy-*
+```
+
+2. Re-capture governance artifacts to reflect the now-compliant policy state:
 
 ```bash
 npm run release:proxy:capture-governance -- \
@@ -60,18 +64,9 @@ npm run release:proxy:capture-governance -- \
   --default-branch main
 ```
 
-3. Re-run release guardrails on a clean tree:
-
-```bash
-npm run release:proxy:guardrails -- \
-  --batch-date 2026-03-03 \
-  --package-selector @commandrelay/proxy-*
-```
-
-4. Follow-up workflow fix is prepared in `.github/workflows/publish-proxy-packages.yml`:
-   - add `Build workspace packages` before package-local check/build/test in verify job
-5. Trigger GitHub Actions dry-run publish again after merging follow-up fix, then append workflow URL/output to:
+3. Append latest successful Gate 3 run evidence to:
    - `scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md`
+   - include run `22670960699` URL/output and clean-tree preflight outcome
 
 ## Files/Artifacts
 
