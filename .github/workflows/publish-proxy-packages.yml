@@ -232,13 +232,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$count" -gt 0 ]]; then
-            node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
-            const fs = require('node:fs');
-            const items = JSON.parse(fs.readFileSync('/tmp/proxy-matrix.json', 'utf8'));
-            for (const item of items) {
-              process.stdout.write(`- ${item.packageName}@${item.version} (${item.dir})\n`);
-            }
-            NODE
+            node -e "const fs=require('node:fs');const items=JSON.parse(fs.readFileSync('/tmp/proxy-matrix.json','utf8'));for (const item of items){process.stdout.write('- '+item.packageName+'@'+item.version+' ('+item.dir+')\\n');}" >> "$GITHUB_STEP_SUMMARY"
           fi
 
   verify:
