@@ -1,0 +1,70 @@
+{
+  "first": {
+    "viaProxy": true,
+    "fromCache": false,
+    "proxyUrl": "http://secure-proxy.local:8443/",
+    "metadata": {
+      "target": "https://api.public.local/v1",
+      "protocol": "https:",
+      "mode": "proxy",
+      "reason": "proxy_configured",
+      "matchedNoProxy": false,
+      "proxyUrl": "http://secure-proxy.local:8443/",
+      "viaProxy": true,
+      "fromCache": false
+    }
+  },
+  "second": {
+    "viaProxy": true,
+    "fromCache": true,
+    "proxyUrl": "http://secure-proxy.local:8443/",
+    "metadata": {
+      "target": "https://admin.public.local/v1",
+      "protocol": "https:",
+      "mode": "proxy",
+      "reason": "proxy_configured",
+      "matchedNoProxy": false,
+      "proxyUrl": "http://secure-proxy.local:8443/",
+      "viaProxy": true,
+      "fromCache": true
+    }
+  },
+  "third": {
+    "viaProxy": false,
+    "fromCache": false,
+    "proxyUrl": null,
+    "metadata": {
+      "target": "https://service.internal.local/v1",
+      "protocol": "https:",
+      "mode": "direct",
+      "reason": "no_proxy_match",
+      "matchedNoProxy": true,
+      "proxyUrl": null,
+      "viaProxy": false,
+      "fromCache": false
+    }
+  },
+  "snapshot": {
+    "settings": {
+      "httpProxy": null,
+      "httpsProxy": "http://secure-proxy.local:8443/",
+      "allProxy": null,
+      "noProxy": [
+        {
+          "host": "internal.local",
+          "port": null,
+          "wildcardSubdomains": true
+        }
+      ]
+    },
+    "cacheSize": 1,
+    "disposed": false,
+    "stats": {
+      "resolveCount": 3,
+      "proxiedCount": 2,
+      "directCount": 1,
+      "noProxyBypassCount": 1,
+      "cacheHitCount": 1
+    }
+  }
+}

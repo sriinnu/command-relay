@@ -1,0 +1,80 @@
+{
+  "first": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy-one.local:8080/",
+    "metadata": {
+      "target": "http://service.example/v1",
+      "protocol": "http:",
+      "mode": "proxy",
+      "reason": "proxy_configured",
+      "matchedNoProxy": false,
+      "proxyUrl": "http://proxy-one.local:8080/",
+      "viaProxy": true,
+      "fromCache": false
+    }
+  },
+  "second": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy-two.local:8080/",
+    "metadata": {
+      "target": "http://service.example/v1",
+      "protocol": "http:",
+      "mode": "proxy",
+      "reason": "proxy_configured",
+      "matchedNoProxy": false,
+      "proxyUrl": "http://proxy-two.local:8080/",
+      "viaProxy": true,
+      "fromCache": false
+    }
+  },
+  "reloadedSettings": {
+    "httpProxy": "http://proxy-three.local:8080/",
+    "httpsProxy": null,
+    "allProxy": null,
+    "noProxy": [
+      {
+        "host": "service.example",
+        "port": null,
+        "wildcardSubdomains": true
+      }
+    ]
+  },
+  "third": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "metadata": {
+      "target": "http://service.example/v1",
+      "protocol": "http:",
+      "mode": "direct",
+      "reason": "no_proxy_match",
+      "matchedNoProxy": true,
+      "proxyUrl": null,
+      "viaProxy": false,
+      "fromCache": false
+    }
+  },
+  "cacheAfterClear": 0,
+  "finalSnapshot": {
+    "settings": {
+      "httpProxy": "http://proxy-three.local:8080/",
+      "httpsProxy": null,
+      "allProxy": null,
+      "noProxy": [
+        {
+          "host": "service.example",
+          "port": null,
+          "wildcardSubdomains": true
+        }
+      ]
+    },
+    "cacheSize": 0,
+    "disposed": true,
+    "stats": {
+      "resolveCount": 3,
+      "proxiedCount": 2,
+      "directCount": 1,
+      "noProxyBypassCount": 1,
+      "cacheHitCount": 0
+    }
+  }
+}
