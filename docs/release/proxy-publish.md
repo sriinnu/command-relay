@@ -76,7 +76,7 @@ npm run release:proxy:preflight -- --batch-date 2026-03-03 --package-selector @c
 Expected lockstep pass output:
 
 ```text
-PASS lockstep: 5 proxy package(s) aligned at version 0.1.0 (@commandrelay=3, @termina=2)
+PASS lockstep: 8 proxy package(s) aligned at version 0.1.0 (@commandrelay=3, @termina=5)
 ```
 
 Expected lockstep fail output:
@@ -154,6 +154,11 @@ Use this only when your release process already guarantees approval and version 
   - `@commandrelay/proxy-core@0.1.0`
   - `@commandrelay/proxy-agent@0.1.0`
   - `@commandrelay/proxy-http-client@0.1.0`
+  - `@termina/proxy-fetch@0.1.0`
+  - `@termina/proxy-undici@0.1.0`
+  - `@termina/proxy-axios@0.1.0`
+  - `@termina/proxy-got@0.1.0`
+  - `@termina/proxy-runtime@0.1.0`
 - [x] Record validation evidence for the current environment:
   - root TAP `22/22` pass ([root TAP](../../artifacts/tap-local/root.tap))
   - `proxy-core` package test summary `14/14` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-core-test.log))

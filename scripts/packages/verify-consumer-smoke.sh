@@ -9,6 +9,9 @@ PACKAGE_DIRS=(
   "packages/proxy-core"
   "packages/proxy-agent"
   "packages/proxy-http-client"
+  "packages/proxy-axios"
+  "packages/proxy-got"
+  "packages/proxy-runtime"
 )
 
 log() {
@@ -94,6 +97,21 @@ import {
   resolveProxyForUrl as resolveAgentProxyForUrl
 } from "@commandrelay/proxy-agent";
 import { requestJson } from "@commandrelay/proxy-http-client";
+import {
+  ProxyAxiosAgentResolver,
+  applyProxyAgentToAxiosConfig,
+  resolveAxiosRequestTarget
+} from "@termina/proxy-axios";
+import {
+  ProxyGotAgentResolver,
+  applyProxyGotAgent,
+  createProxyGotAgentResolver,
+  resolveGotRequestTarget
+} from "@termina/proxy-got";
+import {
+  createProxyRuntimeController,
+  loadProxySettings as loadRuntimeProxySettings
+} from "@termina/proxy-runtime";
 
 const coreSettings = loadCoreProxySettings({
   http_proxy: "http://proxy.local:8080",
@@ -121,6 +139,98 @@ assert.equal(cachedProxyResolution.fromCache, true);
 assert.equal(cachedProxyResolution.agent, firstProxyResolution.agent);
 assert.equal(resolveAgentProxyForUrl("http://api.internal.local", agentSettings), null);
 assert.equal(proxiedFactory.resolve("http://api.internal.local").viaProxy, false);
+
+const axiosResolver = new ProxyAxiosAgentResolver({
+  env: {
+    https_proxy: "http://axios-proxy.local:8443",
+    no_proxy: "internal.local"
+  }
+});
+const axiosTarget = resolveAxiosRequestTarget({
+  baseURL: "https://api.public.local/v1/",
+  url: "health"
+});
+assert.equal(axiosTarget.href, "https://api.public.local/v1/health");
+const axiosApplied = applyProxyAgentToAxiosConfig(
+  {
+    baseURL: "https://api.public.local",
+    url: "/orders",
+    method: "GET",
+    proxy: {
+      host: "legacy-proxy.local"
+    }
+  },
+  axiosResolver
+);
+assert.equal(axiosApplied.target.href, "https://api.public.local/orders");
+assert.equal(axiosApplied.routing.viaProxy, true);
+assert.equal(axiosApplied.routing.proxyUrl, "http://axios-proxy.local:8443/");
+assert.equal(axiosApplied.routing.fromCache, false);
+assert.equal(axiosApplied.config.proxy, false);
+assert.equal(axiosApplied.config.httpsAgent?.constructor.name, "HttpsProxyAgent");
+const axiosBypassed = axiosResolver.resolve("https://api.internal.local/health");
+assert.equal(axiosBypassed.viaProxy, false);
+assert.equal(axiosBypassed.proxyUrl, null);
+axiosResolver.destroy();
+
+const gotResolver = new ProxyGotAgentResolver({
+  env: {
+    https_proxy: "http://got-proxy.local:8443",
+    no_proxy: "internal.local"
+  }
+});
+const existingHttp2Agent = { tag: "existing-http2" };
+const gotApplied = applyProxyGotAgent(
+  {
+    url: "health",
+    prefixUrl: "https://api.external.local/v1",
+    agent: {
+      http2: existingHttp2Agent
+    }
+  },
+  gotResolver
+);
+assert.equal(gotApplied.targetUrl.toString(), "https://api.external.local/v1/health");
+assert.equal(gotApplied.protocol, "https");
+assert.equal(gotApplied.viaProxy, true);
+assert.equal(gotApplied.proxyUrl, "http://got-proxy.local:8443/");
+assert.equal(gotApplied.fromCache, false);
+assert.equal(gotApplied.options.agent?.https?.constructor.name, "HttpsProxyAgent");
+assert.equal(gotApplied.options.agent?.http2, existingHttp2Agent);
+const gotBypassedTarget = resolveGotRequestTarget(undefined, {
+  url: "https://api.internal.local/health"
+});
+const gotBypassed = gotResolver.resolve(gotBypassedTarget);
+assert.equal(gotBypassed.viaProxy, false);
+const gotResolverFromFactory = createProxyGotAgentResolver({ env: {} });
+const gotDirect = gotResolverFromFactory.resolve("https://api.external.local/health");
+assert.equal(gotDirect.viaProxy, false);
+gotResolverFromFactory.destroy();
+gotResolver.destroy();
+
+const runtimeController = createProxyRuntimeController({
+  settings: loadRuntimeProxySettings({
+    https_proxy: "http://runtime-proxy.local:8443",
+    no_proxy: "internal.local"
+  })
+});
+const runtimeFirst = runtimeController.resolve("https://api.public.local/v1");
+const runtimeSecond = runtimeController.resolve("https://admin.public.local/v1");
+const runtimeBypassed = runtimeController.resolve("https://service.internal.local/v1");
+assert.equal(runtimeFirst.viaProxy, true);
+assert.equal(runtimeFirst.metadata.mode, "proxy");
+assert.equal(runtimeFirst.metadata.reason, "proxy_configured");
+assert.equal(runtimeFirst.proxyUrl, "http://runtime-proxy.local:8443/");
+assert.equal(runtimeSecond.fromCache, true);
+assert.equal(runtimeBypassed.viaProxy, false);
+assert.equal(runtimeBypassed.metadata.reason, "no_proxy_match");
+const runtimeSnapshot = runtimeController.getSnapshot();
+assert.equal(runtimeSnapshot.stats.resolveCount, 3);
+assert.equal(runtimeSnapshot.stats.proxiedCount, 2);
+assert.equal(runtimeSnapshot.stats.directCount, 1);
+assert.equal(runtimeSnapshot.stats.noProxyBypassCount, 1);
+assert.equal(runtimeSnapshot.stats.cacheHitCount, 1);
+runtimeController.destroy();
 
 const directFactory = new ProxyAgentFactory({
   settings: {
