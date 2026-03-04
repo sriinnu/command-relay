@@ -1,0 +1,17 @@
+{
+  "sameReference": false,
+  "originalProxy": {
+    "host": "legacy-proxy.local"
+  },
+  "appliedProxy": false,
+  "target": "https://api.external.local/v1/status",
+  "routing": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy.local:8443/",
+    "fromCache": false
+  },
+  "agentFields": {
+    "httpAgent": false,
+    "httpsAgent": true
+  }
+}

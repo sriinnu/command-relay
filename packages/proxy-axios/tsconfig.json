@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@commandrelay/proxy-agent": ["../proxy-agent/src/index.ts"],
+      "@commandrelay/proxy-agent/*": ["../proxy-agent/src/*"],
+      "@commandrelay/proxy-core": ["../proxy-core/src/index.ts"],
+      "@commandrelay/proxy-core/*": ["../proxy-core/src/*"]
+    },
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

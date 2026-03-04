@@ -1,0 +1,17 @@
+{
+  "bypassed": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  },
+  "externalFirst": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy.local:8080/",
+    "fromCache": false
+  },
+  "externalSecond": {
+    "viaProxy": true,
+    "proxyUrl": "http://proxy.local:8080/",
+    "fromCache": true
+  }
+}
