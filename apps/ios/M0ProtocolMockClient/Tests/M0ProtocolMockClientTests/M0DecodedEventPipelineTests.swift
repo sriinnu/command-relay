@@ -3,12 +3,12 @@ import XCTest
 
 final class M0DecodedEventPipelineTests: XCTestCase {
     func testPipelineDecodesEnvelopeAndMapsTypedEvent() throws {
-        let envelope = M0Envelope(
+        let envelope: M0Envelope<M0Event> = M0Envelope(
             streamID: "stream-1",
             streamSeq: 7,
             lastSeq: 6,
             sentAtMs: 101,
-            event: .status(M0StatusEvent(code: "READY", message: "ok"))
+            event: M0Event.status(M0StatusEvent(code: "READY", message: "ok"))
         )
         let frameData = try JSONEncoder().encode(envelope)
 
@@ -18,7 +18,7 @@ final class M0DecodedEventPipelineTests: XCTestCase {
             },
             mapEvent: { decodedEnvelope in
                 switch decodedEnvelope.event {
-                case let .status(status):
+                case let M0Event.status(status):
                     return status.code
                 default:
                     return "UNKNOWN"
@@ -33,12 +33,12 @@ final class M0DecodedEventPipelineTests: XCTestCase {
     }
 
     func testJSONPassthroughPipelineReturnsEnvelopeAsEvent() throws {
-        let envelope = M0Envelope(
+        let envelope: M0Envelope<M0Event> = M0Envelope(
             streamID: "stream-1",
             streamSeq: 2,
             lastSeq: nil,
             sentAtMs: 55,
-            event: .heartbeat(M0HeartbeatEvent(serverTimeMs: 55))
+            event: M0Event.heartbeat(M0HeartbeatEvent(serverTimeMs: 55))
         )
         let frameData = try JSONEncoder().encode(envelope)
         let pipeline = M0DecodedEventPipeline<M0Event, M0Envelope<M0Event>>.jsonEnvelopePassthrough()
