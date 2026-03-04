@@ -1,0 +1,13 @@
+{
+  "target": "https://api.example.com/v1/status",
+  "routing": {
+    "viaProxy": true,
+    "proxyUrl": "http://secure-proxy.local:8443/",
+    "fromCache": false
+  },
+  "agentShape": {
+    "hasHttp": false,
+    "hasHttps": true,
+    "preservedHttp2": true
+  }
+}

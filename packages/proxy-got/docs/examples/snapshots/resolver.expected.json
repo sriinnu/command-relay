@@ -1,0 +1,17 @@
+{
+  "first": {
+    "viaProxy": true,
+    "proxyUrl": "http://secure-proxy.local:8443/",
+    "fromCache": false
+  },
+  "second": {
+    "viaProxy": true,
+    "proxyUrl": "http://secure-proxy.local:8443/",
+    "fromCache": true
+  },
+  "noProxy": {
+    "viaProxy": false,
+    "proxyUrl": null,
+    "fromCache": false
+  }
+}
