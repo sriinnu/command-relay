@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm run check:all
+          npm run ci:check
 
       - name: Perf script CLI sanity (--help)
         shell: bash
