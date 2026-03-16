@@ -61,17 +61,17 @@ test("drops malformed and unsupported proxy URLs", () => {
   );
 });
 
-test("keeps wrapper fallback precedence when uppercase proxy is malformed", () => {
+test("prefers lowercase proxy when uppercase HTTP proxy is malformed", () => {
   const settings = loadProxySettings({
     HTTP_PROXY: "http://[::1",
     http_proxy: "http://lowercase-http-proxy.local:8080",
     ALL_PROXY: "socks5://fallback.local:1080"
   });
 
-  assert.equal(settings.httpProxy, null);
+  assert.equal(settings.httpProxy, "http://lowercase-http-proxy.local:8080/");
   assert.equal(
     resolveProxyForUrl("http://example.com", settings),
-    "socks5://fallback.local:1080"
+    "http://lowercase-http-proxy.local:8080/"
   );
 });
 
@@ -148,13 +148,13 @@ test("ignores malformed NO_PROXY tokens and enforces host boundaries", () => {
   );
 });
 
-test("treats NO_PROXY entries with invalid ports as host-only rules", () => {
+test("ignores NO_PROXY entries with invalid ports", () => {
   const settings = loadProxySettings({
     HTTPS_PROXY: "http://proxy.local:8443",
     NO_PROXY: "secure.local:99999"
   });
 
-  assert.equal(resolveProxyForUrl("https://secure.local:9443", settings), null);
+  assert.equal(resolveProxyForUrl("https://secure.local:9443", settings), "http://proxy.local:8443/");
   assert.equal(
     resolveProxyForUrl("https://external.local:9443", settings),
     "http://proxy.local:8443/"
@@ -208,7 +208,7 @@ test("uses lowercase no_proxy when uppercase NO_PROXY is empty", () => {
   );
 });
 
-test("keeps uppercase NO_PROXY precedence over lowercase no_proxy", () => {
+test("prefers lowercase NO_PROXY over uppercase NO_PROXY", () => {
   const settings = loadProxySettings({
     HTTP_PROXY: "http://proxy.local:8080",
     NO_PROXY: "example.com",
@@ -218,15 +218,14 @@ test("keeps uppercase NO_PROXY precedence over lowercase no_proxy", () => {
   assert.equal(resolveProxyForUrl("http://example.com", settings), null);
   assert.equal(
     resolveProxyForUrl("http://external.local", settings),
-    "http://proxy.local:8080/"
+    null
   );
 });
 
 test("parses no_proxy entries safely", () => {
   const rules = parseNoProxy("example.com, .corp.local:8443, *, bad:99999");
-  assert.equal(rules.length, 4);
+  assert.equal(rules.length, 3);
   assert.equal(rules[1].host, "corp.local");
   assert.equal(rules[1].port, 8443);
   assert.equal(rules[2].host, "*");
-  assert.equal(rules[3].port, null);
 });

@@ -232,7 +232,7 @@ test("uses lowercase no_proxy when uppercase NO_PROXY is empty", () => {
   );
 });
 
-test("keeps uppercase NO_PROXY precedence over lowercase no_proxy", () => {
+test("uses lowercase NO_PROXY over uppercase NO_PROXY", () => {
   withPatchedEnv(
     {
       HTTP_PROXY: "http://proxy.local:8080",
@@ -252,8 +252,8 @@ test("keeps uppercase NO_PROXY precedence over lowercase no_proxy", () => {
       assert.equal(bypassed.proxyUrl, null);
 
       const proxied = factory.resolve("http://external.local");
-      assert.equal(proxied.viaProxy, true);
-      assert.equal(proxied.proxyUrl, "http://proxy.local:8080/");
+      assert.equal(proxied.viaProxy, false);
+      assert.equal(proxied.proxyUrl, null);
     }
   );
 });

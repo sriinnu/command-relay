@@ -7,9 +7,12 @@
     "lib": ["ES2022"],
     "types": ["node"],
     "paths": {
-      "@commandrelay/proxy-agent": ["../proxy-agent/src/index.ts"],
-      "@commandrelay/proxy-core": ["../proxy-core/src/index.ts"]
+      "@commandrelay/client": ["../commandrelay-client/src/index.ts"],
+      "@commandrelay/protocol": ["../commandrelay-protocol/src/index.ts"]
     },
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true

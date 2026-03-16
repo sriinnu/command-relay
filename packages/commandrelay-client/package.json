@@ -1,13 +1,12 @@
 {
-  "name": "@termina/proxy-axios",
+  "name": "@commandrelay/client",
   "version": "0.1.0",
-  "description": "Axios-friendly proxy agent resolver and config helpers without axios runtime coupling",
+  "description": "Typed CommandRelay WebSocket client primitives",
   "keywords": [
-    "termina",
     "commandrelay",
-    "proxy",
-    "axios",
-    "agent",
+    "websocket",
+    "client",
+    "terminal",
     "typescript"
   ],
   "homepage": "https://github.com/sriinnu/command-relay#readme",
@@ -17,7 +16,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sriinnu/command-relay.git",
-    "directory": "packages/proxy-axios"
+    "directory": "packages/commandrelay-client"
   },
   "license": "MIT",
   "type": "module",
@@ -34,28 +33,26 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
-    "SKILL.md",
-    "docs/assets/proxy-axios-brand.svg"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
-    "test": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && node --test dist/**/*.test.js"
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@commandrelay/proxy-agent": "^0.1.0"
+    "ws": "^8.18.3",
+    "@commandrelay/protocol": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=18",
-    "npm": ">=9"
+    "node": ">=22"
   }
 }

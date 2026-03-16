@@ -1,15 +1,13 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "types": ["node"],
-    "paths": {
-      "@commandrelay/proxy-agent": ["../proxy-agent/src/index.ts"],
-      "@commandrelay/proxy-core": ["../proxy-core/src/index.ts"]
-    },
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true

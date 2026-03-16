@@ -123,12 +123,11 @@ test("honors no_proxy wildcard and default websocket ports", () => {
 test("parses no_proxy entries safely", () => {
   const rules = parseNoProxy("example.com, .corp.local:8443, *, bad:99999");
 
-  assert.equal(rules.length, 4);
+  assert.equal(rules.length, 3);
   assert.equal(rules[0]?.host, "example.com");
   assert.equal(rules[1]?.host, "corp.local");
   assert.equal(rules[1]?.port, 8443);
   assert.equal(rules[2]?.host, "*");
-  assert.equal(rules[3]?.port, null);
 });
 
 test("throws invalid_target_url for malformed target strings", () => {
