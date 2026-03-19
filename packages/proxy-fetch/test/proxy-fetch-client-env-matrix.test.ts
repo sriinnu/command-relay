@@ -201,7 +201,7 @@ const MATRIX_SCENARIOS: readonly MatrixScenario[] = [
     ]
   },
   {
-    name: "uppercase NO_PROXY takes precedence over lowercase no_proxy",
+    name: "lowercase no_proxy wins over uppercase NO_PROXY",
     env: {
       https_proxy: "http://https-proxy.local:8443",
       NO_PROXY: "blocked.local",
@@ -209,12 +209,12 @@ const MATRIX_SCENARIOS: readonly MatrixScenario[] = [
     },
     expectations: [
       {
-        target: "https://api.blocked.local/health",
+        target: "https://api.ignored.local/health",
         viaProxy: false,
         proxyUrl: null
       },
       {
-        target: "https://api.ignored.local/health",
+        target: "https://api.blocked.local/health",
         viaProxy: true,
         proxyUrl: "http://https-proxy.local:8443/"
       }

@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+NODE_CMD=(npm exec -- node)
+TSX_CMD=(npm exec -- tsx)
 
 usage() {
   cat <<'USAGE'
@@ -65,19 +67,34 @@ write_skip_tap() {
 package_has_script() {
   local package_json="$1"
   local script_name="$2"
+  local package_dir
+  local package_file
 
-  node -e '
+  package_dir="$(dirname "${package_json}")"
+  package_file="$(basename "${package_json}")"
+
+  (
+    cd "${package_dir}"
+    "${NODE_CMD[@]}" -e '
 const fs = require("node:fs");
 const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 const scripts = pkg.scripts ?? {};
 process.exit(Object.prototype.hasOwnProperty.call(scripts, process.argv[2]) ? 0 : 1);
-' "${package_json}" "${script_name}"
+' "${package_file}" "${script_name}"
+  )
 }
 
 read_package_name() {
   local package_json="$1"
+  local package_dir
+  local package_file
 
-  node -e '
+  package_dir="$(dirname "${package_json}")"
+  package_file="$(basename "${package_json}")"
+
+  (
+    cd "${package_dir}"
+    "${NODE_CMD[@]}" -e '
 const fs = require("node:fs");
 const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
 if (typeof pkg.name === "string" && pkg.name.length > 0) {
@@ -85,7 +102,8 @@ if (typeof pkg.name === "string" && pkg.name.length > 0) {
   process.exit(0);
 }
 process.stdout.write("unknown-package");
-' "${package_json}"
+' "${package_file}"
+  )
 }
 
 run_node_tap() {
@@ -95,7 +113,18 @@ run_node_tap() {
 
   (
     cd "${workdir}"
-    node "$@"
+    "${NODE_CMD[@]}" "$@"
+  ) >"${tap_file}" 2>&1
+}
+
+run_tsx_tap() {
+  local workdir="$1"
+  local tap_file="$2"
+  shift 2
+
+  (
+    cd "${workdir}"
+    "${TSX_CMD[@]}" "$@"
   ) >"${tap_file}" 2>&1
 }
 
@@ -247,7 +276,11 @@ run_web_smoke() {
   fi
 
   for js_file in "${js_files[@]}"; do
-    if ! node --check "${js_file}" >>"${syntax_log}" 2>&1; then
+    relative_js_file="${js_file#"${web_root}/"}"
+    if ! (
+      cd "${web_root}"
+      "${NODE_CMD[@]}" --check "${relative_js_file}"
+    ) >>"${syntax_log}" 2>&1; then
       syntax_status=1
     fi
   done
@@ -295,11 +328,10 @@ run_root() {
   fi
 
   rm -f "${log_file}"
-  run_node_tap \
+  run_tsx_tap \
     "${REPO_ROOT}" \
     "${tap_file}" \
     --test \
-    --import tsx \
     --test-reporter=tap \
     --test-concurrency=1 \
     "${test_files[@]}"

@@ -21,8 +21,8 @@ export type ProxySettings = PrimitiveProxySettings;
 /**
  * Loads proxy settings from process-like environment variables.
  *
- * This compatibility wrapper preserves historical fallback behavior where
- * lowercase env vars are used when uppercase variants are present but empty.
+ * This compatibility wrapper mirrors canonical core precedence where lowercase
+ * environment keys win over uppercase keys when both are present.
  *
  * @param env Env source.
  * @returns Normalized proxy settings.
@@ -31,10 +31,10 @@ export function loadProxySettings(
   env: Record<string, string | undefined> = process.env
 ): ProxySettings {
   const compatibilityEnv: ProxyEnvironment = {
-    HTTP_PROXY: env.HTTP_PROXY || env.http_proxy,
-    HTTPS_PROXY: env.HTTPS_PROXY || env.https_proxy,
-    ALL_PROXY: env.ALL_PROXY || env.all_proxy,
-    NO_PROXY: env.NO_PROXY || env.no_proxy
+    HTTP_PROXY: env.http_proxy ?? env.HTTP_PROXY,
+    HTTPS_PROXY: env.https_proxy ?? env.HTTPS_PROXY,
+    ALL_PROXY: env.all_proxy ?? env.ALL_PROXY,
+    NO_PROXY: env.no_proxy ?? env.NO_PROXY
   };
 
   return loadProxySettingsPrimitive(compatibilityEnv);

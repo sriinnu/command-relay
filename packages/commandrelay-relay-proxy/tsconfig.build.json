@@ -1,0 +1,9 @@
+{
+  "extends": "../proxy-runtime/tsconfig.build.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"]
+}

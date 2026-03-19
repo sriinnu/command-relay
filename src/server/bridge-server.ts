@@ -11,7 +11,11 @@ import { AuditLogger } from "./audit-log.js";
 import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
 import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, snapshotPaneInputOwnership, tokenEquals } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
-import { classifyBridgeRuntimeFailure, classifyReplaySnapshotFallbackReason } from "./bridge-runtime-failures.js";
+import {
+  classifyBridgeCloseFailure,
+  classifyBridgeRuntimeFailure,
+  classifyReplaySnapshotFallbackReason
+} from "./bridge-runtime-failures.js";
 import { buildSessionListRuntimeMetadata } from "./session-list-runtime-metadata.js";
 /** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
 const STATIC_CONTENT_TYPES: Record<string, string> = {
@@ -224,7 +228,19 @@ export async function startBridgeServer(deps) {
       const releasedPanes = releaseClientInputOwnership(inputOwnershipArbiter, client.id);
       if (releasedPanes > 0) void audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "socket_close", releasedPanes } });
       const closeReason = reasonBuffer.toString("utf8");
-      void audit.write({ action: "transport_drop", clientId: client.id, details: { code, reason: closeReason || "socket_closed", releasedPanes } });
+      const closeFailure = classifyBridgeCloseFailure(code, closeReason);
+      void audit.write({
+        action: "transport_drop",
+        clientId: client.id,
+        details: {
+          code,
+          reason: closeReason || "socket_closed",
+          closeFailureCode: closeFailure.code,
+          closeFailureRecoverable: closeFailure.recoverable,
+          closeFailureReason: closeFailure.reason,
+          releasedPanes
+        }
+      });
       telemetry.recordConnectionClosed();
       clearClientAttachLag(pendingAttachLag, client.id);
       clients.delete(client.id);

@@ -20,6 +20,12 @@ export interface BridgeRuntimeFailure {
   message: string;
 }
 
+export interface BridgeConnectionCloseFailure {
+  code: "auth_rejected" | "transport_closed" | "normal";
+  reason: string;
+  recoverable: boolean;
+}
+
 /**
  * Classifies runtime handler exceptions into stable client-facing error codes.
  *
@@ -75,6 +81,43 @@ export function classifyBridgeRuntimeFailure(error: unknown): BridgeRuntimeFailu
     reason: "internal_error",
     recoverable: false,
     message: details.message
+  };
+}
+
+/**
+ * Classifies websocket close reasons into retry categories.
+ *
+ * @param code Close code from WS stack.
+ * @param reason Human-readable close reason.
+ * @returns Classified close classification.
+ */
+export function classifyBridgeCloseFailure(code: number, reason: string): BridgeConnectionCloseFailure {
+  const normalizedReason = reason.toLowerCase();
+  if (code === 1008 && /auth|token|credential|permission/.test(normalizedReason)) {
+    return {
+      code: "auth_rejected",
+      reason: normalizedReason || "authentication rejected",
+      recoverable: false
+    };
+  }
+  if (code >= 1001 && code <= 1011) {
+    return {
+      code: "transport_closed",
+      reason: normalizedReason || "transport closed",
+      recoverable: true
+    };
+  }
+  if (code >= 3000 && code <= 3999) {
+    return {
+      code: "transport_closed",
+      reason: normalizedReason || "application close",
+      recoverable: true
+    };
+  }
+  return {
+    code: "normal",
+    reason: normalizedReason || "normal close",
+    recoverable: false
   };
 }
 

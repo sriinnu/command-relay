@@ -302,27 +302,27 @@ function splitHostAndPort(token: string): { host: string; port: number | null } 
       return null;
     }
 
-    return {
-      host,
-      port: parsePort(rest.slice(1))
-    };
+    const port = parsePort(rest.slice(1));
+    if (port === null) {
+      return null;
+    }
+
+    return { host, port };
   }
 
   const colonMatches = token.match(/:/g);
   const colonCount = colonMatches?.length ?? 0;
+  if (colonCount > 1) return null;
 
   if (colonCount === 1) {
     const separatorIndex = token.lastIndexOf(":");
-    return {
-      host: token.slice(0, separatorIndex),
-      port: parsePort(token.slice(separatorIndex + 1))
-    };
+    const port = parsePort(token.slice(separatorIndex + 1));
+    if (port === null) {
+      return null;
+    }
+    return { host: token.slice(0, separatorIndex), port };
   }
-
-  return {
-    host: token,
-    port: null
-  };
+  return { host: token, port: null };
 }
 
 function shouldMatchSubdomains(host: string, hasWildcardPrefix: boolean): boolean {

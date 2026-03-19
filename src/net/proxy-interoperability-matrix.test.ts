@@ -95,7 +95,7 @@ const MATRIX_CASES: readonly MatrixCase[] = [
     }
   },
   {
-    name: "uppercase proxy vars keep precedence over lowercase variants",
+    name: "lowercase proxy vars win when both variants are present",
     host: "matrix-public.local",
     env: {
       HTTP_PROXY: "http://upper-http-proxy.local:8080",
@@ -106,14 +106,14 @@ const MATRIX_CASES: readonly MatrixCase[] = [
       all_proxy: "socks5://lower-all-proxy.local:1081"
     },
     expected: {
-      http: "http://upper-http-proxy.local:8080/",
-      https: "http://upper-https-proxy.local:8443/",
-      ws: "http://upper-http-proxy.local:8080/",
-      wss: "http://upper-https-proxy.local:8443/"
+      http: "http://lower-http-proxy.local:8081/",
+      https: "http://lower-https-proxy.local:8444/",
+      ws: "http://lower-http-proxy.local:8081/",
+      wss: "http://lower-https-proxy.local:8444/"
     }
   },
   {
-    name: "uppercase NO_PROXY keeps precedence over lowercase no_proxy wildcard",
+    name: "lowercase NO_PROXY wins over uppercase wildcard entry",
     host: "matrix-public.local",
     env: {
       HTTP_PROXY: "http://upper-http-proxy.local:8080",
@@ -122,10 +122,10 @@ const MATRIX_CASES: readonly MatrixCase[] = [
       no_proxy: "*"
     },
     expected: {
-      http: "http://upper-http-proxy.local:8080/",
-      https: "http://upper-https-proxy.local:8443/",
-      ws: "http://upper-http-proxy.local:8080/",
-      wss: "http://upper-https-proxy.local:8443/"
+      http: null,
+      https: null,
+      ws: null,
+      wss: null
     }
   },
   {

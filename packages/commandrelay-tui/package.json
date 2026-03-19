@@ -1,0 +1,50 @@
+{
+  "name": "@commandrelay/tui",
+  "version": "0.1.0",
+  "description": "Cross-platform terminal UI client for CommandRelay",
+  "keywords": [
+    "commandrelay",
+    "terminal",
+    "tui",
+    "websocket",
+    "typescript"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/commandrelay-tui"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "module": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "bin": {
+    "commandrelay-tui": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json && npm exec -- node -e \"const fs=require('node:fs');const candidates=['dist/cli.js','dist/commandrelay-tui/src/cli.js'];let target='';for(const candidate of candidates){if(fs.existsSync(candidate)){target=candidate;break;}}if(!target){throw new Error('cli.js not found in expected output paths');}if(target!=='dist/cli.js'){fs.copyFileSync(target,'dist/cli.js');}fs.chmodSync('dist/cli.js',0o755);\""
+  },
+  "dependencies": {
+    "@commandrelay/client": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

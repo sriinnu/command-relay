@@ -60,7 +60,9 @@ test("parseNoProxy supports wildcard, domain, port, localhost, URL tokens, and I
 });
 
 test("parseNoProxy drops invalid and empty entries", () => {
-  const rules = parseNoProxy(" , [broken, host with spaces:8080, ok.local:8080");
+  const rules = parseNoProxy(
+    " , [broken, host with spaces:8080, ::1, [::1]:bad, ok.local:8080"
+  );
 
   assert.deepEqual(rules, [
     { host: "ok.local", port: 8080, matchSubdomains: true }
