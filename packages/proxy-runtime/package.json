@@ -21,15 +21,15 @@
   },
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/proxy-runtime/src/index.js",
+  "module": "./dist/proxy-runtime/src/index.js",
+  "types": "./dist/proxy-runtime/src/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./dist/proxy-runtime/src/index.d.ts",
+      "import": "./dist/proxy-runtime/src/index.js",
+      "default": "./dist/proxy-runtime/src/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -43,8 +43,8 @@
   },
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
-    "test": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && node --test dist/**/*.test.js"
+    "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js"
   },
   "dependencies": {
     "@commandrelay/proxy-agent": "^0.1.0"

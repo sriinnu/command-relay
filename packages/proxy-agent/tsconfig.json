@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
@@ -9,6 +10,9 @@
     "types": [
       "node"
     ],
+    "paths": {
+      "@commandrelay/proxy-core": ["../proxy-core/src/index.ts"]
+    },
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true

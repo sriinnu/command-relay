@@ -1,28 +1,32 @@
 {
-  "name": "@commandrelay/client",
+  "name": "@commandrelay/relay-proxy",
   "version": "0.1.0",
-  "description": "Typed CommandRelay WebSocket client primitives",
+  "description": "CommandRelay websocket relay proxy for exposing a single `/ws` endpoint through controlled transport paths",
   "keywords": [
     "commandrelay",
     "websocket",
-    "client",
-    "terminal",
-    "typescript"
+    "proxy",
+    "relay",
+    "typescript",
+    "nodejs"
   ],
-  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "homepage": "https://github.com/sriinnu/commandrelay#readme",
   "bugs": {
     "url": "https://github.com/sriinnu/command-relay/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sriinnu/command-relay.git",
-    "directory": "packages/commandrelay-client"
+    "directory": "packages/commandrelay-relay-proxy"
   },
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "commandrelay-relay-proxy": "./dist/cli.js"
+  },
   "sideEffects": false,
   "exports": {
     ".": {
@@ -33,18 +37,19 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
-    "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json"
+    "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "test": "echo \"no tests configured for @commandrelay/relay-proxy\" && exit 0"
   },
   "dependencies": {
-    "ws": "^8.18.3",
-    "@commandrelay/protocol": "^0.1.0"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
@@ -53,6 +58,7 @@
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=18",
+    "npm": ">=9"
   }
 }

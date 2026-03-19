@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 RUN_PHASE_SCRIPT="${SCRIPT_DIR}/run-phase.sh"
+NODE_CMD=(npm exec -- node)
 
 PACKAGE_DIRS=(
   "packages/proxy-core"
@@ -26,36 +27,20 @@ require_command() {
   fi
 }
 
-read_package_name() {
-  local package_json="$1"
-  node -e '
-const fs = require("node:fs");
-const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-if (typeof pkg.name !== "string" || pkg.name.length === 0) {
-  throw new Error(`Missing package name in ${process.argv[1]}`);
-}
-process.stdout.write(pkg.name);
-' "${package_json}"
-}
+read_pack_field() {
+  local field_name="$1"
+  local input
+  local field_value
 
-read_pack_filename() {
-  node -e '
-const fs = require("node:fs");
-const input = fs.readFileSync(0, "utf8").trim();
-const start = input.indexOf("[");
-if (start < 0) {
-  throw new Error(`npm pack did not return JSON: ${input}`);
-}
-const parsed = JSON.parse(input.slice(start));
-if (!Array.isArray(parsed) || parsed.length !== 1) {
-  throw new Error("Unexpected npm pack JSON payload");
-}
-const filename = parsed[0]?.filename;
-if (typeof filename !== "string" || filename.length === 0) {
-  throw new Error("Missing npm pack filename");
-}
-process.stdout.write(filename);
-'
+  input="$(cat)"
+  field_value="$(printf '%s' "${input}" | tr -d '\r\n' | sed -n "s/.*\"${field_name}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p")"
+
+  if [[ -z "${field_value}" ]]; then
+    echo "npm pack did not return field '${field_name}': ${input}" >&2
+    return 1
+  fi
+
+  printf '%s' "${field_value}"
 }
 
 extract_packed_package() {
@@ -307,14 +292,12 @@ console.log("consumer smoke verification passed");
 JS
 }
 
-require_command "node"
 require_command "npm"
 require_command "tar"
 
 TMP_ROOT="$(mktemp -d "${REPO_ROOT}/.consumer-smoke.XXXXXX")"
 PACK_DIR="${TMP_ROOT}/packs"
 CONSUMER_DIR="${TMP_ROOT}/consumer"
-PACKED_LIST_FILE="${TMP_ROOT}/packed-modules.txt"
 mkdir -p "${PACK_DIR}" "${CONSUMER_DIR}"
 
 cleanup() {
@@ -337,34 +320,34 @@ for package_dir in "${PACKAGE_DIRS[@]}"; do
     exit 1
   fi
 
-  package_name="$(read_package_name "${package_json}")"
-  log "Packing ${package_name}"
+  log "Packing ${package_dir}"
   pack_output="$(
     cd "${REPO_ROOT}/${package_dir}"
-    npm pack --json --silent --pack-destination "${PACK_DIR}"
+    npm pack --json --silent
   )"
-  filename="$(printf '%s' "${pack_output}" | read_pack_filename)"
-  tarball_path="${PACK_DIR}/${filename}"
+  package_name="$(printf '%s' "${pack_output}" | read_pack_field name)"
+  filename="$(printf '%s' "${pack_output}" | read_pack_field filename)"
+  tarball_path="${REPO_ROOT}/${package_dir}/${filename}"
 
   if [[ ! -f "${tarball_path}" ]]; then
     echo "Packed artifact missing: ${tarball_path}" >&2
     exit 1
   fi
 
-  printf '%s\t%s\n' "${package_name}" "${tarball_path}" >> "${PACKED_LIST_FILE}"
+  mv "${tarball_path}" "${PACK_DIR}/${filename}"
+  tarball_path="${PACK_DIR}/${filename}"
+
+  extract_packed_package "${package_name}" "${tarball_path}"
 done
 
 mkdir -p "${CONSUMER_DIR}/node_modules"
-while IFS=$'\t' read -r package_name tarball_path; do
-  extract_packed_package "${package_name}" "${tarball_path}"
-done < "${PACKED_LIST_FILE}"
 
 write_consumer_smoke_files
 
 log "Running temporary consumer smoke checks"
 (
   cd "${CONSUMER_DIR}"
-  node consumer-smoke.mjs
+  "${NODE_CMD[@]}" consumer-smoke.mjs
 )
 
 log "Consumer smoke verification completed"
