@@ -31,4 +31,4 @@ export {
   type NoProxyRule,
   type ProxyEnvironment,
   type ProxySettings
-} from "@termina/proxy-undici";
+} from "@commandrelay/proxy-undici";

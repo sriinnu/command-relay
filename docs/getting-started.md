@@ -103,6 +103,51 @@ COMMANDRELAY_RUNTIME_BACKENDS=tmux \
 npm run start
 ```
 
+## Remote Collaboration from Another Computer
+
+Use this flow when your app and terminal run on a home machine or VPS and work happens from another computer.
+
+1. Validate remote host runtime readiness:
+
+```bash
+cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
+./scripts/ssh/validate-remote-runtime.sh --target <user@host>
+```
+
+2. Open a local tunnel from the client machine:
+
+```bash
+./scripts/ssh/open-tunnel.sh --target <user@host>
+```
+
+3. Connect the UI/CLI against:
+
+```text
+http://127.0.0.1:8787
+ws://127.0.0.1:8787/ws
+```
+
+4. Build multi-window collaboration on host tmux:
+
+```bash
+tmux new -d -s work
+tmux new-window -t work:1 -n codex
+tmux new-window -t work:2 -n claude
+```
+
+5. Use one writer per pane across tabs/windows:
+
+- multiple tabs can monitor output simultaneously,
+- only one tab should keep input enabled for a pane at once,
+- on handoff, current writer should run `/disable` (or `disable_input`) before the next writer enables input.
+
+6. Quick remote status check before handoff:
+
+```bash
+curl -sS http://127.0.0.1:8787/status
+curl -sS http://127.0.0.1:8787/health
+```
+
 ## Web App Route Usage (Current Runtime)
 
 The gateway is an HTTP + WebSocket server with a small route surface:

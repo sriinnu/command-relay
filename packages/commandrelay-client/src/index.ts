@@ -1,7 +1,9 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
-import { type ParseMessageOptions, envelope, parseMessage, type ProtocolV1AllowedEventType } from "@commandrelay/protocol";
+import type { ParseMessageOptions, ProtocolV1AllowedEventType } from "@commandrelay/protocol";
+
+type ProtocolModule = typeof import("@commandrelay/protocol");
 export { 
   type AuthErrorPayload,
   type AuthOkPayload,
@@ -43,6 +45,20 @@ import {
   PendingRequest,
   EXPECTED_RESPONSE_TYPES_BY_COMMAND
 } from "./commandrelay-client-types.js";
+
+let protocolRuntime: Promise<ProtocolModule> | null = null;
+function loadProtocolRuntime(): Promise<ProtocolModule> {
+  if (protocolRuntime) return protocolRuntime;
+  protocolRuntime = import("@commandrelay/protocol").catch(async (primaryError: unknown): Promise<ProtocolModule> => {
+    try {
+      const fallbackSpec = new URL("../commandrelay-protocol/dist/index.js", import.meta.url).href;
+      return await import(fallbackSpec);
+    } catch {
+      throw primaryError instanceof Error ? primaryError : new Error(String(primaryError));
+    }
+  });
+  return protocolRuntime;
+}
 
 export type ClientCommand =
   | "auth"
@@ -97,6 +113,7 @@ export function isAuthenticationError(error: unknown): error is CommandRelayProt
 export class CommandRelayClient extends EventEmitter {
   private socket: WebSocket | null;
   private helloPayload: HelloPayload | null;
+  private protocol: ProtocolModule | null;
   private readonly parseOptions: ParseMessageOptions;
   private readonly pendingRequests: Map<string, PendingRequest>;
   private readonly requestPrefixCounter: Map<string, number>;
@@ -108,6 +125,7 @@ export class CommandRelayClient extends EventEmitter {
     super();
     this.socket = null;
     this.helloPayload = null;
+    this.protocol = null;
     this.parseOptions = { strictV1: options.strictProtocolParsing ?? true };
     this.pendingRequests = new Map();
     this.requestPrefixCounter = new Map();
@@ -137,6 +155,7 @@ export class CommandRelayClient extends EventEmitter {
    */
   public async connect(): Promise<HelloPayload> {
     if (this.socket) throw new Error("connection already exists");
+    this.protocol = await loadProtocolRuntime();
     return new Promise<HelloPayload>((resolve, reject) => {
       const socket = new WebSocket(this.url);
       this.socket = socket;
@@ -316,12 +335,14 @@ export class CommandRelayClient extends EventEmitter {
   ): Promise<GatewayEnvelope<GatewayPayload>> {
     const socket = this.socket;
     if (!socket || !this.isOpen()) throw new Error("socket not connected");
+    if (!this.protocol) throw new Error("protocol runtime not initialized");
     const requestId = this.nextRequestId(type);
-    const request = envelope(type, payload, requestId);
+    const request = this.protocol.envelope(type, payload, requestId);
     const response = this.promiseForRequest(requestId, EXPECTED_RESPONSE_TYPES_BY_COMMAND[type]);
     try {
       socket.send(JSON.stringify(request));
     } catch (error) {
+      this.close(1011, "send failed");
       this.cancelPendingRequest(requestId);
       throw error instanceof Error ? error : new Error(String(error));
     }
@@ -329,7 +350,11 @@ export class CommandRelayClient extends EventEmitter {
   }
 
   private parseIncomingMessage(raw: string): GatewayEnvelope<GatewayPayload> | null {
-    const parsed = parseMessage(raw, this.parseOptions);
+    if (!this.protocol) {
+      this.emit("parse_error", new Error("protocol runtime not initialized"), raw);
+      return null;
+    }
+    const parsed = this.protocol.parseMessage(raw, this.parseOptions);
     if (!parsed.ok) {
       this.emit("parse_error", new Error(parsed.error), raw);
       return null;

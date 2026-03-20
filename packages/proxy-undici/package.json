@@ -1,9 +1,9 @@
 {
-  "name": "@termina/proxy-undici",
+  "name": "@commandrelay/proxy-undici",
   "version": "0.1.0",
   "description": "Proxy-aware Undici dispatcher factory for HTTP and HTTPS targets",
   "keywords": [
-    "termina",
+    "commandrelay",
     "commandrelay",
     "proxy",
     "undici",

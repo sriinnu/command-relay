@@ -2,7 +2,7 @@
 
 Last updated: 2026-02-25
 
-This document captures high-impact next capabilities for CommandRelay and the `@commandrelay`/`@termina` proxy package families.
+This document captures high-impact next capabilities for CommandRelay and the `@commandrelay/*` proxy package family.
 
 ## Objectives
 
@@ -77,7 +77,7 @@ Next additions:
 
 Expected impact:
 
-1. Trustworthy `@termina/proxy-*` adoption in other repos.
+1. Trustworthy `@commandrelay/proxy-*` adoption in other repos.
 2. Faster support/debug for external users.
 
 ### 5) Advanced Transport Exploration (Flagged)

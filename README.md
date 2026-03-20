@@ -73,7 +73,7 @@ Local optional UI: Ghostty (operator convenience only)
 
 ## Proxy Packages: Parallel Track
 
-The proxy packages (`@commandrelay/*`, `@termina/proxy-*`) are a parallel product track for outbound HTTP/proxy reuse.
+The proxy packages (`@commandrelay/*`, `@commandrelay/proxy-*`) are a parallel product track for outbound HTTP/proxy reuse.
 
 They are not mandatory for the core terminal-control path (`list/attach/replay/input`) and should be treated as adjacent infrastructure, not a prerequisite for SSH + tmux operation.
 

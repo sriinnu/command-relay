@@ -1,16 +1,16 @@
-# @termina/proxy-fetch
+# @commandrelay/proxy-fetch
 
 <p align="left">
   <img src="./docs/assets/proxy-fetch-brand.svg" width="88" height="88" alt="Proxy Fetch brand mark" />
 </p>
 
-`@termina/proxy-fetch` provides a production-ready proxy-aware wrapper around Node fetch.
-It resolves Undici dispatchers through `@termina/proxy-undici`, supports explicit settings/env inputs, and includes JSON parsing safeguards with typed failures.
+`@commandrelay/proxy-fetch` provides a production-ready proxy-aware wrapper around Node fetch.
+It resolves Undici dispatchers through `@commandrelay/proxy-undici`, supports explicit settings/env inputs, and includes JSON parsing safeguards with typed failures.
 
 ## Install
 
 ```bash
-npm install @termina/proxy-fetch
+npm install @commandrelay/proxy-fetch
 ```
 
 ## Runtime support
@@ -24,11 +24,11 @@ npm install @termina/proxy-fetch
 - Node-only package: this wrapper depends on Undici dispatchers and Node `fetch` behavior.
 - `fetch` dispatcher injection is supported in Node and is not a browser API.
 - Works with explicit `settings` objects or with environment variables (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`).
-- Compatible with `@termina/proxy-undici@^0.1.0`.
+- Compatible with `@commandrelay/proxy-undici@^0.1.0`.
 
 ## Migration
 
-`@termina/proxy-fetch` is currently `0.1.x`; there is no prior package-specific breaking release. Most migrations are from direct `fetch` usage or custom proxy wrappers.
+`@commandrelay/proxy-fetch` is currently `0.1.x`; there is no prior package-specific breaking release. Most migrations are from direct `fetch` usage or custom proxy wrappers.
 
 1. Replace direct `fetch` calls with `proxyFetch`/`proxyFetchJson` for one-shot calls.
 2. For services with repeated outbound calls, switch to one long-lived `ProxyFetchClient`.
@@ -46,7 +46,7 @@ npm install @termina/proxy-fetch
 ## Quick Start
 
 ```ts
-import { ProxyFetchClient } from "@termina/proxy-fetch";
+import { ProxyFetchClient } from "@commandrelay/proxy-fetch";
 
 const client = new ProxyFetchClient();
 
@@ -68,7 +68,7 @@ client.destroy();
 | One-off proxied `fetch` call with routing metadata | `proxyFetch` | Minimal setup for scripts and low-frequency calls |
 | One-off JSON call with timeout/size guards | `proxyFetchJson<T>` | Adds typed JSON parse + guardrail errors |
 | Service making repeated outbound calls | `new ProxyFetchClient()` | Reuses dispatcher cache and centralizes defaults |
-| Need only Undici dispatcher wiring (no fetch wrapper) | Prefer `@termina/proxy-undici` | Lower-level control for custom Undici clients |
+| Need only Undici dispatcher wiring (no fetch wrapper) | Prefer `@commandrelay/proxy-undici` | Lower-level control for custom Undici clients |
 
 ## API
 

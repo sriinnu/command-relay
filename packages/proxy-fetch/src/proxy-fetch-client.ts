@@ -4,7 +4,7 @@ import {
   type ProxySettings,
   ProxyUndiciDispatcherFactory,
   type ProxyUndiciDispatcherFactoryOptions
-} from "@termina/proxy-undici";
+} from "@commandrelay/proxy-undici";
 import { NonJsonResponseError, RequestTimeoutError } from "./errors.js";
 import {
   createAbortControl,
@@ -15,7 +15,7 @@ import {
   parseTargetUrl,
   readResponseTextWithLimit
 } from "./proxy-fetch-runtime.js";
-import type { ProxyUndiciDispatcherResolution } from "@termina/proxy-undici";
+import type { ProxyUndiciDispatcherResolution } from "@commandrelay/proxy-undici";
 
 /**
  * Default request timeout in milliseconds.

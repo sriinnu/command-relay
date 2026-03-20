@@ -7,7 +7,7 @@
     "lib": ["ES2022"],
     "types": ["node"],
     "paths": {
-      "@termina/proxy-undici": ["../proxy-undici/src/index.ts"],
+      "@commandrelay/proxy-undici": ["../proxy-undici/src/index.ts"],
       "@commandrelay/proxy-core": ["../proxy-core/src/index.ts"]
     },
     "strict": true,

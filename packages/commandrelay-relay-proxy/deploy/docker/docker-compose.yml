@@ -1,0 +1,14 @@
+services:
+  relay-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: commandrelay-relay-proxy
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    env_file:
+      - .env
+    environment:
+      COMMANDRELAY_RELAY_LISTEN_HOST: "0.0.0.0"
+      COMMANDRELAY_RELAY_LISTEN_PORT: "8788"

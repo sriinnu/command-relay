@@ -54,13 +54,13 @@ export function withProxy<TOptions extends object>(
 }
 ```
 
-## External Naming Conventions (`@termina/proxy-*`)
+## External Naming Conventions (`@commandrelay/proxy-*`)
 
-For external consumers that mirror this ecosystem (for example `@termina/*`), keep package role names stable:
+For external consumers that mirror this ecosystem (for example `@commandrelay/*`), keep package role names stable:
 
-- `@termina/proxy-core`: policy/parsing only
-- `@termina/proxy-<transport>`: transport bindings only (`undici`, `fetch`, `axios`, etc.)
-- `@termina/proxy-runtime` (optional): refresh/diagnostics utilities
+- `@commandrelay/proxy-core`: policy/parsing only
+- `@commandrelay/proxy-<transport>`: transport bindings only (`undici`, `fetch`, `axios`, etc.)
+- `@commandrelay/proxy-runtime` (optional): refresh/diagnostics utilities
 
 Guideline: keep one package per role and preserve the `proxy-*` suffixes so cross-repo docs and migrations stay predictable.
 
@@ -91,10 +91,10 @@ console.log({ controlPlaneProxy, telemetryProxy, oneShotProxy });
 
 | Integration need | Use `@commandrelay/proxy-core` | Pair with |
 | --- | --- | --- |
-| Shared proxy policy across multiple HTTP clients | Yes, as the single source of env parsing and `NO_PROXY` matching | `@commandrelay/proxy-agent`, `@termina/proxy-undici`, `@termina/proxy-fetch`, or app wrapper |
+| Shared proxy policy across multiple HTTP clients | Yes, as the single source of env parsing and `NO_PROXY` matching | `@commandrelay/proxy-agent`, `@commandrelay/proxy-undici`, `@commandrelay/proxy-fetch`, or app wrapper |
 | Build a thin adapter for a specific transport | Yes, call `loadProxySettings` once and `resolveProxyForUrl` per target | Transport-specific package in your stack |
-| Need ready-to-use runtime agents/dispatchers | Not by itself | `@commandrelay/proxy-agent` or `@termina/proxy-undici` |
-| Need operator diagnostics from terminal/CI | Core can power this, but prefer dedicated UX | `@termina/cli-proxy` |
+| Need ready-to-use runtime agents/dispatchers | Not by itself | `@commandrelay/proxy-agent` or `@commandrelay/proxy-undici` |
+| Need operator diagnostics from terminal/CI | Core can power this, but prefer dedicated UX | `@commandrelay/cli-proxy` |
 
 ## API Surface
 

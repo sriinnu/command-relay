@@ -16,8 +16,8 @@ import type {
 test("formats help text with key commands", () => {
   const output = formatHelpText();
 
-  assert.equal(output.includes("termina-cli-proxy env"), true);
-  assert.equal(output.includes("termina-cli-proxy explain"), true);
+  assert.equal(output.includes("commandrelay-cli-proxy env"), true);
+  assert.equal(output.includes("commandrelay-cli-proxy explain"), true);
 });
 
 test("formats parse errors with hints", () => {

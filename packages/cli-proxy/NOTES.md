@@ -1,6 +1,6 @@
 # cli-proxy Integration Notes
 
-Use `@termina/cli-proxy` for proxy diagnostics in CI jobs, runtime startup checks, or support bundles.
+Use `@commandrelay/cli-proxy` for proxy diagnostics in CI jobs, runtime startup checks, or support bundles.
 
 ## Compatibility Checklist
 
@@ -17,16 +17,16 @@ Use `@termina/cli-proxy` for proxy diagnostics in CI jobs, runtime startup check
 
 ## Quick start checklist
 
-1. Run `termina-cli-proxy env` during startup validation.
-2. Run `termina-cli-proxy explain <urls...>` for target-specific routing checks.
+1. Run `commandrelay-cli-proxy env` during startup validation.
+2. Run `commandrelay-cli-proxy explain <urls...>` for target-specific routing checks.
 3. Use `--json` in automation and parse the result object.
 4. Install `@commandrelay/proxy-agent` only when agent-class detail is useful.
 
 ## Suggested CI usage
 
 ```bash
-termina-cli-proxy env --json > proxy-env-report.json
-termina-cli-proxy explain --json --no-agent https://api.example.com https://telemetry.example.com > proxy-route-report.json
+commandrelay-cli-proxy env --json > proxy-env-report.json
+commandrelay-cli-proxy explain --json --no-agent https://api.example.com https://telemetry.example.com > proxy-route-report.json
 ```
 
 ## Troubleshooting Playbook

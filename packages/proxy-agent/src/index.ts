@@ -1,6 +1,7 @@
 export {
   ProxyAgentFactory,
   createProxyAgent,
+  type ProxyAgentTlsOptions,
   type HttpProxyAgentConstructorOptions,
   type HttpsProxyAgentConstructorOptions,
   type PacProxyAgentConstructorOptions,

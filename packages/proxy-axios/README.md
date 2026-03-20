@@ -1,4 +1,4 @@
-# @termina/proxy-axios
+# @commandrelay/proxy-axios
 
 <p align="left">
   <img src="./docs/assets/proxy-axios-brand.svg" width="88" height="88" alt="Proxy Axios brand mark" />
@@ -9,7 +9,7 @@ Axios-friendly proxy agent adapter for Node.js. It provides typed config contrac
 ## Install
 
 ```bash
-npm install @termina/proxy-axios
+npm install @commandrelay/proxy-axios
 ```
 
 ## Runtime support
@@ -25,9 +25,9 @@ npm install @termina/proxy-axios
 
 ## Export surface
 
-- `@termina/proxy-axios` (root API)
-- `@termina/proxy-axios/package.json` (metadata only)
-- Deep imports such as `@termina/proxy-axios/dist/*` are intentionally unsupported.
+- `@commandrelay/proxy-axios` (root API)
+- `@commandrelay/proxy-axios/package.json` (metadata only)
+- Deep imports such as `@commandrelay/proxy-axios/dist/*` are intentionally unsupported.
 
 ## Quick Start
 
@@ -37,7 +37,7 @@ import {
   ProxyAxiosAgentResolver,
   applyProxyAgentToAxiosConfig,
   type ProxyAxiosRequestConfig
-} from "@termina/proxy-axios";
+} from "@commandrelay/proxy-axios";
 
 const resolver = new ProxyAxiosAgentResolver({
   env: {

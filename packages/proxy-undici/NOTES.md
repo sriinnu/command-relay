@@ -1,4 +1,4 @@
-# @termina/proxy-undici Notes
+# @commandrelay/proxy-undici Notes
 
 ## Scope
 

@@ -38,8 +38,10 @@ Local MCP note:
 
 1. [getting-started.md](getting-started.md): runtime quickstart and live environment setup.
 2. [operations.md](operations.md): operator runbook and runtime behavior details.
-3. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_COMMAND`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
-4. Tunnel helper runbook: [../scripts/ssh/README.md](../scripts/ssh/README.md).
+3. [remote-collaboration-workflow.md](remote-collaboration-workflow.md): SSH tunnel + multi-tab collaboration flow.
+4. SSH startup config keys: `COMMANDRELAY_TRANSPORT_MODE`, `COMMANDRELAY_SSH_PROFILE`, `COMMANDRELAY_SSH_TARGET`, `COMMANDRELAY_SSH_COMMAND`, `COMMANDRELAY_SSH_PORT`, `COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS`, `COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING`.
+5. Tunnel helper runbook: [../scripts/ssh/README.md](../scripts/ssh/README.md).
+6. Relay server deploy presets: [proxy/relay-server-deployment.md](proxy/relay-server-deployment.md).
 
 ## Discoverability + Extension CLI
 
@@ -79,11 +81,13 @@ Local MCP note:
 10. [macos-menu-bar-control-lane-spec.md](macos-menu-bar-control-lane-spec.md)
 11. [control-lane-parity-checklist.md](control-lane-parity-checklist.md)
 12. [controlled-input-audit.md](controlled-input-audit.md)
-13. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
-14. [research-next-opportunities.md](research-next-opportunities.md)
-15. [TODO.md](TODO.md)
-16. [release/proxy-publish.md](release/proxy-publish.md)
-17. [ssh-transport-contract.md](ssh-transport-contract.md)
-18. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
-19. [architecture/host-state-authority-plan.md](architecture/host-state-authority-plan.md)
-20. [orchestration/subagent-contract.md](orchestration/subagent-contract.md)
+13. [proxy/relay-server-deployment.md](proxy/relay-server-deployment.md): relay-server deployment presets (Linux/systemd, macOS/launchd, Windows/Docker, WSL).
+14. [proxy/external-app-consumption.md](proxy/external-app-consumption.md): integration guidance for other apps.
+15. [proxy-ecosystem-roadmap.md](proxy-ecosystem-roadmap.md)
+16. [research-next-opportunities.md](research-next-opportunities.md)
+17. [TODO.md](TODO.md)
+18. [release/proxy-publish.md](release/proxy-publish.md)
+19. [ssh-transport-contract.md](ssh-transport-contract.md)
+20. [adr/ADR-001-ssh-first-transport.md](adr/ADR-001-ssh-first-transport.md)
+21. [architecture/host-state-authority-plan.md](architecture/host-state-authority-plan.md)
+22. [orchestration/subagent-contract.md](orchestration/subagent-contract.md)

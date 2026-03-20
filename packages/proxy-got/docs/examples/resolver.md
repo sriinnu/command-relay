@@ -6,7 +6,7 @@ This example demonstrates direct/proxy/no_proxy routing and cache metadata with 
 
 ```bash
 node --import tsx <<'TS'
-import { ProxyGotAgentResolver, loadProxySettings } from "@termina/proxy-got";
+import { ProxyGotAgentResolver, loadProxySettings } from "@commandrelay/proxy-got";
 
 const resolver = new ProxyGotAgentResolver({
   settings: loadProxySettings({

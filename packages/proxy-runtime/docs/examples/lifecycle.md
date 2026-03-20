@@ -9,7 +9,7 @@ node --import tsx <<'TS'
 import {
   ProxyRuntimeController,
   loadProxySettings
-} from "@termina/proxy-runtime";
+} from "@commandrelay/proxy-runtime";
 
 const controller = new ProxyRuntimeController({
   settings: loadProxySettings({

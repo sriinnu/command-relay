@@ -10,7 +10,7 @@ import {
   ProxyAxiosAgentResolver,
   applyProxyAgentToAxiosConfig,
   type ProxyAxiosRequestConfig
-} from "@termina/proxy-axios";
+} from "@commandrelay/proxy-axios";
 
 const resolver = new ProxyAxiosAgentResolver({
   env: {

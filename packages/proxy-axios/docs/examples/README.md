@@ -1,4 +1,4 @@
-# @termina/proxy-axios Examples
+# @commandrelay/proxy-axios Examples
 
 Each example includes a runnable snippet and an expected output snapshot.
 Snapshots are stored under [`./snapshots`](./snapshots/).

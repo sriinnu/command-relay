@@ -6,7 +6,7 @@ This example applies proxy routing to got-compatible options while preserving ex
 
 ```bash
 node --import tsx <<'TS'
-import { ProxyGotAgentResolver, applyProxyGotAgent, loadProxySettings } from "@termina/proxy-got";
+import { ProxyGotAgentResolver, applyProxyGotAgent, loadProxySettings } from "@commandrelay/proxy-got";
 
 const resolver = new ProxyGotAgentResolver({
   settings: loadProxySettings({

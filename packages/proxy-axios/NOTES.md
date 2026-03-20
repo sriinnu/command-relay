@@ -1,8 +1,8 @@
-# @termina/proxy-axios Notes
+# @commandrelay/proxy-axios Notes
 
 ## Scope
 
-`@termina/proxy-axios` is an adapter package for axios-style configs.
+`@commandrelay/proxy-axios` is an adapter package for axios-style configs.
 It resolves proxy routing via `@commandrelay/proxy-agent` and applies Node agents without taking an axios runtime dependency.
 
 ## Compatibility Checklist

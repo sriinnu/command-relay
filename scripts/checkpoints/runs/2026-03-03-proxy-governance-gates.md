@@ -43,7 +43,7 @@ Advance Track B release governance and gate evidence for batch `2026-03-03` with
 | --- | --- | --- | --- |
 | Governance recapture artifacts | `PASS` | `npm run release:proxy:capture-governance -- --batch-date 2026-03-03 --repo sriinnu/command-relay --default-branch main` | Artifacts regenerated at `2026-03-04T13:57:58Z`; `contains_NPM_TOKEN=true`; `npm_publish_environment_present=true`; `environment_details_status=ok`. |
 | Branch protection endpoint | `PASS` | `gh api repos/sriinnu/command-relay/branches/main/protection` | `protection_status=ok`; `branch_summary.protection.enabled=true`; required contexts include `Check and Test (Node 22)` and `Swift Package Tests (macOS)`. |
-| Lockstep versions | `PASS` | `npm run release:proxy:lockstep` | `PASS lockstep: 5 proxy package(s) aligned at version 0.1.0 (@commandrelay=3, @termina=2)`. |
+| Lockstep versions | `PASS` | `npm run release:proxy:lockstep` | `PASS lockstep: 5 proxy package(s) aligned at version 0.1.0 (@commandrelay=5)`. |
 | Guardrails (active tree) | `FAIL` | `npm run release:proxy:guardrails -- --batch-date 2026-03-03 --package-selector @commandrelay/proxy-*` | Fails only on dirty working tree because `scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md` is modified in-place for this checkpoint update. |
 | Deterministic validation | `PASS` | `npm run release:proxy:deterministic-validate` | Deterministic validation completed successfully. |
 | Safety gate allow path | `PASS` | `scripts/release/safety-gate.sh npm run ci:test` | `safety-gate: allow: npm run ci:test`. |

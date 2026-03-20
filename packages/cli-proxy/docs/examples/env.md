@@ -6,7 +6,7 @@
 env -i PATH="$PATH" \
 http_proxy=http://proxy.local:8080 \
 no_proxy=internal.local \
-termina-cli-proxy env
+commandrelay-cli-proxy env
 ```
 
 Expected snapshot file: [`./snapshots/env.human.expected.txt`](./snapshots/env.human.expected.txt)
@@ -47,7 +47,7 @@ Effective settings:
 env -i PATH="$PATH" \
 http_proxy=http://proxy.local:8080 \
 no_proxy=internal.local \
-termina-cli-proxy env --json
+commandrelay-cli-proxy env --json
 ```
 
 Expected snapshot file: [`./snapshots/env.json.expected.json`](./snapshots/env.json.expected.json)

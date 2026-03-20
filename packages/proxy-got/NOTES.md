@@ -1,4 +1,4 @@
-# @termina/proxy-got Notes
+# @commandrelay/proxy-got Notes
 
 ## Scope
 

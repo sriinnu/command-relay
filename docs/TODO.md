@@ -102,20 +102,20 @@ Primary strategy: SSH-first transport, tmux-first runtime, remote state owned by
 ### B3) Parallel Ecosystem Wave
 
 - [x] P1 completed:
-  - `@termina/cli-proxy`
-  - `@termina/proxy-undici`
-  - `@termina/proxy-fetch`
-- [ ] P2 hardening wave (parallelizable). Status: `partial` (package creation is complete for `@termina/proxy-axios`, `@termina/proxy-got`, and `@termina/proxy-runtime`; hardening and release-gate evidence are still in progress):
-  - `@termina/proxy-axios`
-  - `@termina/proxy-got`
-  - `@termina/proxy-runtime`
+  - `@commandrelay/cli-proxy`
+  - `@commandrelay/proxy-undici`
+  - `@commandrelay/proxy-fetch`
+- [ ] P2 hardening wave (parallelizable). Status: `partial` (package creation is complete for `@commandrelay/proxy-axios`, `@commandrelay/proxy-got`, and `@commandrelay/proxy-runtime`; hardening and release-gate evidence are still in progress):
+  - `@commandrelay/proxy-axios`
+  - `@commandrelay/proxy-got`
+  - `@commandrelay/proxy-runtime`
 - [ ] P3 exploration gate:
-  - `@termina/proxy-ssh` feasibility + threat model (explicit go/no-go decision doc)
+  - `@commandrelay/proxy-ssh` feasibility + threat model (explicit go/no-go decision doc)
 
 ### B4) Release Criteria (Track B)
 
 - [ ] Gate 0: `npm run release:proxy:guardrails -- --batch-date <YYYY-MM-DD> --package-selector <current-batch-selector>` is green with evidence files present. Status: `partial` ([guardrails command wiring](../package.json), [preflight guardrails contract](../scripts/release/proxy-preflight.sh), [governance artifacts](../artifacts/2026-03-03-proxy-publish-governance), [2026-03-03 governance+gate checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)); as of 2026-03-04, governance and branch-protection checks are compliant, but active-branch runs can still fail on dirty-tree guardrails during in-flight edits.
-- [ ] Gate 1: version and changelog readiness confirmed for all release candidates. Status: `partial` ([current-batch versions/changelog confirmation](./release/proxy-publish.md#internal-v01-gate-checklist-tag-prep-only), [2026-03-03 dry-run checkpoint selected packages](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md)); blocker: confirmation is recorded for current `@commandrelay/proxy-*` batch only, and newly created `@termina/proxy-axios`, `@termina/proxy-got`, and `@termina/proxy-runtime` are not yet covered by release-candidate changelog/approval evidence.
+- [ ] Gate 1: version and changelog readiness confirmed for all release candidates. Status: `partial` ([current-batch versions/changelog confirmation](./release/proxy-publish.md#internal-v01-gate-checklist-tag-prep-only), [2026-03-03 dry-run checkpoint selected packages](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md)); blocker: confirmation is recorded for current `@commandrelay/proxy-*` batch only, and newly created `@commandrelay/proxy-axios`, `@commandrelay/proxy-got`, and `@commandrelay/proxy-runtime` are not yet covered by release-candidate changelog/approval evidence.
 - [ ] Gate 2: `check/build/test` green on designated Mac validation environment. Status: `open` ([runbook follow-up item](./release/proxy-publish.md#current-batch-follow-up)); blocker: designated home-Mac validation run (`npm run check && npm test && npm run test:ci:all`) is still unchecked.
 - [x] Gate 3: publish dry-run green with expected selector + dist-tag. Status: `done` ([2026-03-03 local dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [dry-run artifacts](../artifacts/2026-03-03-proxy-publish-dry-run), [2026-03-03 governance+gate checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md), [runbook current-batch follow-up](./release/proxy-publish.md#current-batch-follow-up)); GitHub Actions dry-run run `22670960699` completed `success` on 2026-03-04.
 - [ ] Gate 4: release notes and rollback notes approved before publish-mode is allowed. Status: `open` ([runbook publish flow and gate checklist](./release/proxy-publish.md#internal-v01-gate-checklist-tag-prep-only)); blocker: no approval artifact/release note record is linked yet.

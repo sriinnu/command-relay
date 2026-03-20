@@ -1,4 +1,4 @@
-# @termina/cli-proxy
+# @commandrelay/cli-proxy
 
 ![cli-proxy brand](./docs/assets/cli-proxy-brand.svg)
 
@@ -7,7 +7,7 @@ Proxy diagnostics CLI for inspecting proxy-related environment variables and exp
 ## Install
 
 ```bash
-npm install @termina/cli-proxy @commandrelay/proxy-core
+npm install @commandrelay/cli-proxy @commandrelay/proxy-core
 ```
 
 Optional agent-level explain details:
@@ -31,10 +31,10 @@ npm install @commandrelay/proxy-agent
 
 ## Migration
 
-`@termina/cli-proxy` is currently `0.1.x`; there is no prior package-specific breaking release. Typical migration is from shell scripts or custom debug tooling.
+`@commandrelay/cli-proxy` is currently `0.1.x`; there is no prior package-specific breaking release. Typical migration is from shell scripts or custom debug tooling.
 
-1. Replace custom env debug scripts with `termina-cli-proxy env --json`.
-2. Replace hand-written routing checks with `termina-cli-proxy explain --json <urls...>`.
+1. Replace custom env debug scripts with `commandrelay-cli-proxy env --json`.
+2. Replace hand-written routing checks with `commandrelay-cli-proxy explain --json <urls...>`.
 3. If you do not need optional agent metadata, run with `--no-agent` for deterministic output in CI.
 4. Update automation to treat parse/usage failures as exit code `2`.
 
@@ -42,15 +42,15 @@ npm install @commandrelay/proxy-agent
 
 Binary names:
 
-- `termina-cli-proxy`
-- `termina-proxy`
+- `commandrelay-cli-proxy`
+- `commandrelay-proxy`
 
 ### Commands
 
 ```bash
-termina-cli-proxy env [--json]
-termina-cli-proxy explain [--json] [--with-agent|--no-agent] <url...>
-termina-cli-proxy help
+commandrelay-cli-proxy env [--json]
+commandrelay-cli-proxy explain [--json] [--with-agent|--no-agent] <url...>
+commandrelay-cli-proxy help
 ```
 
 ### `env`
@@ -79,16 +79,16 @@ For each URL, reports:
 Use `--json` for machine-readable output:
 
 ```bash
-termina-cli-proxy explain --json --no-agent https://example.com https://api.internal.local
+commandrelay-cli-proxy explain --json --no-agent https://example.com https://api.internal.local
 ```
 
 ## Usage Matrix
 
 | Operational need | Command/API path | Why |
 | --- | --- | --- |
-| Validate effective proxy env in CI or containers | `termina-cli-proxy env --json` | Emits normalized settings from runtime env with stable machine output |
-| Explain route decisions for specific outbound URLs | `termina-cli-proxy explain [--json] <url...>` | Shows proxy/direct choice, source, and matched `NO_PROXY` rule |
-| Keep output deterministic without optional agent dependency | `termina-cli-proxy explain --no-agent ...` | Avoids optional peer loading and agent metadata variance |
+| Validate effective proxy env in CI or containers | `commandrelay-cli-proxy env --json` | Emits normalized settings from runtime env with stable machine output |
+| Explain route decisions for specific outbound URLs | `commandrelay-cli-proxy explain [--json] <url...>` | Shows proxy/direct choice, source, and matched `NO_PROXY` rule |
+| Keep output deterministic without optional agent dependency | `commandrelay-cli-proxy explain --no-agent ...` | Avoids optional peer loading and agent metadata variance |
 | Embed diagnostics in Node scripts | Programmatic `inspectProxyEnvironment` / `explainProxyRoutes` | Reuses CLI logic without shelling out |
 
 ## Programmatic API
@@ -99,7 +99,7 @@ import {
   explainProxyRoutes,
   parseCliArgs,
   runCli
-} from "@termina/cli-proxy";
+} from "@commandrelay/cli-proxy";
 
 const inspection = inspectProxyEnvironment(process.env);
 const explain = await explainProxyRoutes(["https://example.com"], {
@@ -113,7 +113,7 @@ console.log(inspection.settings.httpProxy, explain.routes[0]?.decision);
 ## Troubleshooting
 
 - `Unknown command` or `Unknown option`:
-  - Use `termina-cli-proxy help`; parse failures return exit code `2`.
+  - Use `commandrelay-cli-proxy help`; parse failures return exit code `2`.
 - Route output does not match expected proxy:
   - Re-check `NO_PROXY` inputs and whether lowercase env vars shadow uppercase values.
 - `agentSupport: unavailable` in explain output:

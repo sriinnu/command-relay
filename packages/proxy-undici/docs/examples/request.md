@@ -10,7 +10,7 @@ import {
   ProxyUndiciDispatcherFactory,
   loadProxySettings,
   type UndiciDispatcherAdapter
-} from "@termina/proxy-undici";
+} from "@commandrelay/proxy-undici";
 
 const adapter: UndiciDispatcherAdapter = {
   createDirect: () => ({ kind: "direct" } as never),

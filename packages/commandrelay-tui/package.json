@@ -27,14 +27,18 @@
     "commandrelay-tui": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "SKILL.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
-    "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json && npm exec -- node -e \"const fs=require('node:fs');const candidates=['dist/cli.js','dist/commandrelay-tui/src/cli.js'];let target='';for(const candidate of candidates){if(fs.existsSync(candidate)){target=candidate;break;}}if(!target){throw new Error('cli.js not found in expected output paths');}if(target!=='dist/cli.js'){fs.copyFileSync(target,'dist/cli.js');}fs.chmodSync('dist/cli.js',0o755);\""
+    "build": "pnpm exec node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json && pnpm exec node -e \"const fs=require('node:fs');const path=require('node:path');const flattenSource='dist/commandrelay-tui/src';if(fs.existsSync(flattenSource)){const walk=(root)=>{for(const entry of fs.readdirSync(root,{withFileTypes:true})){const src=path.join(root,entry.name);if(entry.isDirectory()){walk(src);}else if(src.endsWith('.js')||src.endsWith('.d.ts')||src.endsWith('.map')){const target=path.join('dist',path.basename(src));if(src!==target){fs.copyFileSync(src,target);}}}};walk(flattenSource);}const candidates=['dist/cli.js','dist/commandrelay-tui/src/cli.js'];let target='';for(const candidate of candidates){if(fs.existsSync(candidate)){target=candidate;break;}}if(!target){throw new Error('cli.js not found in expected output paths');}if(target!=='dist/cli.js'){fs.copyFileSync(target,'dist/cli.js');}fs.chmodSync('dist/cli.js',0o755);\"",
+    "test": "tsx --test test/**/*.test.ts",
+    "qa": "node dist/cli.js --qa",
+    "cli": "node dist/cli.js"
   },
   "dependencies": {
     "@commandrelay/client": "^0.1.0"

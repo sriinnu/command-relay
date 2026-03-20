@@ -48,13 +48,13 @@ export function toAdapterOptions(input: AdapterInput): AdapterOutput {
 }
 ```
 
-## External Package Naming (`@termina/proxy-*`)
+## External Package Naming (`@commandrelay/proxy-*`)
 
 When publishing companion packages outside `@commandrelay`, preserve the role-based suffix model:
 
-- `@termina/proxy-core` for policy/parsing
-- `@termina/proxy-<transport>` for transport adapters
-- `@termina/proxy-runtime` for optional runtime helpers
+- `@commandrelay/proxy-core` for policy/parsing
+- `@commandrelay/proxy-<transport>` for transport adapters
+- `@commandrelay/proxy-runtime` for optional runtime helpers
 
 Avoid role overlap (for example two different packages both acting as the primary fetch adapter).
 

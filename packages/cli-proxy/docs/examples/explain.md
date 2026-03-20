@@ -6,7 +6,7 @@
 env -i PATH="$PATH" \
 https_proxy=http://secure-proxy.local:8443 \
 no_proxy=internal.local \
-termina-cli-proxy explain --no-agent https://public.example.com https://api.internal.local
+commandrelay-cli-proxy explain --no-agent https://public.example.com https://api.internal.local
 ```
 
 Expected snapshot file: [`./snapshots/explain.human.expected.txt`](./snapshots/explain.human.expected.txt)
@@ -40,7 +40,7 @@ Agent support: disabled
 env -i PATH="$PATH" \
 https_proxy=http://secure-proxy.local:8443 \
 no_proxy=internal.local \
-termina-cli-proxy explain --json --no-agent https://public.example.com https://api.internal.local
+commandrelay-cli-proxy explain --json --no-agent https://public.example.com https://api.internal.local
 ```
 
 Expected snapshot file: [`./snapshots/explain.json.expected.json`](./snapshots/explain.json.expected.json)
@@ -154,7 +154,7 @@ Expected snapshot file: [`./snapshots/explain.json.expected.json`](./snapshots/e
 ## Invalid URL example
 
 ```bash
-termina-cli-proxy explain --no-agent not-a-url
+commandrelay-cli-proxy explain --no-agent not-a-url
 ```
 
 For invalid entries, each route is reported with `decision=error` and `error=invalid_target_url`.

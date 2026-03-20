@@ -86,17 +86,17 @@ import {
   ProxyAxiosAgentResolver,
   applyProxyAgentToAxiosConfig,
   resolveAxiosRequestTarget
-} from "@termina/proxy-axios";
+} from "@commandrelay/proxy-axios";
 import {
   ProxyGotAgentResolver,
   applyProxyGotAgent,
   createProxyGotAgentResolver,
   resolveGotRequestTarget
-} from "@termina/proxy-got";
+} from "@commandrelay/proxy-got";
 import {
   createProxyRuntimeController,
   loadProxySettings as loadRuntimeProxySettings
-} from "@termina/proxy-runtime";
+} from "@commandrelay/proxy-runtime";
 
 const coreSettings = loadCoreProxySettings({
   http_proxy: "http://proxy.local:8080",
