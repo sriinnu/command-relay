@@ -31,8 +31,8 @@ Source of truth: `docs/TODO.md`.
 - [ ] Complete API stability review and public surface lock for v0.1.
 - [ ] Confirm publish workflow dry-run path with selector and dist-tag policy (currently partial; blocked env rerun needed).
 - [ ] Validate npm publish governance (`NPM_TOKEN`, environment reviewers, branch protections) with in-repo evidence.
-- [ ] P2 hardening wave (`@termina/proxy-axios`, `@termina/proxy-got`, `@termina/proxy-runtime`).
-- [ ] P3 exploration gate (`@termina/proxy-ssh` feasibility + threat model + go/no-go doc).
+- [ ] P2 hardening wave (`@commandrelay/proxy-axios`, `@commandrelay/proxy-got`, `@commandrelay/proxy-runtime`).
+- [ ] P3 exploration gate (`@commandrelay/proxy-ssh` feasibility + threat model + go/no-go doc).
 - [ ] Gate 1: version and changelog readiness confirmed for all release candidates.
 - [ ] Gate 2: `check/build/test` green on designated Mac validation environment.
 - [ ] Gate 3: publish dry-run green with expected selector + dist-tag.

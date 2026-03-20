@@ -1,11 +1,11 @@
 ---
-name: "termina-orchestrator"
-description: "Use for CommandRelay/Termina work in this repository: tmux+cmux runtime wiring, bi-directional remote terminal control, proxy package hardening, native/web parity, and multi-agent execution with Chitragupta as co-orchestrator."
+name: "commandrelay-orchestrator"
+description: "Use for production work in this repository: terminal/runtime wiring, remote control safety, proxy package hardening, native-web parity, and multi-agent execution with Chitragupta as co-orchestrator."
 ---
 
-# Termina Orchestrator
+# CommandRelay Orchestrator
 
-This skill is for production work on `command-relay` (Termina alias): remote/local terminal control, runtime backends, proxy ecosystem packages, and native client parity.
+This skill is for production work on `command-relay`: remote/local terminal control, runtime backends, proxy ecosystem packages, and native client parity.
 
 ## Trigger Conditions
 
@@ -13,7 +13,7 @@ Use this skill when requests involve any of:
 
 1. Runtime/backends: `tmux`, `cmux`, backend muxing, pane routing, attach/replay/input flows.
 2. Remote control: bi-directional command execution, safety gates, lane conflicts, takeover behavior.
-3. Proxy packages: `@commandrelay/proxy-*`, `@termina/proxy-*`, adapter hardening, release gates.
+3. Proxy packages: `@commandrelay/proxy-*`, `@commandrelay/relay-proxy`, adapter hardening, release gates.
 4. Cross-platform clients: iOS/Android/macos/web fallback protocol parity.
 5. Parallel execution: spawn multiple agents and orchestrate to completion.
 
@@ -63,7 +63,7 @@ npm run capsule:build -- --help
 npm run capsule:build -- \
   --goal "Update distilled context docs policy" \
   --owner docs-policy \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --path docs/operations.md \
   --accept "Replace stale capsule/brief script references" \
   --risk "Over-broad context increases leakage risk" \
@@ -73,7 +73,7 @@ npm run capsule:brief -- \
   --capsule /tmp/docs-policy.capsule.json \
   --task "Update distilled context docs policy" \
   --owner docs-policy \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --path docs/operations.md \
   --out /tmp/docs-policy.brief.md
 
@@ -81,7 +81,7 @@ npm run capsule:dispatch -- \
   --brief /tmp/docs-policy.brief.md \
   --task "Update distilled context docs policy" \
   --owner docs-policy \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --path docs/operations.md \
   --agent-type worker \
   --instruction "You are not alone in the codebase; respect owned file scope." \
@@ -120,7 +120,7 @@ Persist user preferences:
 
 ## Proxy Ecosystem Guardrails
 
-For `@commandrelay/proxy-*` or `@termina/proxy-*` changes:
+For `@commandrelay/proxy-*` or `@commandrelay/relay-proxy` changes:
 
 1. Keep root exports stable; avoid deep-import guidance.
 2. Enforce typed error boundaries and lifecycle cleanup (`destroy`/`dispose`).
@@ -138,14 +138,3 @@ A task is done only when all are true:
 2. Validation commands pass.
 3. Documentation/TODO updates included when behavior or roadmap changes.
 4. Branch pushed and status communicated with commit hash.
-5. Any detected Chitragupta failure modes are explicitly reported with reproduction context.
-
-## High-Signal References
-
-1. `README.md`
-2. `docs/TODO.md`
-3. `docs/protocol-v1.md`
-4. `docs/security.md`
-5. `docs/operations.md`
-6. `docs/proxy-ecosystem-roadmap.md`
-7. `docs/research-next-opportunities.md`

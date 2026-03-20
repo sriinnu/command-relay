@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
 BATCH_DATE="$(date -u +%F)"
-PACKAGE_SELECTOR="@commandrelay/proxy-*,@termina/proxy-*"
+PACKAGE_SELECTOR="@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
 RUNBOOK_PATH="docs/release/proxy-publish.md"
 CHECKPOINT_FILE=""
 DRY_RUN_ARTIFACT_DIR=""
@@ -31,7 +31,7 @@ Usage:
 Options:
       --batch-date <YYYY-MM-DD>          Batch date (default: today in UTC)
       --package-selector <selector>      Comma-separated wildcard selector
-                                         (default: @commandrelay/proxy-*,@termina/proxy-*)
+                                         (default: @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*)
       --runbook <path>                   Release runbook path
                                          (default: docs/release/proxy-publish.md)
       --checkpoint-file <path>           Dry-run checkpoint markdown path
@@ -75,9 +75,9 @@ collect_selected_packages() {
 const fs = require('node:fs');
 const path = require('node:path');
 
-const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*,@termina/proxy-*';
+const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*';
 const packagesDir = path.resolve(process.cwd(), 'packages');
-const packageNameRegex = /^@(commandrelay|termina)\/proxy-[a-z0-9][a-z0-9-]*$/;
+const packageNameRegex = /^@commandrelay\/(proxy-[a-z0-9][a-z0-9-]*|relay-proxy)$/;
 
 const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
 const selectorPatterns = selector
@@ -230,6 +230,18 @@ assert_non_empty_file() {
   fi
 }
 
+assert_no_legacy_namespace_references() {
+  local legacy_hits
+  legacy_hits="$(rg -n "@termina/" "$REPO_ROOT" | sed -n '1,10p' || true)"
+  if [[ -z "$legacy_hits" ]]; then
+    printf 'PASS legacy namespace sweep: no @termina/ references found\n'
+    return 0
+  fi
+
+  printf 'FAIL legacy namespace sweep: @termina/ references remain\n%s\n' "$legacy_hits" >&2
+  record_failure "legacy namespace references (@termina/) present"
+}
+
 printf 'INFO batch-date=%s selector=%s\n' "$BATCH_DATE" "$PACKAGE_SELECTOR"
 
 git_status="$(git status --porcelain=v1)"
@@ -245,6 +257,7 @@ if [[ ! -f "$RUNBOOK_PATH" ]]; then
 else
   printf 'PASS release runbook present: %s\n' "$RUNBOOK_PATH"
 fi
+assert_no_legacy_namespace_references
 
 readonly GOVERNANCE_PLACEHOLDER_TOKENS=(
   "proxy-release-governance:npm-token"

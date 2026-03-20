@@ -2,7 +2,7 @@
 
 Last updated: 2026-03-04
 
-This roadmap expands `@commandrelay/proxy-*` for external reuse in other projects (`termina/*`, proxy-agents-style stacks, service SDKs).
+This roadmap expands `@commandrelay/proxy-*` for external reuse in other projects (`commandrelay/*`, proxy-agents-style stacks, service SDKs).
 
 ## Design Goals
 
@@ -18,11 +18,11 @@ This roadmap expands `@commandrelay/proxy-*` for external reuse in other project
 | `@commandrelay/proxy-core` | Ready | Env parsing + routing decision (`HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`). |
 | `@commandrelay/proxy-agent` | Ready | Node agent resolution for `http/https/socks/pac` with cache + lifecycle controls. |
 | `@commandrelay/proxy-http-client` | Ready | JSON HTTP boundary with timeouts, size guards, typed errors, and proxy resolver support. |
-| `@termina/proxy-fetch` | Ready (internal) | Fetch adapter helper with proxy-aware request composition. |
-| `@termina/proxy-undici` | Ready (internal) | Undici dispatcher resolution for HTTP/HTTPS targets with cache + lifecycle controls. |
-| `@termina/proxy-axios` | Created (internal) | Axios adapter helper + resolver for proxy-aware config wiring. |
-| `@termina/proxy-got` | Created (internal) | Got adapter helper + resolver for protocol-scoped agent wiring. |
-| `@termina/proxy-runtime` | Created (internal) | Runtime controller for settings rotation, metadata, and lifecycle. |
+| `@commandrelay/proxy-fetch` | Ready (internal) | Fetch adapter helper with proxy-aware request composition. |
+| `@commandrelay/proxy-undici` | Ready (internal) | Undici dispatcher resolution for HTTP/HTTPS targets with cache + lifecycle controls. |
+| `@commandrelay/proxy-axios` | Created (internal) | Axios adapter helper + resolver for proxy-aware config wiring. |
+| `@commandrelay/proxy-got` | Created (internal) | Got adapter helper + resolver for protocol-scoped agent wiring. |
+| `@commandrelay/proxy-runtime` | Created (internal) | Runtime controller for settings rotation, metadata, and lifecycle. |
 
 ## Ecosystem Expansion Matrix
 
@@ -40,14 +40,14 @@ The following matrix maps the user-requested package family and next candidates.
 | `pac-proxy-agent` | PAC proxy agent | external dependency | P0 |
 | `pac-resolver` | PAC resolution runtime | external dependency | P2 |
 | `proxy-agent` | auto protocol resolver | external dependency + compatibility target | P1 |
-| `proxy` | generic proxy utility surface | `@termina/proxy-runtime` (created) | P2 |
-| `cli-proxy` | operator CLI for proxy diagnostics (internal ready) | `@termina/cli-proxy` | P1 |
-| `ssh-proxy` | SSH tunnel proxy transport | `@termina/proxy-ssh` | P3 |
-| `@termina/proxy-undici` | Undici dispatcher adapter (internal ready) | internal new package | P1 |
-| `@termina/proxy-fetch` | Fetch adapter (internal ready) | internal new package | P1 |
-| `@termina/proxy-got` | Got adapter | internal new package (created) | P2 |
-| `@termina/proxy-axios` | Axios adapter | internal new package (created) | P2 |
-| `@termina/proxy-runtime` | Runtime controller wrapper | internal new package (created) | P2 |
+| `proxy` | generic proxy utility surface | `@commandrelay/proxy-runtime` (created) | P2 |
+| `cli-proxy` | operator CLI for proxy diagnostics (internal ready) | `@commandrelay/cli-proxy` | P1 |
+| `ssh-proxy` | SSH tunnel proxy transport | `@commandrelay/proxy-ssh` | P3 |
+| `@commandrelay/proxy-undici` | Undici dispatcher adapter (internal ready) | internal new package | P1 |
+| `@commandrelay/proxy-fetch` | Fetch adapter (internal ready) | internal new package | P1 |
+| `@commandrelay/proxy-got` | Got adapter | internal new package (created) | P2 |
+| `@commandrelay/proxy-axios` | Axios adapter | internal new package (created) | P2 |
+| `@commandrelay/proxy-runtime` | Runtime controller wrapper | internal new package (created) | P2 |
 
 Priority scale:
 - `P0`: already in critical path / shipped dependency.
@@ -57,16 +57,16 @@ Priority scale:
 
 ## P1 Progress Snapshot (2026-02-26)
 
-1. `@termina/proxy-undici`: complete and internally ready.
-2. `@termina/cli-proxy`: complete and internally ready.
-3. `@termina/proxy-fetch`: complete and internally ready.
+1. `@commandrelay/proxy-undici`: complete and internally ready.
+2. `@commandrelay/cli-proxy`: complete and internally ready.
+3. `@commandrelay/proxy-fetch`: complete and internally ready.
 4. `P2` package creation is complete (`proxy-axios`, `proxy-got`, `proxy-runtime`) and is now in hardening/release-gate evidence mode.
 
 ## P2 Creation Snapshot (2026-03-04)
 
-1. `@termina/proxy-axios`: package scaffold + docs/examples + tests are present in repo.
-2. `@termina/proxy-got`: package scaffold + docs/examples + tests are present in repo.
-3. `@termina/proxy-runtime`: package scaffold + docs/examples + tests are present in repo.
+1. `@commandrelay/proxy-axios`: package scaffold + docs/examples + tests are present in repo.
+2. `@commandrelay/proxy-got`: package scaffold + docs/examples + tests are present in repo.
+3. `@commandrelay/proxy-runtime`: package scaffold + docs/examples + tests are present in repo.
 4. Release readiness remains gate-bound: Mac validation and approval artifacts are still open in Track B runbooks/checklists.
 
 ## Milestone Decision Mirror 2026-02-27 CR-P1-002
@@ -85,19 +85,19 @@ This section mirrors the 2026-02-27 weekly evidence-lane decisions into the prox
 1. Start with `@commandrelay/proxy-core` for environment parsing and route decisions.
 2. Add only one adapter layer per caller runtime:
    - Node agent clients: `@commandrelay/proxy-agent`
-   - Undici clients: `@termina/proxy-undici`
-   - Fetch clients: `@termina/proxy-fetch`
-   - Operator diagnostics CLI: `@termina/cli-proxy`
+   - Undici clients: `@commandrelay/proxy-undici`
+   - Fetch clients: `@commandrelay/proxy-fetch`
+   - Operator diagnostics CLI: `@commandrelay/cli-proxy`
 3. Use `@commandrelay/proxy-http-client` only when you need the guarded JSON boundary (typed errors, timeouts, body limits).
 4. Keep integrations on root exports only and avoid stacking multiple adapter packages in the same call path.
 
 ## Proposed Build Order
 
 1. Stabilize current 3-package line (`proxy-core`, `proxy-agent`, `proxy-http-client`) and publish `0.1.x`.
-2. Keep `@termina/proxy-undici` as the completed reference adapter for P1.
-3. Complete P2 package creation for `@termina/proxy-axios`, `@termina/proxy-got`, and `@termina/proxy-runtime`.
+2. Keep `@commandrelay/proxy-undici` as the completed reference adapter for P1.
+3. Complete P2 package creation for `@commandrelay/proxy-axios`, `@commandrelay/proxy-got`, and `@commandrelay/proxy-runtime`.
 4. Harden P2 adapters/runtime with conformance evidence and release-gate checklist coverage.
-5. Evaluate `@termina/proxy-ssh` feasibility after runtime telemetry and threat model review.
+5. Evaluate `@commandrelay/proxy-ssh` feasibility after runtime telemetry and threat model review.
 
 ## Security and Hardening Baseline
 

@@ -1,8 +1,8 @@
-# @termina/proxy-runtime
+# @commandrelay/proxy-runtime
 
 ![proxy-runtime brand](./docs/assets/proxy-runtime-brand.svg)
 
-`@termina/proxy-runtime` provides a production-ready runtime controller for proxy decisions, settings rotation, and proxy-agent cache lifecycle.
+`@commandrelay/proxy-runtime` provides a production-ready runtime controller for proxy decisions, settings rotation, and proxy-agent cache lifecycle.
 
 It wraps `@commandrelay/proxy-agent` with:
 
@@ -13,7 +13,7 @@ It wraps `@commandrelay/proxy-agent` with:
 ## Install
 
 ```bash
-npm install @termina/proxy-runtime
+npm install @commandrelay/proxy-runtime
 ```
 
 ## Runtime
@@ -28,7 +28,7 @@ npm install @termina/proxy-runtime
 import {
   ProxyRuntimeController,
   loadProxySettings
-} from "@termina/proxy-runtime";
+} from "@commandrelay/proxy-runtime";
 
 const controller = new ProxyRuntimeController({
   settings: loadProxySettings({
@@ -48,7 +48,7 @@ controller.dispose();
 
 ## Usage Matrix
 
-| Integration need | Use `@termina/proxy-runtime` | Why |
+| Integration need | Use `@commandrelay/proxy-runtime` | Why |
 | --- | --- | --- |
 | Need a long-lived runtime boundary for proxy decisions | Yes | `ProxyRuntimeController` centralizes settings + lifecycle |
 | Need per-request metadata for logs/metrics | Yes | `resolve()` returns structured decision metadata |
@@ -93,7 +93,7 @@ Also re-exported from `@commandrelay/proxy-agent` for convenience:
 - Replace ad-hoc proxy helpers with one process-level `ProxyRuntimeController`.
 - Route all outbound targets through `controller.resolve(target)` to get both route and metadata.
 - On proxy env rotation, call `reloadFromEnvironment()` (or `updateSettings()` when config is sourced elsewhere).
-- Keep imports at package root (`@termina/proxy-runtime`), not deep `dist/*` paths.
+- Keep imports at package root (`@commandrelay/proxy-runtime`), not deep `dist/*` paths.
 - While pre-`1.0`, pin minor versions (`~0.1.x`) for controlled upgrades.
 
 ## Troubleshooting

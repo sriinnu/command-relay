@@ -1,9 +1,9 @@
 {
-  "name": "@termina/cli-proxy",
+  "name": "@commandrelay/cli-proxy",
   "version": "0.1.0",
   "description": "CLI diagnostics for proxy environment inspection and route explanation",
   "keywords": [
-    "termina",
+    "commandrelay",
     "proxy",
     "cli",
     "diagnostics",
@@ -25,8 +25,8 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "termina-cli-proxy": "./dist/cli.js",
-    "termina-proxy": "./dist/cli.js"
+    "commandrelay-cli-proxy": "./dist/cli.js",
+    "commandrelay-proxy": "./dist/cli.js"
   },
   "sideEffects": false,
   "exports": {

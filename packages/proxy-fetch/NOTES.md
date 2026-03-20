@@ -1,15 +1,15 @@
-# @termina/proxy-fetch Notes
+# @commandrelay/proxy-fetch Notes
 
 ## Scope
 
 This package adds proxy-aware wrappers around Node fetch with JSON-specific safety defaults.
-Dispatcher resolution is delegated to `@termina/proxy-undici`.
+Dispatcher resolution is delegated to `@commandrelay/proxy-undici`.
 
 ## Compatibility Checklist
 
 - Node.js `>=18` with global `fetch` support.
 - ESM runtime/package consumption.
-- Proxy environment behavior inherited from `@termina/proxy-undici` and `@commandrelay/proxy-core`.
+- Proxy environment behavior inherited from `@commandrelay/proxy-undici` and `@commandrelay/proxy-core`.
 - Dispatcher injection is Node-specific and not a browser feature.
 
 ## Migration Checklist

@@ -1,4 +1,4 @@
-import type { ProxyUndiciDispatcherResolution } from "@termina/proxy-undici";
+import type { ProxyUndiciDispatcherResolution } from "@commandrelay/proxy-undici";
 import { InvalidUrlError, RequestTimeoutError, ResponseSizeLimitError } from "./errors.js";
 import type { ProxyFetchRequestOptions } from "./proxy-fetch-client.js";
 

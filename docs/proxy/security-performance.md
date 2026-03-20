@@ -48,6 +48,102 @@ This guide captures current security and performance behavior for `@commandrelay
   - Restrict PAC origin.
   - Monitor PAC host integrity.
 
+## TLS Trust and Handshake Model (Production Reference)
+
+- `@commandrelay/relay-proxy` uses `ws` with `wss://` when available for the upstream hop.
+- During upstream connect, the standard TLS handshake sequence is:
+  - TCP connect to the upstream endpoint.
+  - `ClientHello` from relay client carrying supported ciphers and supported key-exchange groups.
+  - `ServerHello` + certificate chain.
+  - Optional server authentication (chain/path + hostname check) and optionally client authentication.
+  - Ephemeral key exchange to derive a symmetric session key.
+  - Finished messages and encrypted traffic using symmetric keys.
+- When using `COMMANDRELAY_RELAY_UPSTREAM_TLS_REJECT_UNAUTHORIZED` (default `true`), certificate validation is strict and rejected if trust is invalid.
+- For mTLS, set `..._CA_FILE`, `..._CERT_FILE`, and `..._KEY_FILE` to provide chain and client identity to the upstream `wss` dialer.
+- TLS material validation rules at startup:
+  - `CERT` and `KEY` must be provided together.
+  - `PFX` cannot be combined with `CERT`/`KEY`.
+  - `MIN_VERSION` and `MAX_VERSION` must be one of `TLSv1.1|TLSv1.2|TLSv1.3` and honor ordering (`min <= max`).
+- At runtime, the relay only decrypts and re-encrypts at each endpoint boundary:
+  - Frames from relay client to relay server are decrypted by relay server.
+  - Frames from relay server to upstream are separately encrypted/decrypted under upstream TLS keys.
+- For HTTP proxy CONNECT flows:
+  - TLS between relay and destination is established after CONNECT negotiation.
+  - The proxy sees CONNECT metadata (host/port), not application plaintext when tunnel mode is active.
+
+## Runtime Status and Heartbeat
+
+- `@commandrelay/relay-proxy` always exposes a status endpoint at `GET /status` in addition to the configured `COMMANDRELAY_RELAY_HEALTH_PATH` (default `/health`).
+- Health responses return:
+  - `status` (`open` for `/status`, `ok` for `/health`)
+  - `heartbeat.checkedAtMs` (or `heartbeat` value on `/health`)
+  - active/total connection counters
+  - upstream target and selected TLS trust settings
+- Use this for CI/operator checks:
+  - Poll `curl -sS http://127.0.0.1:8788/status`
+  - Verify `status=open` and `heartbeat.checkedAtMs` increments
+  - Verify `activeConnections` is expected and no unexpected `proxyUrl` path is open if behind token gate.
+
+## Build/Test Proof and Certificate-Rotation Exercises
+
+- Deterministic package verification:
+  - `npm --prefix packages/commandrelay-relay-proxy test`
+  - `npm --prefix packages/commandrelay-relay-proxy run check`
+  - `npm --prefix packages/commandrelay-relay-proxy run build`
+  - Ensure `packages/commandrelay-relay-proxy/dist/index.js` and `dist/cli.js` are recreated after build.
+- End-to-end runtime smoke checks (quick):
+  - `node packages/commandrelay-relay-proxy/agent1-smoke.mjs`
+  - `node packages/commandrelay-relay-proxy/agent2-lifecycle.mjs`
+  - `node packages/commandrelay-relay-proxy/agent3-cli-build.mjs`
+- Relay upstream TLS validation tests:
+  - Test with valid CA bundle:
+    - Start upstream with server cert signed by private CA.
+    - Start relay with `--upstream-tls-ca-file`, `--upstream-tls-cert-file`, `--upstream-tls-key-file`.
+    - Confirm `/status` reports `upstream.tls.hasClientIdentity=true` and connection succeeds.
+  - Test trust rejection:
+    - Run without CA/with wrong CA and `--upstream-tls-reject-unauthorized true`; expect upstream handshake failure.
+  - Test forced trust:
+    - Set `--upstream-tls-reject-unauthorized false` only for rollback drill; confirm relay starts and connects while recording risk decision.
+- Certificate rotation playbook:
+  - Keep old and new CA/certs on disk side-by-side (`ca-old.pem`, `ca-new.pem`).
+  - Roll relay by updating `COMMANDRELAY_RELAY_UPSTREAM_TLS_CA_FILE` and restarting (`SIGHUP` is not wired today).
+  - For zero-downtime rollout, run a second relay instance with the new cert set, drain old sessions, then shift upstream route to the new relay.
+  - After cutover, verify both:
+    - `/status` shows expected active session counts and open/close transitions.
+    - client reconnects remain green while old cert windows expire.
+
+## Windows PowerShell (native)
+
+- Native status/heartbeat checks:
+  - `Invoke-RestMethod http://127.0.0.1:8788/status`
+  - `if ((Invoke-RestMethod http://127.0.0.1:8788/status).status -eq 'open') { 'OPEN' }`
+  - Poll loop:
+    ```powershell
+    while ($true) {
+      $s = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:8788/status"
+      Write-Host "$([DateTime]::UtcNow.ToString('o')) status=$($s.status) checkedAtMs=$($s.heartbeat.checkedAtMs) active=$($s.activeConnections) total=$($s.totalConnections)"
+      Start-Sleep -Seconds 2
+    }
+    ```
+- Equivalent build/test commands:
+  - `npm --prefix packages\commandrelay-relay-proxy run check`
+  - `npm --prefix packages\commandrelay-relay-proxy run build`
+  - `npm --prefix packages\commandrelay-relay-proxy test`
+  - `node packages\commandrelay-relay-proxy\agent1-smoke.mjs`
+  - `node packages\commandrelay-relay-proxy\agent2-lifecycle.mjs`
+  - `node packages\commandrelay-relay-proxy\agent3-cli-build.mjs`
+- TLS env vars and rotation in PowerShell:
+  - `Setx` for persistent environment, or inline session vars:
+    ```powershell
+    $env:COMMANDRELAY_RELAY_UPSTREAM_TLS_CA_FILE = "C:\certs\ca-new.pem"
+    $env:COMMANDRELAY_RELAY_UPSTREAM_TLS_CERT_FILE = "C:\certs\client-new.pem"
+    $env:COMMANDRELAY_RELAY_UPSTREAM_TLS_KEY_FILE = "C:\certs\client-new.key"
+    $env:COMMANDRELAY_RELAY_UPSTREAM_TLS_REJECT_UNAUTHORIZED = "true"
+    ```
+  - Restart relay host process/service after switching to new files and confirm heartbeat resumes normal on `/status`.
+- Replace `curl`/`watch` on Windows-native path:
+  - Use `Invoke-RestMethod` + `Start-Sleep` loops as shown above.
+
 ## Performance Baseline
 
 - `ProxyAgentFactory` cache key is `proxyUrl|targetProtocol`.

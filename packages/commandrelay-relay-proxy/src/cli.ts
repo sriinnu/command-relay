@@ -20,6 +20,17 @@ interface CliConfig {
   requiredToken: string;
   allowedOrigins: string;
   upstreamSubprotocols: string;
+  upstreamTlsRejectUnauthorized: string;
+  upstreamTlsCaFile: string;
+  upstreamTlsCertFile: string;
+  upstreamTlsKeyFile: string;
+  upstreamTlsPfxFile: string;
+  upstreamTlsPassphrase: string;
+  upstreamTlsServername: string;
+  upstreamTlsMinVersion: string;
+  upstreamTlsMaxVersion: string;
+  upstreamTlsWatchIntervalMs: string;
+  upstreamTlsRestartOnChange: string;
   help?: boolean;
 }
 
@@ -44,7 +55,22 @@ async function main(): Promise<void> {
     shutdownTimeoutMs: parsePositiveIntArg(args.shutdownTimeoutMs, env.shutdownTimeoutMs),
     requiredToken: args.requiredToken || env.requiredToken,
     allowedOrigins: args.allowedOrigins || env.allowedOrigins,
-    upstreamSubprotocols: args.upstreamSubprotocols || env.upstreamSubprotocols
+    upstreamSubprotocols: args.upstreamSubprotocols || env.upstreamSubprotocols,
+    upstreamTlsRejectUnauthorized:
+      args.upstreamTlsRejectUnauthorized || env.upstreamTlsRejectUnauthorized,
+    upstreamTlsWatchIntervalMs:
+      args.upstreamTlsWatchIntervalMs
+        ? parseNonNegativeIntArg(args.upstreamTlsWatchIntervalMs, env.upstreamTlsWatchIntervalMs)
+        : env.upstreamTlsWatchIntervalMs,
+    upstreamTlsRestartOnChange: args.upstreamTlsRestartOnChange || env.upstreamTlsRestartOnChange,
+    upstreamTlsCaFile: args.upstreamTlsCaFile || env.upstreamTlsCaFile,
+    upstreamTlsCertFile: args.upstreamTlsCertFile || env.upstreamTlsCertFile,
+    upstreamTlsKeyFile: args.upstreamTlsKeyFile || env.upstreamTlsKeyFile,
+    upstreamTlsPfxFile: args.upstreamTlsPfxFile || env.upstreamTlsPfxFile,
+    upstreamTlsPassphrase: args.upstreamTlsPassphrase || env.upstreamTlsPassphrase,
+    upstreamTlsServername: args.upstreamTlsServername || env.upstreamTlsServername,
+    upstreamTlsMinVersion: args.upstreamTlsMinVersion || env.upstreamTlsMinVersion,
+    upstreamTlsMaxVersion: args.upstreamTlsMaxVersion || env.upstreamTlsMaxVersion
   });
 
   const handle = await createRelayProxyServer(values);
@@ -61,6 +87,7 @@ async function main(): Promise<void> {
     `commandrelay-relay-proxy listening ${values.listenHost}:${values.listenPort}${values.relayPath}`
   );
   console.info(`health: ${values.healthPath}`);
+  console.info(`status: /status`);
   console.info(`upstream: ${values.upstreamUrl}`);
 }
 
@@ -76,7 +103,18 @@ function parseArgs(argv: string[]): CliConfig {
     shutdownTimeoutMs: "",
     requiredToken: "",
     allowedOrigins: "",
-    upstreamSubprotocols: ""
+    upstreamSubprotocols: "",
+    upstreamTlsRejectUnauthorized: "",
+    upstreamTlsCaFile: "",
+    upstreamTlsCertFile: "",
+    upstreamTlsKeyFile: "",
+    upstreamTlsPfxFile: "",
+    upstreamTlsPassphrase: "",
+    upstreamTlsServername: "",
+    upstreamTlsMinVersion: "",
+    upstreamTlsMaxVersion: "",
+    upstreamTlsWatchIntervalMs: "",
+    upstreamTlsRestartOnChange: ""
   };
 
   let index = 0;
@@ -153,6 +191,72 @@ function parseArgs(argv: string[]): CliConfig {
       index += 2;
       continue;
     }
+    if (arg === "--upstream-tls-reject-unauthorized") {
+      if (!next) throw new Error("missing --upstream-tls-reject-unauthorized");
+      config.upstreamTlsRejectUnauthorized = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-ca-file") {
+      if (!next) throw new Error("missing --upstream-tls-ca-file");
+      config.upstreamTlsCaFile = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-cert-file") {
+      if (!next) throw new Error("missing --upstream-tls-cert-file");
+      config.upstreamTlsCertFile = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-key-file") {
+      if (!next) throw new Error("missing --upstream-tls-key-file");
+      config.upstreamTlsKeyFile = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-pfx-file") {
+      if (!next) throw new Error("missing --upstream-tls-pfx-file");
+      config.upstreamTlsPfxFile = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-passphrase") {
+      if (!next) throw new Error("missing --upstream-tls-passphrase");
+      config.upstreamTlsPassphrase = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-servername") {
+      if (!next) throw new Error("missing --upstream-tls-servername");
+      config.upstreamTlsServername = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-min-version") {
+      if (!next) throw new Error("missing --upstream-tls-min-version");
+      config.upstreamTlsMinVersion = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-max-version") {
+      if (!next) throw new Error("missing --upstream-tls-max-version");
+      config.upstreamTlsMaxVersion = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-watch-interval-ms") {
+      if (!next) throw new Error("missing --upstream-tls-watch-interval-ms");
+      config.upstreamTlsWatchIntervalMs = next;
+      index += 2;
+      continue;
+    }
+    if (arg === "--upstream-tls-restart-on-change") {
+      if (!next) throw new Error("missing --upstream-tls-restart-on-change");
+      config.upstreamTlsRestartOnChange = next;
+      index += 2;
+      continue;
+    }
     if (arg === "--token-from-env") {
       if (!next) throw new Error("missing --token-from-env");
       const envKey = normalizeEnvKey(next);
@@ -170,9 +274,25 @@ function parseArgs(argv: string[]): CliConfig {
 }
 
 function parsePositiveIntArg(value: string, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = Number.parseInt(value, 10);
+    if (!value) return fallback;
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`invalid integer value: ${value}`);
+  }
+  const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`invalid integer value: ${value}`);
+  }
+  return parsed;
+}
+function parseNonNegativeIntArg(value: string, fallback: number): number {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`invalid integer value: ${value}`);
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
     throw new Error(`invalid integer value: ${value}`);
   }
   return parsed;
@@ -207,11 +327,24 @@ function printUsage(): void {
     "COMMANDRELAY_RELAY_SHUTDOWN_TIMEOUT_MS",
     "COMMANDRELAY_RELAY_REQUIRED_TOKEN",
     "COMMANDRELAY_RELAY_ALLOWED_ORIGINS",
-    "COMMANDRELAY_RELAY_UPSTREAM_SUBPROTOCOLS"
+    "COMMANDRELAY_RELAY_UPSTREAM_SUBPROTOCOLS",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_REJECT_UNAUTHORIZED",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_CA_FILE",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_CERT_FILE",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_KEY_FILE",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_PFX_FILE",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_PASSPHRASE",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_SERVERNAME",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_MIN_VERSION",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_MAX_VERSION",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_WATCH_INTERVAL_MS",
+    "COMMANDRELAY_RELAY_UPSTREAM_TLS_RESTART_ON_CHANGE"
   ]) {
     console.info(`  - ${option}`);
   }
-  console.info("Security note: when token is configured, clients must pass `Authorization: Bearer <token>`");
+  console.info(
+    "Security note: when token is configured, clients must pass `Authorization: Bearer <token>` and TLS cert validation is enabled by default"
+  );
 }
 
 void main().catch((error) => {

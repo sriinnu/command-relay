@@ -6,7 +6,7 @@ Use the one-shot helper when you need a single proxied request without holding a
 
 ```bash
 node --import tsx <<'TS'
-import { loadProxySettings, proxyFetchJson } from "@termina/proxy-fetch";
+import { loadProxySettings, proxyFetchJson } from "@commandrelay/proxy-fetch";
 
 const result = await proxyFetchJson<{ version: string }>("https://api.example.com/version", {
   timeoutMs: 3_000,

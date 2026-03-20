@@ -1,9 +1,9 @@
 {
-  "name": "@termina/proxy-got",
+  "name": "@commandrelay/proxy-got",
   "version": "0.1.0",
   "description": "Got-friendly proxy agent resolver and option helpers without a got runtime dependency",
   "keywords": [
-    "termina",
+    "commandrelay",
     "commandrelay",
     "proxy",
     "got",
@@ -44,7 +44,7 @@
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
     "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
-    "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js"
+    "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js && npm exec -- node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@commandrelay/proxy-agent": "^0.1.0"

@@ -9,10 +9,10 @@ import {
   touchProfile,
   upsertProfile
 } from "./connection-profile.js";
-import { isAuthenticationError } from "@commandrelay/client";
 import { isBackend, defaultShell, launchLocalTerminal } from "./backend.js";
 import { promptToken } from "./token.js";
 import type { CliState } from "./cli-state.js";
+import { loadCommandRelayClientModule } from "./commandrelay-client-loader.js";
 
 interface CliCommandContext {
   state: CliState;
@@ -123,7 +123,8 @@ async function runAuth(context: CliCommandContext): Promise<void> {
     context.writeLine("authenticated");
   } catch (error) {
     context.writeLine(`auth failed: ${error instanceof Error ? error.message : String(error)}`);
-    if (isAuthenticationError(error)) {
+    const clientModule = await loadCommandRelayClientModule();
+    if (clientModule.isAuthenticationError(error)) {
       context.state.authFailureBlocked = true;
     }
     context.state.authToken = null;
@@ -281,18 +282,42 @@ async function runProfile(context: CliCommandContext, raw: string): Promise<void
 async function runHealth(context: CliCommandContext): Promise<void> {
   try {
     const healthUrl = buildHealthUrl(context.state.url);
-    const response = await fetch(healthUrl, { headers: { accept: "application/json" } });
+    const statusUrl = buildStatusUrl(context.state.url);
+    let response: Response;
+    try {
+      response = await fetch(statusUrl, { headers: { accept: "application/json" } });
+      if (!response.ok) {
+        throw new Error(`status request failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      const fallbackError = error instanceof Error ? error.message : String(error);
+      response = await fetch(healthUrl, { headers: { accept: "application/json" } });
+      if (!response.ok) {
+        const details = fallbackError ?? "";
+        context.writeLine(`health request failed: ${response.status} ${response.statusText}${details ? ` (${details})` : ""}`);
+        return;
+      }
+    }
     if (!response.ok) {
       context.writeLine(`health request failed: ${response.status} ${response.statusText}`);
       return;
     }
     const healthPayload = await response.json() as Record<string, unknown>;
     const status = typeof healthPayload.status === "string" ? healthPayload.status : "unknown";
+    const heartbeat = resolveHeartbeatMs(healthPayload);
+    const activeConnections = typeof healthPayload.activeConnections === "number" ? healthPayload.activeConnections : "n/a";
+    const totalConnections = typeof healthPayload.totalConnections === "number" ? healthPayload.totalConnections : "n/a";
     const clients = typeof healthPayload.clients === "number" ? healthPayload.clients : 0;
     const panes = typeof healthPayload.panesAttached === "number" ? healthPayload.panesAttached : 0;
     const uptime = typeof healthPayload.uptimeMs === "number" ? healthPayload.uptimeMs : 0;
     const transportMode = typeof healthPayload.transportMode === "string" ? healthPayload.transportMode : "unknown";
     context.writeLine(`health: status=${status} transport=${transportMode} clients=${clients} panes=${panes} uptime=${formatDurationMs(uptime)}`);
+    if (heartbeat !== null) {
+      context.writeLine(`heartbeat.checkedAtMs=${heartbeat}`);
+    }
+    if (activeConnections !== "n/a" || totalConnections !== "n/a") {
+      context.writeLine(`connections=${activeConnections}/${totalConnections}`);
+    }
   } catch (error) {
     context.writeLine(`health failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -305,6 +330,31 @@ function buildHealthUrl(wsUrl: string): string {
   parsed.search = "";
   parsed.hash = "";
   return parsed.toString();
+}
+
+function buildStatusUrl(wsUrl: string): string {
+  const parsed = new URL(wsUrl);
+  parsed.protocol = parsed.protocol === "wss:" ? "https:" : "http:";
+  parsed.pathname = "/status";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function resolveHeartbeatMs(payload: Record<string, unknown>): number | null {
+  if (typeof payload.heartbeat === "number") {
+    return payload.heartbeat;
+  }
+  const nestedHeartbeat = payload.heartbeat;
+  if (
+    nestedHeartbeat &&
+    typeof nestedHeartbeat === "object" &&
+    "checkedAtMs" in nestedHeartbeat &&
+    typeof nestedHeartbeat.checkedAtMs === "number"
+  ) {
+    return nestedHeartbeat.checkedAtMs as number;
+  }
+  return null;
 }
 
 function formatDurationMs(value: number): string {

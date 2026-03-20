@@ -1,18 +1,17 @@
 import readline from "node:readline";
 
-import {
+import type {
   CommandRelayClient,
-  isAuthenticationError,
-  type GatewayEnvelope,
-  type GatewayErrorPayload,
-  type HelloPayload,
-  type OutputPayload,
-  type PolicyUpdatePayload,
-  type SessionListPayload
-} from "@commandrelay/client";
-
+  GatewayEnvelope,
+  GatewayErrorPayload,
+  HelloPayload,
+  OutputPayload,
+  PolicyUpdatePayload,
+  SessionListPayload
+} from "./commandrelay-client-loader.js";
 import type { CliCommandHandlers } from "./cli-commands.js";
 import type { CliState } from "./cli-state.js";
+import { loadCommandRelayClientModule } from "./commandrelay-client-loader.js";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 export const RECONNECT_ATTEMPTS_MAX = 6;
@@ -129,7 +128,8 @@ export function createCliRuntime(context: CliRuntimeContext): CliRuntime {
     try {
       await connectAndBootstrap();
     } catch (error) {
-      if (!isAuthenticationError(error)) {
+      const clientModule = await loadCommandRelayClientModule();
+      if (!clientModule.isAuthenticationError(error)) {
         writeLine(`reconnect failed: ${error instanceof Error ? error.message : String(error)}`);
         scheduleReconnect();
       }

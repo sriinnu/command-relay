@@ -11,14 +11,39 @@ import { buildInputPolicyState } from "./input-policy.js";
  *
  * @param socket WebSocket instance.
  * @param message Envelope payload.
+ * @param onSendFailure Optional failure callback used to teardown the active session.
  * @returns Nothing.
  */
 export function sendEnvelope(
-  socket: { OPEN: number; readyState: number; send: (payload: string) => void },
-  message: unknown
+  socket: {
+    OPEN: number;
+    CLOSING: number;
+    CLOSED: number;
+    readyState: number;
+    send: (payload: string) => void;
+    close?: (code?: number, reason?: string) => void;
+    _socket?: { destroy?: () => void };
+  },
+  message: unknown,
+  onSendFailure?: () => void
 ): void {
-  if (socket.readyState !== socket.OPEN) return;
-  socket.send(JSON.stringify(message));
+  if (socket.readyState !== socket.OPEN) {
+    if (socket.readyState === socket.CLOSING || socket.readyState === socket.CLOSED) {
+      onSendFailure?.();
+    }
+    return;
+  }
+  try {
+    socket.send(JSON.stringify(message));
+  } catch {
+    onSendFailure?.();
+    try {
+      socket.close?.(1011, "send_failed");
+    } catch {
+      const transport = socket._socket;
+      transport?.destroy?.();
+    }
+  }
 }
 
 /**

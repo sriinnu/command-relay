@@ -1,6 +1,6 @@
 # proxy-runtime Integration Notes
 
-Use `@termina/proxy-runtime` when a service needs a stable proxy runtime boundary with consistent routing metadata.
+Use `@commandrelay/proxy-runtime` when a service needs a stable proxy runtime boundary with consistent routing metadata.
 
 ## Fast Integration Checklist
 
@@ -26,7 +26,7 @@ Treat snapshots as read-only observations and avoid exposing proxy credentials i
 
 - `@commandrelay/proxy-core`: pure parsing/matching rules
 - `@commandrelay/proxy-agent`: agent construction + bounded cache
-- `@termina/proxy-runtime`: controller orchestration, lifecycle, diagnostics
+- `@commandrelay/proxy-runtime`: controller orchestration, lifecycle, diagnostics
 
 Keep transport-specific wrappers in their own packages (`proxy-fetch`, `proxy-undici`, etc.).
 
@@ -34,7 +34,7 @@ Keep transport-specific wrappers in their own packages (`proxy-fetch`, `proxy-un
 
 - Replace scattered env parsing with one controller initialization path.
 - Migrate call sites to consume `resolve(...).metadata` for explainable behavior.
-- Prefer root exports only (`@termina/proxy-runtime`), not `dist/*` deep imports.
+- Prefer root exports only (`@commandrelay/proxy-runtime`), not `dist/*` deep imports.
 - While pre-`1.0`, pin minor releases (`~0.1.x`) in production.
 
 ## Troubleshooting

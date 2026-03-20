@@ -15,7 +15,7 @@ on:
         description: "Comma-separated wildcard filters for package names"
         required: false
         type: string
-        default: "@commandrelay/proxy-*,@termina/proxy-*"
+        default: "@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
       dist_tag:
         description: "npm dist-tag"
         required: false
@@ -74,7 +74,7 @@ jobs:
           set -euo pipefail
 
           run_mode="dry-run"
-          selector="@commandrelay/proxy-*,@termina/proxy-*"
+          selector="@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
           dist_tag="latest"
 
           if [[ "$EVENT_NAME" == "release" ]]; then
@@ -93,7 +93,7 @@ jobs:
             fi
 
             run_mode="publish"
-            selector="@commandrelay/proxy-*,@termina/proxy-*"
+            selector="@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
             dist_tag="latest"
 
             if [[ "$RELEASE_PRERELEASE" == "true" ]]; then
@@ -106,7 +106,7 @@ jobs:
             fi
           else
             run_mode="${INPUT_MODE:-dry-run}"
-            selector="${INPUT_SELECTOR:-@commandrelay/proxy-*}"
+            selector="${INPUT_SELECTOR:-@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*}"
             dist_tag="${INPUT_DIST_TAG:-latest}"
 
             if [[ "$run_mode" == "publish" ]]; then
@@ -136,7 +136,7 @@ jobs:
           const fs = require('node:fs');
           const path = require('node:path');
 
-          const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*,@termina/proxy-*';
+          const selector = process.env.PACKAGE_SELECTOR ?? '@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*';
           const packagesDir = path.resolve('packages');
 
           const escapeRegExp = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
@@ -158,7 +158,7 @@ jobs:
           if (selectorRegexes.length === 0) {
             throw new Error(`No valid selector patterns found in "${selector}"`);
           }
-          const packageNameRegex = /^@[^/]+\/proxy-[a-z0-9][a-z0-9-]*$/;
+          const packageNameRegex = /^@commandrelay\/(proxy-[a-z0-9][a-z0-9-]*|relay-proxy)$/;
 
           const selected = [];
           if (fs.existsSync(packagesDir)) {

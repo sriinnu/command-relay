@@ -6,7 +6,7 @@ Use `ProxyFetchClient` when the process performs multiple outbound calls and you
 
 ```bash
 node --import tsx <<'TS'
-import { ProxyFetchClient, loadProxySettings } from "@termina/proxy-fetch";
+import { ProxyFetchClient, loadProxySettings } from "@commandrelay/proxy-fetch";
 
 const client = new ProxyFetchClient({
   settings: loadProxySettings({

@@ -6,7 +6,7 @@ Use this example to inspect direct/proxy/no_proxy decisions from one runtime con
 
 ```bash
 node --import tsx <<'TS'
-import { ProxyRuntimeController, loadProxySettings } from "@termina/proxy-runtime";
+import { ProxyRuntimeController, loadProxySettings } from "@commandrelay/proxy-runtime";
 
 const controller = new ProxyRuntimeController({
   settings: loadProxySettings({

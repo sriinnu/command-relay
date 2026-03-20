@@ -81,8 +81,15 @@ Tunnel defaults:
 1. Local endpoint: `127.0.0.1:8787`
 2. Remote endpoint: `127.0.0.1:8787`
 3. Local URLs: `http://127.0.0.1:8787` and `ws://127.0.0.1:8787/ws`
+4. For multi-tab collaboration from a second machine, keep one input-enabled pane per client and use `/status` for lane-level confirmation.
 
 For extra examples and option details, see [`scripts/ssh/README.md`](../scripts/ssh/README.md).
+
+Cross-host collaboration note:
+
+1. Use this runbook for temporary operations and development lanes.
+2. Avoid exposing remote port binds directly while the host is internet-exposed.
+3. Host-side tunnel targets should default to loopback (`127.0.0.1`) and use strict auth/token at runtime.
 
 ## SSH Runtime Validator Reference
 
@@ -222,7 +229,7 @@ cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 npm run capsule:build -- \
   --goal "Document capsule brief wiring in operations, docs index, and skill guide" \
   --owner docs-brief-owner \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --path docs/README.md \
   --path docs/operations.md \
   --accept "Document capsule:brief full flow after capsule build" \
@@ -237,7 +244,7 @@ npm run capsule:brief -- \
   --owner docs-brief-owner \
   --path docs/operations.md \
   --path docs/README.md \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.md
 
 npm run capsule:dispatch -- \
@@ -246,7 +253,7 @@ npm run capsule:dispatch -- \
   --owner docs-brief-owner \
   --path docs/operations.md \
   --path docs/README.md \
-  --path skills/termina-orchestrator/SKILL.md \
+  --path skills/commandrelay-orchestrator/SKILL.md \
   --agent-type worker \
   --instruction "You are not alone in the codebase; respect owned file scope." \
   --out /mnt/c/sriinnu/personal/Kaala-brahma/terminal/.tmp/docs-brief-wiring.dispatch.json

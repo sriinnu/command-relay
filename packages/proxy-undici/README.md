@@ -1,13 +1,13 @@
-# @termina/proxy-undici
+# @commandrelay/proxy-undici
 
-`@termina/proxy-undici` provides proxy-aware Undici dispatcher resolution for Node services and SDK clients.
+`@commandrelay/proxy-undici` provides proxy-aware Undici dispatcher resolution for Node services and SDK clients.
 
 It reuses `@commandrelay/proxy-core` for environment parsing and `NO_PROXY` matching, then creates direct or proxy dispatchers for HTTP/HTTPS targets.
 
 ## Install
 
 ```bash
-npm install @termina/proxy-undici undici
+npm install @commandrelay/proxy-undici undici
 ```
 
 ## Runtime support
@@ -26,7 +26,7 @@ npm install @termina/proxy-undici undici
 
 ## Migration
 
-`@termina/proxy-undici` is currently `0.1.x`; there is no prior package-specific breaking release. Typical migration is from ad-hoc `ProxyAgent` allocation or direct `Agent` wiring.
+`@commandrelay/proxy-undici` is currently `0.1.x`; there is no prior package-specific breaking release. Typical migration is from ad-hoc `ProxyAgent` allocation or direct `Agent` wiring.
 
 1. Replace per-request agent construction with one shared `ProxyUndiciDispatcherFactory`.
 2. Resolve dispatchers per target URL (`factory.resolve(target)`) and pass the dispatcher to Undici clients.
@@ -44,7 +44,7 @@ npm install @termina/proxy-undici undici
 ## Quick Start
 
 ```ts
-import { ProxyUndiciDispatcherFactory } from "@termina/proxy-undici";
+import { ProxyUndiciDispatcherFactory } from "@commandrelay/proxy-undici";
 import { request } from "undici";
 
 const factory = new ProxyUndiciDispatcherFactory();
@@ -64,9 +64,9 @@ factory.destroy();
 
 | Undici integration need | Recommended package | Reason |
 | --- | --- | --- |
-| Reusable dispatcher routing for Undici `request`/`fetch` | `@termina/proxy-undici` | Resolves direct vs proxy dispatcher with bounded cache |
+| Reusable dispatcher routing for Undici `request`/`fetch` | `@commandrelay/proxy-undici` | Resolves direct vs proxy dispatcher with bounded cache |
 | Need Node agent integration (`http.Agent`/`https.Agent`) | Prefer `@commandrelay/proxy-agent` | Agent-oriented clients do not consume Undici dispatchers |
-| Need SOCKS or PAC proxy protocols | Prefer `@commandrelay/proxy-agent` | `@termina/proxy-undici` intentionally supports only HTTP/HTTPS proxy URLs |
+| Need SOCKS or PAC proxy protocols | Prefer `@commandrelay/proxy-agent` | `@commandrelay/proxy-undici` intentionally supports only HTTP/HTTPS proxy URLs |
 | Need policy-only parsing and `NO_PROXY` matching | Prefer `@commandrelay/proxy-core` | Keeps decision logic transport-agnostic |
 
 ## API
@@ -112,7 +112,7 @@ Unsupported proxy protocols in this package: SOCKS and PAC. Use `@commandrelay/p
 ## Troubleshooting
 
 - `unsupported_proxy_protocol:*` for SOCKS/PAC URLs:
-  - This is expected in `@termina/proxy-undici`; route those cases to `@commandrelay/proxy-agent`.
+  - This is expected in `@commandrelay/proxy-undici`; route those cases to `@commandrelay/proxy-agent`.
 - Unexpected direct routing:
   - Inspect `NO_PROXY` and ensure the target protocol has matching proxy settings.
 - Unexpected proxy routing:

@@ -33,6 +33,43 @@ const TARGET_PROTOCOLS = new Set(["http:", "https:", "ws:", "wss:"]);
 const PAC_SECURE_DEFAULTS: Pick<PacProxyAgentConstructorOptions, "fallbackToDirect"> = {
   fallbackToDirect: false
 };
+/**
+ * Shared TLS options applied across transport agents.
+ */
+export type ProxyAgentTlsOptions = {
+  /**
+   * Set to false to allow upstream TLS certificates that fail default validation.
+   */
+  rejectUnauthorized?: boolean;
+  /**
+   * Additional CA certificates used to validate proxy and target chains.
+   */
+  ca?: string | Array<string | Buffer> | Buffer;
+  /**
+   * Client certificate chain used for mutual TLS to proxy endpoints.
+   */
+  cert?: string | Array<string | Buffer> | Buffer;
+  /**
+   * Client private key used with `cert` for mutual TLS to proxy endpoints.
+   */
+  key?: string | Array<string | Buffer> | Buffer;
+  /**
+   * PKCS#12 identity for mutual TLS to proxy endpoints.
+   */
+  pfx?: string | ArrayBuffer | ArrayBufferView | Array<string | Buffer>;
+  /**
+   * Optional passphrase for encrypted keys or PKCS#12 files.
+   */
+  passphrase?: string;
+  /**
+   * Optional minimum TLS protocol version.
+   */
+  minVersion?: string;
+  /**
+   * Optional maximum TLS protocol version.
+   */
+  maxVersion?: string;
+};
 type DisposableAgent = Agent & {
   destroy?: (() => unknown) | undefined;
   dispose?: (() => unknown) | undefined;
@@ -87,6 +124,10 @@ export interface ProxyAgentConstructorOptions {
    * Applied when the selected agent class is `PacProxyAgent`.
    */
   pac?: PacProxyAgentConstructorOptions;
+  /**
+   * Shared TLS settings applied to supported proxy agents.
+   */
+  tls?: ProxyAgentTlsOptions;
 }
 
 /**
@@ -313,19 +354,19 @@ export function createProxyAgent(
   const protocol = parseProtocol(proxyUrl);
 
   if (SOCKS_PROTOCOLS.has(protocol)) {
-    return new SocksProxyAgent(proxyUrl, options.socks) as unknown as Agent;
+    return new SocksProxyAgent(proxyUrl, applyTlsOptionsToSocksAgent(options.socks, options.tls)) as unknown as Agent;
   }
 
   if (PAC_PROTOCOLS.has(protocol)) {
-    return new PacProxyAgent(proxyUrl, toPacAgentOptions(options.pac)) as unknown as Agent;
+    return new PacProxyAgent(proxyUrl, applyTlsOptions(toPacAgentOptions(options.pac), options.tls)) as unknown as Agent;
   }
 
   if (protocol === "http:" || protocol === "https:") {
     if (normalizedTargetProtocol === "http:" || normalizedTargetProtocol === "ws:") {
-      return new HttpProxyAgent(proxyUrl, options.http) as unknown as Agent;
+      return new HttpProxyAgent(proxyUrl, applyTlsOptions(options.http, options.tls)) as unknown as Agent;
     }
 
-    return new HttpsProxyAgent(proxyUrl, options.https) as unknown as Agent;
+    return new HttpsProxyAgent(proxyUrl, applyTlsOptions(options.https, options.tls)) as unknown as Agent;
   }
 
   throw new UnsupportedProxyProtocolError(protocol);
@@ -335,6 +376,33 @@ function toPacAgentOptions(
   options: PacProxyAgentConstructorOptions | undefined
 ): PacProxyAgentConstructorOptions {
   return { ...PAC_SECURE_DEFAULTS, ...options };
+}
+
+/**
+ * Applies shared TLS configuration to protocol-specific agent options.
+ */
+function applyTlsOptions<T extends object>(
+  agentOptions: T | undefined,
+  tlsOptions: ProxyAgentTlsOptions | undefined
+): T {
+  if (!agentOptions && !tlsOptions) return {} as T;
+  if (!agentOptions) return tlsOptions as T;
+  if (!tlsOptions) return agentOptions;
+
+  return {
+    ...agentOptions,
+    ...tlsOptions
+  } as T;
+}
+
+/**
+ * Applies TLS options to SOCKS agents only for fields explicitly supported by runtime.
+ */
+function applyTlsOptionsToSocksAgent(
+  socksOptions: SocksProxyAgentConstructorOptions | undefined,
+  _tlsOptions: ProxyAgentTlsOptions | undefined
+): SocksProxyAgentConstructorOptions | undefined {
+  return socksOptions;
 }
 
 /**

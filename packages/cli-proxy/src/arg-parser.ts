@@ -50,7 +50,7 @@ export function parseCliArgs(argv: readonly string[]): CliParseResult {
       return fail(
         "unknown_command",
         `Unknown command: ${command}`,
-        "Use 'termina-cli-proxy help' to see available commands."
+        "Use 'commandrelay-cli-proxy help' to see available commands."
       );
   }
 }
@@ -109,7 +109,7 @@ function parseHelpCommand(rest: readonly string[]): CliParseResult {
     return fail(
       "unexpected_argument",
       `Unexpected argument for help: ${rest[0]}`,
-      "Run 'termina-cli-proxy help'."
+      "Run 'commandrelay-cli-proxy help'."
     );
   }
 
@@ -200,7 +200,7 @@ function parseExplainCommand(rest: readonly string[], inheritedJson: boolean): C
     return fail(
       "missing_url",
       "The explain command requires at least one URL.",
-      "Example: termina-cli-proxy explain https://example.com"
+      "Example: commandrelay-cli-proxy explain https://example.com"
     );
   }
 

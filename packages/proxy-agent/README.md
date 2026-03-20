@@ -47,7 +47,11 @@ const factory = new ProxyAgentFactory({
   maxCacheEntries: 256,
   agentOptions: {
     http: { keepAlive: true },
-    https: { keepAlive: true }
+    https: { keepAlive: true },
+    tls: {
+      rejectUnauthorized: true,
+      minVersion: "TLSv1.2"
+    }
   }
 });
 
@@ -70,7 +74,7 @@ export function resolveAgent(target: string | URL) {
 | Integration context | Recommended package | Reason |
 | --- | --- | --- |
 | Axios, Got, or custom `http`/`https` clients that accept Node agents | `@commandrelay/proxy-agent` | Returns protocol-correct `http.Agent`/`https.Agent` with cache + env routing |
-| Node `fetch`/Undici code expecting a `dispatcher` | Prefer `@termina/proxy-undici` or `@termina/proxy-fetch` | Those integrations are dispatcher-native |
+| Node `fetch`/Undici code expecting a `dispatcher` | Prefer `@commandrelay/proxy-undici` or `@commandrelay/proxy-fetch` | Those integrations are dispatcher-native |
 | Need SOCKS or PAC proxy URL support in Node clients | `@commandrelay/proxy-agent` | Supports `socks*` and `pac+*` schemes |
 | Need policy-only decision logic without creating agents | Prefer `@commandrelay/proxy-core` | Keeps routing logic decoupled from transport runtime |
 
@@ -110,7 +114,22 @@ Also exported:
 - `resolveProxyForUrl(target: string | URL, settings: ProxySettings): string | null`
 - `shouldBypassProxy(target: URL, rules: NoProxyRule[]): boolean`
 - `parseNoProxy(raw: string): NoProxyRule[]`
-- Types: `NoProxyRule`, `ProxyEnvironment`, `ProxySettings`, `ProxyAgentFactoryOptions`, `ProxyAgentResolution`, `ProxyAgentConstructorOptions`
+- Types: `NoProxyRule`, `ProxyEnvironment`, `ProxySettings`, `ProxyAgentFactoryOptions`, `ProxyAgentResolution`, `ProxyAgentConstructorOptions`, `ProxyAgentTlsOptions`
+
+`ProxyAgentTlsOptions` is also exported for shared trust policy:
+
+```ts
+type ProxyAgentTlsOptions = {
+  rejectUnauthorized?: boolean;
+  ca?: string | Array<string | Buffer> | Buffer;
+  cert?: string | Array<string | Buffer> | Buffer;
+  key?: string | Array<string | Buffer> | Buffer;
+  pfx?: string | ArrayBuffer | ArrayBufferView | Array<string | Buffer>;
+  passphrase?: string;
+  minVersion?: string;
+  maxVersion?: string;
+};
+```
 
 ## Security and Ops
 

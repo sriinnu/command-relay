@@ -1,5 +1,5 @@
 import type { ActiveProfileState } from "./connection-profile.js";
-import type { CommandRelayClient } from "@commandrelay/client";
+import type { CommandRelayClient } from "./commandrelay-client-loader.js";
 import type { Backend } from "./backend.js";
 
 /**

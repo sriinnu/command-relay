@@ -16,12 +16,27 @@ Use [`validate-remote-runtime.sh`](./validate-remote-runtime.sh) to preflight a 
 2. SSH access to the target host.
 3. CommandRelay running on the remote host (default assumed on `127.0.0.1:8787`).
 
+### PowerShell (Windows)
+
+If you are on Windows, use the PowerShell variants:
+
+```powershell
+./open-tunnel.ps1 -Target relay@relay-host
+./validate-remote-runtime.ps1 -Target relay@relay-host
+```
+
 ## Quick start
 
 From repo root:
 
 ```bash
 ./scripts/ssh/open-tunnel.sh --target <user@host>
+```
+
+Windows equivalent:
+
+```powershell
+./open-tunnel.ps1 -Target <user@host>
 ```
 
 Then connect local clients to:
@@ -35,6 +50,18 @@ macOS/Linux default tunnel:
 
 ```bash
 ./scripts/ssh/open-tunnel.sh --target dev@relay-host
+```
+
+Use a different SSH executable:
+
+```bash
+./scripts/ssh/open-tunnel.sh --target dev@relay-host --ssh-command /opt/homebrew/bin/ssh
+```
+
+Windows equivalent:
+
+```powershell
+./open-tunnel.ps1 -Target dev@relay-host -SshCommand "C:\Program Files\Git\usr\bin\ssh.exe"
 ```
 
 Use a different local port:
@@ -63,11 +90,28 @@ Preview command without opening the tunnel:
 ./scripts/ssh/open-tunnel.sh --target dev@relay-host --dry-run
 ```
 
+Windows equivalent:
+
+```powershell
+./open-tunnel.ps1 -Target dev@relay-host -DryRun
+```
+
 ## Help
 
 ```bash
 ./scripts/ssh/open-tunnel.sh --help
 ```
+
+```powershell
+./open-tunnel.ps1 -Help
+```
+
+### Open tunnel exit codes
+
+1. `0`: success
+2. `2`: invalid usage/arguments
+3. `3`: local SSH/port validation issue
+4. `4`: ssh command execution failure
 
 ## Remote runtime validator
 
@@ -83,6 +127,12 @@ What it checks in one non-interactive SSH command set:
 
 ```bash
 ./scripts/ssh/validate-remote-runtime.sh --target <user@host>
+```
+
+Windows equivalent:
+
+```powershell
+./validate-remote-runtime.ps1 -Target <user@host>
 ```
 
 ### Examples
@@ -118,6 +168,10 @@ Dry-run local validation:
 
 ```bash
 ./scripts/ssh/validate-remote-runtime.sh --target relay-prod --dry-run
+```
+
+```powershell
+./validate-remote-runtime.ps1 -Target relay-prod -DryRun
 ```
 
 ### Exit codes

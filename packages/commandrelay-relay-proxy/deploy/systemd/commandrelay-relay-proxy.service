@@ -1,0 +1,23 @@
+[Unit]
+Description=CommandRelay Relay Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/commandrelay-relay-proxy.env
+Environment=NODE_ENV=production
+ExecStart=commandrelay-relay-proxy
+Restart=on-failure
+RestartSec=5
+KillMode=process
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=no
+ProtectHome=no
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

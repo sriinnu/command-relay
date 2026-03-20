@@ -2,9 +2,6 @@
   "name": "commandrelay-bridge",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
   "type": "module",
   "description": "CommandRelay tmux bridge core engine",
   "scripts": {
@@ -26,6 +23,9 @@
     "check:all": "bash scripts/packages/run-phase.sh check --include-root --root-script check",
     "build": "npm run build:all",
     "build:packages": "bash scripts/packages/run-phase.sh build",
+    "build:packages:ordered": "node scripts/packages/run-phase-ordered.mjs build",
+    "build:packages:ordered:root": "node scripts/packages/run-phase-ordered.mjs build --include-root --root-script build:packages:ordered",
+    "order:packages": "node scripts/packages/run-phase-ordered.mjs build --print-order",
     "build:all": "npm run build:packages",
     "test": "npm run test:root",
     "test:root": "tsx --test src/**/*.test.ts",

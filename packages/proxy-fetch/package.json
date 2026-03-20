@@ -1,9 +1,9 @@
 {
-  "name": "@termina/proxy-fetch",
+  "name": "@commandrelay/proxy-fetch",
   "version": "0.1.0",
   "description": "Proxy-aware fetch wrappers with JSON safety limits and timeout controls",
   "keywords": [
-    "termina",
+    "commandrelay",
     "commandrelay",
     "proxy",
     "fetch",
@@ -44,10 +44,10 @@
   "scripts": {
     "check": "tsc -p tsconfig.json --noEmit",
     "build": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
-    "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js"
+    "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js && npm exec -- node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@termina/proxy-undici": "^0.1.0"
+    "@commandrelay/proxy-undici": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

@@ -11,12 +11,12 @@ import type {
  */
 export function formatHelpText(): string {
   return [
-    "@termina/cli-proxy",
+    "@commandrelay/cli-proxy",
     "",
     "Usage:",
-    "  termina-cli-proxy env [--json]",
-    "  termina-cli-proxy explain [--json] [--with-agent|--no-agent] <url...>",
-    "  termina-cli-proxy help",
+    "  commandrelay-cli-proxy env [--json]",
+    "  commandrelay-cli-proxy explain [--json] [--with-agent|--no-agent] <url...>",
+    "  commandrelay-cli-proxy help",
     "",
     "Commands:",
     "  env      Inspect proxy-related environment variables and normalized settings.",

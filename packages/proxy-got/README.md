@@ -1,15 +1,15 @@
-# @termina/proxy-got
+# @commandrelay/proxy-got
 
 <p align="left">
   <img src="./docs/assets/proxy-got-brand.svg" width="88" height="88" alt="Proxy Got brand mark" />
 </p>
 
-`@termina/proxy-got` provides a production-ready got adapter baseline that resolves and applies proxy-aware Node agents without importing got at runtime.
+`@commandrelay/proxy-got` provides a production-ready got adapter baseline that resolves and applies proxy-aware Node agents without importing got at runtime.
 
 ## Install
 
 ```bash
-npm install @termina/proxy-got
+npm install @commandrelay/proxy-got
 ```
 
 ## Runtime support
@@ -36,7 +36,7 @@ npm install @termina/proxy-got
 
 ```ts
 import got from "got";
-import { ProxyGotAgentResolver, applyProxyGotAgent } from "@termina/proxy-got";
+import { ProxyGotAgentResolver, applyProxyGotAgent } from "@commandrelay/proxy-got";
 
 const resolver = new ProxyGotAgentResolver();
 

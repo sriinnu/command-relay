@@ -1,4 +1,4 @@
-# @termina/proxy-got Examples
+# @commandrelay/proxy-got Examples
 
 Each example includes a runnable snippet and an expected output snapshot.
 Snapshots are stored under [`./snapshots`](./snapshots/).

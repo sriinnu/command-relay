@@ -6,7 +6,7 @@ This example shows direct vs proxied resolution and cache metadata.
 
 ```bash
 node --import tsx <<'TS'
-import { ProxyAxiosAgentResolver } from "@termina/proxy-axios";
+import { ProxyAxiosAgentResolver } from "@commandrelay/proxy-axios";
 
 const resolver = new ProxyAxiosAgentResolver({
   env: {
