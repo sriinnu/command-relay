@@ -2,8 +2,6 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import type { ParseMessageOptions, ProtocolV1AllowedEventType } from "@commandrelay/protocol";
-
-type ProtocolModule = typeof import("@commandrelay/protocol");
 export { 
   type AuthErrorPayload,
   type AuthOkPayload,
@@ -45,20 +43,7 @@ import {
   PendingRequest,
   EXPECTED_RESPONSE_TYPES_BY_COMMAND
 } from "./commandrelay-client-types.js";
-
-let protocolRuntime: Promise<ProtocolModule> | null = null;
-function loadProtocolRuntime(): Promise<ProtocolModule> {
-  if (protocolRuntime) return protocolRuntime;
-  protocolRuntime = import("@commandrelay/protocol").catch(async (primaryError: unknown): Promise<ProtocolModule> => {
-    try {
-      const fallbackSpec = new URL("../commandrelay-protocol/dist/index.js", import.meta.url).href;
-      return await import(fallbackSpec);
-    } catch {
-      throw primaryError instanceof Error ? primaryError : new Error(String(primaryError));
-    }
-  });
-  return protocolRuntime;
-}
+import { loadProtocolRuntime, type ProtocolModule } from "./protocol-runtime-loader.js";
 
 export type ClientCommand =
   | "auth"

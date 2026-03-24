@@ -103,11 +103,12 @@ function Section-Selected {
 function Wait-ForEndpoint {
   param(
     [string]$Uri,
+    [hashtable]$Headers = @{},
     [int]$Attempts = 30
   )
   for ($i = 0; $i -lt $Attempts; $i++) {
     try {
-      Invoke-WebRequest -Uri $Uri -UseBasicParsing -Method Get -TimeoutSec 1 | Out-Null
+      Invoke-WebRequest -Uri $Uri -Headers $Headers -UseBasicParsing -Method Get -TimeoutSec 1 | Out-Null
       return $true
     } catch {
       Start-Sleep -Milliseconds 500
@@ -119,13 +120,16 @@ function Wait-ForEndpoint {
 function Probe-RelayEndpoints {
   $healthUrl = "http://$Host`:$Port$HealthPath"
   $statusUrl = "http://$Host`:$Port/status"
-  $statusAuthUrl = "$statusUrl?token=$Token"
+  $headers = @{}
+  if (-not [string]::IsNullOrWhiteSpace($Token)) {
+    $headers["Authorization"] = "Bearer $Token"
+  }
 
-  if (-not (Wait-ForEndpoint -Uri $healthUrl)) {
+  if (-not (Wait-ForEndpoint -Uri $healthUrl -Headers $headers)) {
     throw "Relay health endpoint did not come up: $healthUrl"
   }
 
-  $status = Invoke-RestMethod -Uri $statusAuthUrl -TimeoutSec 5 -Method Get
+  $status = Invoke-RestMethod -Uri $statusUrl -Headers $headers -TimeoutSec 5 -Method Get
   if ($null -eq $status.statusContractVersion -or [int]$status.statusContractVersion -ne 2) {
     throw "Invalid statusContractVersion. Expected 2."
   }

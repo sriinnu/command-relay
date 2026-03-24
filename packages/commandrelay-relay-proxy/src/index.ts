@@ -1,9 +1,10 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { SecureVersion } from "node:tls";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
+import { isOriginAllowed, isRelayPath, isTokenValidFromRequest } from "./request-guards.js";
 
 const MAX_WS_PAYLOAD_BYTES = 1024 * 1024 * 4;
 const MAX_UPSTREAM_PENDING_MESSAGES = 64;
@@ -658,33 +659,6 @@ function loadTlsMaterial(raw: string, label: string): Buffer | undefined {
 
 function loadTlsMaterialAsBuffer(raw: string, label: string): Buffer | undefined {
   return loadTlsMaterial(raw, label);
-}
-function isRelayPath(request: IncomingMessage, relayPath: string): boolean {
-  const parsed = new URL(request.url || "", "http://localhost");
-  return parsed.pathname === relayPath;
-}
-function isOriginAllowed(originHeader: string | undefined, allowedOrigins: string[]): boolean {
-  if (!allowedOrigins.length) return true;
-  return typeof originHeader === "string" && allowedOrigins.includes(originHeader);
-}
-function isTokenValidFromRequest(request: IncomingMessage, requiredToken: string): boolean {
-  if (!requiredToken) return true;
-  return constantTimeEquals(hashToken(requiredToken), hashToken(extractClientToken(request)));
-}
-function extractClientToken(request: IncomingMessage): string {
-  const query = request.url ? new URL(request.url, "http://localhost").searchParams : new URLSearchParams();
-  const bearer = request.headers.authorization;
-  if (typeof bearer === "string" && bearer.toLowerCase().startsWith("bearer ")) {
-    return bearer.slice(7).trim();
-  }
-  return query.get("token") ?? "";
-}
-function hashToken(value: string): Buffer {
-  return createHash("sha256").update(value).digest();
-}
-function constantTimeEquals(left: Buffer, right: Buffer): boolean {
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
 }
 function serveHealth(
   request: IncomingMessage,

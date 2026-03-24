@@ -125,7 +125,7 @@ node ./packages/commandrelay-relay-proxy/dist/cli.js \
 From a second shell:
 
 ```bash
-curl -sS http://127.0.0.1:8788/health
+curl -sS -H "Authorization: Bearer my-token" "http://127.0.0.1:8788/health"
 curl -sS -H "Authorization: Bearer my-token" "http://127.0.0.1:8788/status"
 curl -i -H "Authorization: Bearer my-token" "http://127.0.0.1:8788/status"
 curl -sS "http://127.0.0.1:8788/status"
@@ -252,8 +252,8 @@ node .\packages\commandrelay-relay-proxy\dist\cli.js `
 ```
 
 ```powershell
-Invoke-RestMethod -Uri "http://127.0.0.1:8788/health"
-Invoke-RestMethod -Uri "http://127.0.0.1:8788/status?token=my-token"
+Invoke-RestMethod -Uri "http://127.0.0.1:8788/health" -Headers @{ Authorization = "Bearer my-token" }
+Invoke-RestMethod -Uri "http://127.0.0.1:8788/status" -Headers @{ Authorization = "Bearer my-token" }
 ```
 
 ```powershell

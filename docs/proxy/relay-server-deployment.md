@@ -54,8 +54,8 @@ docker compose --env-file .env up -d
 Health / status:
 
 ```bash
-curl -sS http://127.0.0.1:8788/health  # add ?token=<token> or Authorization header when REQUIRED_TOKEN is set
-curl -sS http://127.0.0.1:8788/status  # add ?token=<token> or Authorization header when REQUIRED_TOKEN is set
+curl -sS http://127.0.0.1:8788/health  # add Authorization: Bearer <token> when REQUIRED_TOKEN is set
+curl -sS http://127.0.0.1:8788/status  # add Authorization: Bearer <token> when REQUIRED_TOKEN is set
 ```
 
 Edit `packages/commandrelay-relay-proxy/deploy/docker/.env` for upstream, token, TLS, and upstream trust policy.

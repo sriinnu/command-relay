@@ -66,7 +66,7 @@ Security notes:
 
 1. Keep `COMMANDRELAY_RELAY_UPSTREAM_TLS_REJECT_UNAUTHORIZED=true` unless you have a test-only reason.
 2. Prefer `COMMANDRELAY_RELAY_REQUIRED_TOKEN` with TLS in any remote-exposed layout.
-3. `COMMANDRELAY_RELAY_REQUIRED_TOKEN` also applies to `/health` and `/status` operator endpoints (`Authorization: Bearer <token>` or `?token=`).
+3. `COMMANDRELAY_RELAY_REQUIRED_TOKEN` also applies to `/health` and `/status` operator endpoints and must be sent via `Authorization: Bearer <token>`.
 4. Monitor `/status` for heartbeat, `statusContractVersion`, and TLS rotation state.
 
 ## API Quick Start
@@ -141,8 +141,8 @@ await relay.close();
    - `cd packages/commandrelay-relay-proxy/deploy/docker`
    - `docker compose build`
    - `docker compose --env-file .env up -d`
-   - Health: `curl http://127.0.0.1:8788/health` (add `?token=<token>` if required token is configured)
-   - Status: `curl http://127.0.0.1:8788/status` (add `?token=<token>` if required token is configured)
+  - Health: `curl -H "Authorization: Bearer <token>" http://127.0.0.1:8788/health` when required token is configured
+  - Status: `curl -H "Authorization: Bearer <token>" http://127.0.0.1:8788/status` when required token is configured
 
 3. **Windows (native service)**
 

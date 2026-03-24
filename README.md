@@ -80,9 +80,9 @@ They are not mandatory for the core terminal-control path (`list/attach/replay/i
 ## Quick Start
 
 ```bash
-npm install
-npm run check
-npm start
+pnpm install
+pnpm run check
+pnpm start
 ```
 
 Optional SSH startup wiring (remote profile orchestration contract):
@@ -95,7 +95,7 @@ export COMMANDRELAY_SSH_COMMAND=ssh
 export COMMANDRELAY_SSH_PORT=22
 export COMMANDRELAY_SSH_CONNECT_TIMEOUT_SECONDS=8
 export COMMANDRELAY_SSH_STRICT_HOST_KEY_CHECKING=true
-npm start
+pnpm start
 ```
 
 Current runtime data path remains the WS server (`/ws`) plus tmux runtime control.
