@@ -44,7 +44,7 @@ commandrelay-relay-proxy \
 
 ### Example: test status and health probes
 ```bash
-curl -sS http://127.0.0.1:8788/health
+curl -sS -H "Authorization: Bearer sekrit" http://127.0.0.1:8788/health
 curl -sS -H "Authorization: Bearer sekrit" http://127.0.0.1:8788/status
 ```
 
@@ -93,7 +93,7 @@ curl -sS -H "Authorization: Bearer ${COMMANDRELAY_RELAY_REQUIRED_TOKEN}" \
 2. Optional upstream WebSocket upgrade to `upstreamUrl` (`ws:` or `wss:`).
 3. Optional required token challenge:
    - Token is validated via hash compare using constant-time comparison.
-   - Token can be supplied with `Authorization: Bearer <token>` or `?token=<token>` on `GET /health` and `GET /status`.
+   - Token must be supplied with `Authorization: Bearer <token>` on `GET /health` and `GET /status`.
    - Client-provided and configured tokens are not logged.
 
 4. Upstream TLS policy:
@@ -122,8 +122,10 @@ Reload and rotation hardening options:
 ## Example heartbeat checks
 
 ```bash
-curl -sS "http://127.0.0.1:8788/health?token=${COMMANDRELAY_RELAY_REQUIRED_TOKEN}"
-curl -sS "http://127.0.0.1:8788/status?token=${COMMANDRELAY_RELAY_REQUIRED_TOKEN}"
+curl -sS -H "Authorization: Bearer ${COMMANDRELAY_RELAY_REQUIRED_TOKEN}" \
+  "http://127.0.0.1:8788/health"
+curl -sS -H "Authorization: Bearer ${COMMANDRELAY_RELAY_REQUIRED_TOKEN}" \
+  "http://127.0.0.1:8788/status"
 ```
 
 `/status` is always open only when token policy allows access and includes:

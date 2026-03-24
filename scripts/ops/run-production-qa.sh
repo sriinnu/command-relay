@@ -168,9 +168,14 @@ assert_command() {
 probe_endpoint() {
   local url="$1"
   local timeout_s="$2"
+  local auth_header="${3:-}"
   local i=1
   while (( i <= timeout_s )); do
-    if curl -sS "$url" >/dev/null; then
+    if [[ -n "$auth_header" ]]; then
+      if curl -sS -H "$auth_header" "$url" >/dev/null; then
+        return 0
+      fi
+    elif curl -sS "$url" >/dev/null; then
       return 0
     fi
     sleep 1
@@ -182,17 +187,16 @@ probe_endpoint() {
 probe_relay_endpoints() {
   local health_url="http://$HOST:$PORT$HEALTH_PATH"
   local status_url="http://$HOST:$PORT/status"
-  local status_authorized_url="$status_url?token=$TOKEN"
 
-  if ! run_command "relay health endpoint" bash -lc "curl -sS \"$health_url\" >/dev/null"; then
+  if ! run_command "relay health endpoint" bash -lc "curl -sS -H 'Authorization: Bearer $TOKEN' \"$health_url\" >/dev/null"; then
     return 1
   fi
 
-  if ! run_command "relay status endpoint with token" bash -lc "curl -sS -H 'Authorization: Bearer $TOKEN' \"$status_authorized_url\" >/dev/null"; then
+  if ! run_command "relay status endpoint with token" bash -lc "curl -sS -H 'Authorization: Bearer $TOKEN' \"$status_url\" >/dev/null"; then
     return 1
   fi
 
-  if ! run_command "relay status contract fields" bash -lc "curl -sS \"$status_authorized_url\" | node -e 'const fs=require(\"node:fs\"); const data=JSON.parse(fs.readFileSync(0,\"utf8\")); if (data.statusContractVersion!==2){process.exit(1);} if (typeof data.configFingerprint!==\"string\" || data.configFingerprint.length===0){process.exit(1);} if (!data.heartbeat || typeof data.heartbeat.checkedAtMs!==\"number\"){process.exit(1);} if (!data.upstream || !data.upstream.rotation || typeof data.upstream.rotation.status!==\"string\"){process.exit(1);}'"; then
+  if ! run_command "relay status contract fields" bash -lc "curl -sS -H 'Authorization: Bearer $TOKEN' \"$status_url\" | node -e 'const fs=require(\"node:fs\"); const data=JSON.parse(fs.readFileSync(0,\"utf8\")); if (data.statusContractVersion!==2){process.exit(1);} if (typeof data.configFingerprint!==\"string\" || data.configFingerprint.length===0){process.exit(1);} if (!data.heartbeat || typeof data.heartbeat.checkedAtMs!==\"number\"){process.exit(1);} if (!data.upstream || !data.upstream.rotation || typeof data.upstream.rotation.status!==\"string\"){process.exit(1);}'"; then
     return 1
   fi
 
@@ -251,8 +255,8 @@ start_and_probe_relay() {
 
   (
     cd "$REPO_ROOT" || exit 1
-    "${relay_cmd[@]}" >"$log_file" 2>&1 &
-  )
+    "${relay_cmd[@]}" >"$log_file" 2>&1
+  ) &
   relay_pid=$!
 
   trap 'cleanup_relay_process "$relay_pid"' EXIT
@@ -265,7 +269,7 @@ start_and_probe_relay() {
     return 1
   fi
 
-  if ! probe_endpoint "http://$HOST:$PORT$HEALTH_PATH" 30; then
+  if ! probe_endpoint "http://$HOST:$PORT$HEALTH_PATH" 30 "Authorization: Bearer $TOKEN"; then
     echo "Relay health probe timed out." >&2
     tail -n 80 "$log_file" >&2
     return 1

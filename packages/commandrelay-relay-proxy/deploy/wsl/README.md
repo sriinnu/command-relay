@@ -32,8 +32,8 @@ docker compose --env-file .env up -d
 ## 3) Health checks
 
 ```bash
-curl -sS "http://127.0.0.1:8788/health?token=<token>"   # optional when token is configured
-curl -sS "http://127.0.0.1:8788/status?token=<token>"   # optional when token is configured
+curl -sS -H "Authorization: Bearer <token>" "http://127.0.0.1:8788/health"   # when token is configured
+curl -sS -H "Authorization: Bearer <token>" "http://127.0.0.1:8788/status"   # when token is configured
 ```
 
 For WSL where neither systemd nor Docker is available, you can run the relay in a foreground process:
