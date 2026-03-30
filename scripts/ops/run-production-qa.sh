@@ -12,7 +12,7 @@ PORT="8788"
 UPSTREAM="ws://127.0.0.1:8787/ws"
 RELAY_PATH="/ws"
 HEALTH_PATH="/health"
-TOKEN="my-token"
+TOKEN=""
 PACKAGE_SELECTOR="@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
 WATCH_INTERVAL_MS="1500"
 RESTART_ON_CHANGE="true"
@@ -34,7 +34,7 @@ General:
   --upstream <url>
   --relay-path <path>           default: /ws
   --health-path <path>          default: /health
-  --token <value>
+  --token <value>               optional; generated automatically when omitted
   --package-selector <selector>
   --watch-interval-ms <ms>
   --restart-on-change true|false
@@ -47,6 +47,20 @@ Sections:
   relay   build+test relay package + status endpoint contract probes
   smoke   workspace-by-workspace relay-oriented package tests
 USAGE
+}
+
+resolve_token() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+    return 0
+  fi
+
+  if command -v uuidgen >/dev/null 2>&1; then
+    uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '\n'
+    return 0
+  fi
+
+  date +%s%N | sha256sum | awk '{print $1}'
 }
 
 run_command() {
@@ -415,6 +429,10 @@ fi
 
 PASSES=()
 FAILS=()
+
+if [[ -z "${TOKEN}" ]]; then
+  TOKEN="$(resolve_token)"
+fi
 
 if run_if_selected "deps"; then
   if phase_deps; then

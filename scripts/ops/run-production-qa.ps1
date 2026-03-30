@@ -7,7 +7,7 @@ param(
   [string]$Upstream = 'ws://127.0.0.1:8787/ws',
   [string]$RelayPath = '/ws',
   [string]$HealthPath = '/health',
-  [string]$Token = 'my-token',
+  [string]$Token = '',
   [string]$PackageSelector = '@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*',
   [int]$WatchIntervalMs = 1500,
   [ValidateSet('true', 'false')][string]$RestartOnChange = 'true',
@@ -159,6 +159,10 @@ function Probe-RelayEndpoints {
 }
 
 function Start-And-Probe-Relay {
+  if ([string]::IsNullOrWhiteSpace($Token)) {
+    $Token = [guid]::NewGuid().ToString('N')
+  }
+
   if (-not (Test-Path -Path $relayCli)) {
     throw "Relay CLI missing at $relayCli"
   }

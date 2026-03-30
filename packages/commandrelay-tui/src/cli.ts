@@ -14,7 +14,7 @@ import { createCliCommandHandlers } from "./cli-commands.js";
 import { createCliRuntime, RECONNECT_COOLDOWN_MS, RECONNECT_FAILURE_THRESHOLD } from "./cli-runtime.js";
 import { createInitialCliState } from "./cli-state.js";
 import type { CliState } from "./cli-state.js";
-import { createQaModeUsage, runProductionQaMode } from "./qa-mode.js";
+import { createQaModeUsage, resolveSelectedSectionsFromCliArg, runProductionQaMode } from "./qa-mode.js";
 import { loadCommandRelayClientModule } from "./commandrelay-client-loader.js";
 
 const DEFAULT_WS_URL = "ws://127.0.0.1:8787/ws";
@@ -289,10 +289,7 @@ function parseArgs(argv: string[]): CliArgs {
       if (!next) {
         throw new Error("missing --qa-sections value");
       }
-      args.qaSections = next
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
+      args.qaSections = resolveSelectedSectionsFromCliArg([...args.qaSections, next]);
       index += 2;
       continue;
     }
