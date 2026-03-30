@@ -221,6 +221,9 @@ function parseArgs(argv: string[]): CliArgs {
   };
 
   let index = 0;
+  while (index < argv.length && argv[index] === "--" && argv[index + 1]?.startsWith("--")) {
+    index += 1;
+  }
   while (index < argv.length) {
     const current = argv[index];
     const next = argv[index + 1];

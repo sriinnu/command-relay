@@ -17,8 +17,8 @@ import { buildInputPolicyState } from "./input-policy.js";
 export function sendEnvelope(
   socket: {
     OPEN: number;
-    CLOSING: number;
-    CLOSED: number;
+    CLOSING?: number;
+    CLOSED?: number;
     readyState: number;
     send: (payload: string) => void;
     close?: (code?: number, reason?: string) => void;
@@ -28,7 +28,10 @@ export function sendEnvelope(
   onSendFailure?: () => void
 ): void {
   if (socket.readyState !== socket.OPEN) {
-    if (socket.readyState === socket.CLOSING || socket.readyState === socket.CLOSED) {
+    if (
+      (socket.CLOSING !== undefined && socket.readyState === socket.CLOSING) ||
+      (socket.CLOSED !== undefined && socket.readyState === socket.CLOSED)
+    ) {
       onSendFailure?.();
     }
     return;
@@ -390,7 +393,11 @@ export function releaseClientInputOwnership(
  * @returns Nothing.
  */
 export function sendPolicyUpdateEnvelope(
-  socket: { OPEN: number; readyState: number; send: (payload: string) => void },
+  socket: {
+    OPEN: number;
+    readyState: number;
+    send: (payload: string) => void;
+  },
   clientInputEnabled: boolean,
   globalInputDisabled: boolean,
   requestId: string | undefined

@@ -1,4 +1,4 @@
-import { ProtocolV1AllowedEventType } from "@commandrelay/protocol";
+import { type ProtocolV1AllowedEventType } from "@commandrelay/protocol";
 
 interface ClientOptions {
   strictProtocolParsing?: boolean;
