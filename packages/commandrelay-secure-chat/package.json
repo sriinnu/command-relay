@@ -1,0 +1,61 @@
+{
+  "name": "@commandrelay/secure-chat",
+  "version": "0.1.0",
+  "description": "Terminal-only encrypted chat server and client with zero on-disk persistence",
+  "keywords": [
+    "commandrelay",
+    "terminal",
+    "chat",
+    "encryption",
+    "nodejs",
+    "typescript"
+  ],
+  "homepage": "https://github.com/sriinnu/command-relay#readme",
+  "bugs": {
+    "url": "https://github.com/sriinnu/command-relay/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sriinnu/command-relay.git",
+    "directory": "packages/commandrelay-secure-chat"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "commandrelay-secure-chat": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "tsc -p tsconfig.json --noEmit",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.build.json",
+    "cli": "node dist/cli.js",
+    "test": "if [ -d test ] && find test -name '*.test.ts' -type f | grep -q .; then tsx --test test/**/*.test.ts; fi"
+  },
+  "engines": {
+    "node": ">=22",
+    "npm": ">=9"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

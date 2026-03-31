@@ -13,6 +13,7 @@ PACKAGE_DIRS=(
   "packages/proxy-axios"
   "packages/proxy-got"
   "packages/proxy-runtime"
+  "packages/commandrelay-secure-chat"
 )
 
 log() {
@@ -97,6 +98,7 @@ import {
   createProxyRuntimeController,
   loadProxySettings as loadRuntimeProxySettings
 } from "@commandrelay/proxy-runtime";
+import { SecureChatClient, SecureChatServer } from "@commandrelay/secure-chat";
 
 const coreSettings = loadCoreProxySettings({
   http_proxy: "http://proxy.local:8080",
@@ -287,6 +289,8 @@ assert.equal(response.status, 200);
 assert.deepEqual(response.body, { ok: true });
 assert.ok(capturedRequest);
 assert.equal(capturedRequest.bodyText(), '{"ping":true}');
+assert.equal(typeof SecureChatClient, "function");
+assert.equal(typeof SecureChatServer, "function");
 
 console.log("consumer smoke verification passed");
 JS
