@@ -47,7 +47,7 @@
     "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js && npm exec -- node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@commandrelay/proxy-core": "^0.1.0",
+    "@commandrelay/proxy-core": "workspace:^",
     "undici": "^7.16.0"
   },
   "devDependencies": {

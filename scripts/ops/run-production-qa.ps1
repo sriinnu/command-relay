@@ -2,12 +2,12 @@
 param(
   [string[]]$Section = @(),
   [string]$BatchDate = (Get-Date -AsUTC).ToString('yyyy-MM-dd'),
-  [string]$Host = '127.0.0.1',
+  [Alias("Host")][string]$HostAddress = '127.0.0.1',
   [string]$Port = '8788',
   [string]$Upstream = 'ws://127.0.0.1:8787/ws',
   [string]$RelayPath = '/ws',
   [string]$HealthPath = '/health',
-  [string]$Token = 'my-token',
+  [string]$Token = '',
   [string]$PackageSelector = '@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*',
   [int]$WatchIntervalMs = 1500,
   [ValidateSet('true', 'false')][string]$RestartOnChange = 'true',
@@ -16,6 +16,31 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$nodeCandidates = @(
+  "$env:ProgramFiles\nodejs",
+  "${env:ProgramFiles(x86)}\nodejs",
+  'C:\Program Files\nodejs',
+  'C:\Program Files (x86)\nodejs'
+)
+$resolvedNodeHome = $null
+if (Get-Command node -ErrorAction SilentlyContinue) {
+  $resolvedNodeHome = Split-Path -Path (Get-Command node).Path -Parent
+} else {
+  foreach ($candidate in $nodeCandidates) {
+    $candidateNode = Join-Path $candidate 'node.exe'
+    if (Test-Path $candidateNode) {
+      $resolvedNodeHome = $candidate
+      break
+    }
+  }
+  if ($resolvedNodeHome) {
+    $env:PATH = "$resolvedNodeHome;$env:PATH"
+  }
+}
+
+if (-not $resolvedNodeHome) {
+  Write-Warning 'node.exe not found in PATH or common install locations.'
+}
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $relayCli = Join-Path $repoRoot 'packages/commandrelay-relay-proxy/dist/cli.js'
@@ -65,7 +90,16 @@ function Run-RepoCommand {
   $oldLocation = Get-Location
   try {
     Set-Location $repoRoot
-    & $Command[0] @($Command[1..($Command.Count - 1)])
+    $commandParts = @()
+    foreach ($part in $Command) {
+      if ($part -match '[\s"]') {
+        $escaped = $part -replace '"', '\"'
+        $commandParts += "`"$escaped`""
+      } else {
+        $commandParts += $part
+      }
+    }
+    & cmd /c ($commandParts -join " ")
     if ($LASTEXITCODE -ne 0) {
       throw "Command '$($Command -join ' ')' exited with code $LASTEXITCODE"
     }
@@ -118,8 +152,8 @@ function Wait-ForEndpoint {
 }
 
 function Probe-RelayEndpoints {
-  $healthUrl = "http://$Host`:$Port$HealthPath"
-  $statusUrl = "http://$Host`:$Port/status"
+  $healthUrl = "http://$HostAddress`:$Port$HealthPath"
+  $statusUrl = "http://$HostAddress`:$Port/status"
   $headers = @{}
   if (-not [string]::IsNullOrWhiteSpace($Token)) {
     $headers["Authorization"] = "Bearer $Token"
@@ -159,6 +193,10 @@ function Probe-RelayEndpoints {
 }
 
 function Start-And-Probe-Relay {
+  if ([string]::IsNullOrWhiteSpace($Token)) {
+    $Token = [guid]::NewGuid().ToString('N')
+  }
+
   if (-not (Test-Path -Path $relayCli)) {
     throw "Relay CLI missing at $relayCli"
   }
@@ -177,7 +215,7 @@ function Start-And-Probe-Relay {
   $relayArgs = @(
     $relayCli,
     '--host',
-    $Host,
+    $HostAddress,
     '--port',
     $Port,
     '--upstream',
@@ -223,7 +261,7 @@ function Start-And-Probe-Relay {
 }
 
 function Run-SectionDependencies {
-  if (-not (Run-Step 'preflight tooling' { Run-RepoCommand @('node', '-v') })) { return $false }
+  if (-not (Run-Step 'preflight tooling' { Run-RepoCommand @('where.exe', 'node') })) { return $false }
   if (-not (Run-Step 'pnpm version' { Run-RepoCommand @('pnpm', '-v') })) { return $false }
   if (-not (Run-Step 'git status pre-check' { Run-RepoCommand @('git', 'status', '--short') })) { return $false }
   if (-not (Run-Step 'workspace integrity' { Run-RepoCommand @('pnpm', 'run', 'check:all') })) { return $false }

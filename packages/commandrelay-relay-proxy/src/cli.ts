@@ -285,7 +285,11 @@ function parsePositiveIntArg(value: string, fallback: number): number {
   }
   return parsed;
 }
-function parseNonNegativeIntArg(value: string, fallback: number): number {
+function parseNonNegativeIntArg(value: string | number, fallback: number): number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.max(0, Math.floor(value));
+  }
   if (!value) return fallback;
   const trimmed = value.trim();
   if (!/^-?\d+$/.test(trimmed)) {

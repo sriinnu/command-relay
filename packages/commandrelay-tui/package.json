@@ -41,7 +41,7 @@
     "cli": "node dist/cli.js"
   },
   "dependencies": {
-    "@commandrelay/client": "^0.1.0"
+    "@commandrelay/client": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

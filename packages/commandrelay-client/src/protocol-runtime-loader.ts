@@ -11,12 +11,16 @@ async function importFromSpecifier(specifier: string): Promise<ProtocolModule | 
   try {
     return (await import(specifier)) as ProtocolModule;
   } catch (error) {
+    const message = error instanceof Error ? error.message : "";
     if (
       error &&
       typeof error === "object" &&
       "code" in error &&
-      error.code === "ERR_MODULE_NOT_FOUND"
+      (error.code === "ERR_MODULE_NOT_FOUND" || /ERR_MODULE_NOT_FOUND/.test(message))
     ) {
+      return null;
+    }
+    if (message.includes(`Cannot find package '${specifier}'`) || message.includes(`Cannot find package "${specifier}"`)) {
       return null;
     }
     throw error;

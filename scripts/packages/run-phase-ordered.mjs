@@ -38,7 +38,7 @@ for (let index = 1; index < args.length; index += 1) {
 }
 
 const scriptName = command;
-const repoRoot = path.resolve(import.meta.dirname, "../..");
+const repoRoot = locateProjectRoot();
 const rootPackageJson = path.join(repoRoot, "package.json");
 const packagesDir = path.join(repoRoot, "packages");
 const phaseRunner = detectRunner();
@@ -191,6 +191,49 @@ function runScript(packageRootOrPackageJson, scriptName, phaseRunner) {
   }
 
   return true;
+}
+
+function locateProjectRoot() {
+  const candidates = [
+    path.resolve(process.cwd(), "."),
+    path.resolve(import.meta.dirname, "../.."),
+    path.resolve(import.meta.dirname, ".."),
+    path.resolve(process.cwd(), "..")
+  ];
+
+  for (const candidate of candidates) {
+    const root = climbToWorkspaceRoot(candidate);
+    if (root) return root;
+  }
+
+  // Fallback: keep current behavior for compatibility, but fail with a clear message.
+  throw new Error(`Unable to locate project root containing package.json from ${process.cwd()}`);
+}
+
+function climbToWorkspaceRoot(startDir) {
+  const markerNames = ["package.json", "pnpm-workspace.yaml"];
+  let cursor = path.resolve(startDir);
+
+  for (let index = 0; index < 8; index += 1) {
+    for (const marker of markerNames) {
+      const markerPath = path.join(cursor, marker);
+      if (fs.existsSync(markerPath)) {
+        if (
+          (marker === "package.json" && fs.existsSync(path.join(cursor, "packages"))) ||
+          marker === "pnpm-workspace.yaml"
+        ) {
+          return cursor;
+        }
+      }
+    }
+    const next = path.dirname(cursor);
+    if (next === cursor) {
+      return null;
+    }
+    cursor = next;
+  }
+
+  return null;
 }
 
 function readManifest(manifestPath) {
