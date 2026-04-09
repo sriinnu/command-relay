@@ -9,6 +9,7 @@ import type {
 } from "../config.js";
 import { TmuxAdapter } from "../tmux/tmux-adapter.js";
 import { CmuxAdapter } from "./cmux-adapter.js";
+import { ManagedAdapter } from "./managed-adapter.js";
 import { RuntimeMultiplexer } from "./runtime-multiplexer.js";
 import type { RuntimeBackend as RuntimeBackendContract, RuntimePane } from "./runtime-backend.js";
 import { SshTmuxAdapter } from "./ssh-tmux-adapter.js";
@@ -85,6 +86,9 @@ export interface StartupTransportConfig {
  */
 export interface RuntimeBackendFactoryConfig {
   cmuxCommand: string;
+  managedCommand: string;
+  managedStateDir: string | null;
+  managedCommandTimeoutMs: number;
   transportConfig: StartupTransportConfig;
 }
 
@@ -106,6 +110,10 @@ export function createRuntimeBackends(
       adapters.push(wrapRuntimeBackend(backend, createTmuxRuntimeAdapter(transportConfig)));
       continue;
     }
+    if (backend === "managed") {
+      adapters.push(wrapRuntimeBackend(backend, createManagedRuntimeAdapter(factoryConfig)));
+      continue;
+    }
     adapters.push(wrapRuntimeBackend(backend, new CmuxAdapter({ cmuxCommand })));
   }
   return adapters;
@@ -119,13 +127,12 @@ export function createRuntimeBackends(
  * @returns Adapter used by the bridge runtime.
  */
 export function createRuntimeAdapter(
-  runtimeBackends: RuntimeBackendId[],
   adapters: RuntimeBackendContract[]
 ): RuntimeAdapter {
   if (adapters.length === 0) {
     throw new Error("At least one runtime backend adapter is required");
   }
-  if (isTmuxOnly(runtimeBackends)) {
+  if (adapters.length === 1) {
     return adapters[0];
   }
   return new RuntimeMultiplexer({ backends: adapters });
@@ -220,6 +227,40 @@ export function createTmuxRuntimeAdapter(transportConfig: StartupTransportConfig
     knownHostsFile: transportConfig.sshKnownHostsFile,
     expectedFingerprintSha256: transportConfig.sshExpectedFingerprintSha256
   });
+}
+
+/**
+ * Creates the managed runtime adapter for local daemon-backed process ownership.
+ *
+ * @param factoryConfig Runtime backend factory configuration.
+ * @returns Configured managed runtime adapter.
+ */
+export function createManagedRuntimeAdapter(
+  factoryConfig: Pick<
+    RuntimeBackendFactoryConfig,
+    "managedCommand" | "managedStateDir" | "managedCommandTimeoutMs"
+  >
+): RuntimeAdapter {
+  return new ManagedAdapter({
+    command: factoryConfig.managedCommand,
+    stateDir: factoryConfig.managedStateDir,
+    commandTimeoutMs: factoryConfig.managedCommandTimeoutMs
+  });
+}
+
+/**
+ * Legacy managed-runtime factory alias retained for `oly` references.
+ *
+ * @param factoryConfig Runtime backend factory configuration.
+ * @returns Configured managed runtime adapter.
+ */
+export function createOlyRuntimeAdapter(
+  factoryConfig: Pick<
+    RuntimeBackendFactoryConfig,
+    "managedCommand" | "managedStateDir" | "managedCommandTimeoutMs"
+  >
+): RuntimeAdapter {
+  return createManagedRuntimeAdapter(factoryConfig);
 }
 
 function normalizeOptionalTransportString(value: string | null | undefined): string | null {

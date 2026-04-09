@@ -3,12 +3,25 @@
  */
 
 import { accessSync, constants as fsConstants } from "node:fs";
+import {
+  parseBooleanEnv,
+  parseBooleanEnvWithAlias,
+  parseEnumEnv,
+  parseIntEnv,
+  parseOptionalStringEnv,
+  parseStrictIntEnv,
+  parseStringEnv,
+  readAliasedEnv
+} from "./config-env.js";
 import { isValidSshProfileName, parseSshTarget } from "./ssh/ssh-target.js";
 
 /** Runtime bridge configuration values. */
 export interface BridgeConfig {
   runtimeBackends: RuntimeBackend[];
   cmuxCommand: string;
+  managedCommand: string;
+  managedStateDir: string | null;
+  managedCommandTimeoutMs: number;
   host: string;
   port: number;
   transportMode: TransportMode;
@@ -37,7 +50,7 @@ export interface BridgeConfig {
   auditLogPath: string | null;
 }
 
-const SUPPORTED_RUNTIME_BACKENDS = ["tmux", "cmux"] as const;
+const SUPPORTED_RUNTIME_BACKENDS = ["tmux", "cmux", "managed"] as const;
 const SUPPORTED_TRANSPORT_MODES = ["ws", "ssh"] as const;
 const SSH_SHA256_FINGERPRINT_PATTERN = /^SHA256:[A-Za-z0-9+/]{43}=?$/;
 
@@ -50,114 +63,6 @@ export type RuntimeBackend = (typeof SUPPORTED_RUNTIME_BACKENDS)[number];
  * Supported transport mode identifiers for bridge connectivity.
  */
 export type TransportMode = (typeof SUPPORTED_TRANSPORT_MODES)[number];
-
-interface NumericBounds {
-  min?: number;
-  max?: number;
-}
-
-/**
- * Parses an integer environment variable with a fallback and bounds.
- *
- * @param raw Raw env value.
- * @param fallback Fallback value.
- * @param bounds Optional numeric bounds.
- * @returns Parsed integer or fallback.
- */
-function parseIntEnv(raw: string | undefined, fallback: number, bounds: NumericBounds = {}): number {
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  if (bounds.min !== undefined && parsed < bounds.min) return fallback;
-  if (bounds.max !== undefined && parsed > bounds.max) return fallback;
-  return parsed;
-}
-
-/**
- * Parses an integer environment variable strictly with fallback and bounds.
- *
- * @param raw Raw env value.
- * @param fallback Fallback value when unset.
- * @param bounds Required numeric bounds.
- * @param envName Environment variable name for error messages.
- * @returns Parsed integer or fallback.
- */
-function parseStrictIntEnv(
-  raw: string | undefined,
-  fallback: number,
-  bounds: NumericBounds,
-  envName: string
-): number {
-  if (raw === undefined) return fallback;
-  const trimmed = raw.trim();
-  if (!trimmed) return fallback;
-  if (!/^-?\d+$/.test(trimmed)) {
-    throw new Error(`${envName} must be an integer (received "${raw}")`);
-  }
-
-  const parsed = Number.parseInt(trimmed, 10);
-  if (bounds.min !== undefined && parsed < bounds.min) {
-    throw new Error(`${envName} must be >= ${bounds.min} (received "${raw}")`);
-  }
-  if (bounds.max !== undefined && parsed > bounds.max) {
-    throw new Error(`${envName} must be <= ${bounds.max} (received "${raw}")`);
-  }
-
-  return parsed;
-}
-
-/**
- * Parses a strict boolean environment variable.
- *
- * @param raw Raw env value.
- * @param fallback Fallback value when unset.
- * @param envName Environment variable name for error messages.
- * @returns Parsed boolean.
- */
-function parseBooleanEnv(raw: string | undefined, fallback: boolean, envName: string): boolean {
-  if (!raw) return fallback;
-  const normalized = raw.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  throw new Error(
-    `${envName} must be one of: 1,true,yes,on,0,false,no,off (received "${raw}")`
-  );
-}
-
-/**
- * Parses a boolean environment variable with optional legacy alias fallback.
- *
- * @param env Environment map.
- * @param primaryName Primary environment variable name.
- * @param aliasName Legacy alias environment variable name.
- * @param fallback Fallback when neither variable is set.
- * @returns Parsed boolean value.
- */
-function parseBooleanEnvWithAlias(
-  env: NodeJS.ProcessEnv,
-  primaryName: string,
-  aliasName: string,
-  fallback: boolean
-): boolean {
-  const primary = env[primaryName];
-  if (primary !== undefined) {
-    return parseBooleanEnv(primary, fallback, primaryName);
-  }
-
-  return parseBooleanEnv(env[aliasName], fallback, aliasName);
-}
-
-/**
- * Parses an optional env string and normalizes whitespace-only values to null.
- *
- * @param raw Raw env value.
- * @returns Trimmed string or null.
- */
-function parseOptionalStringEnv(raw: string | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  return trimmed ? trimmed : null;
-}
 
 /**
  * Parses and validates optional SSH SHA256 fingerprint env value.
@@ -221,43 +126,6 @@ function parseOptionalSshTargetEnv(raw: string | undefined, envName: string): st
 }
 
 /**
- * Parses a required-ish string env with fallback.
- *
- * @param raw Raw env value.
- * @param fallback Fallback when value is unset or blank.
- * @returns Trimmed string or fallback.
- */
-function parseStringEnv(raw: string | undefined, fallback: string): string {
-  if (!raw) return fallback;
-  const trimmed = raw.trim();
-  return trimmed ? trimmed : fallback;
-}
-
-/**
- * Parses a strict enum environment variable from a list of allowed values.
- *
- * @param raw Raw env value.
- * @param fallback Fallback when value is unset/blank.
- * @param allowed Allowed values.
- * @param envName Environment variable name for error messages.
- * @returns Parsed enum value.
- */
-function parseEnumEnv<T extends string>(
-  raw: string | undefined,
-  fallback: T,
-  allowed: readonly T[],
-  envName: string
-): T {
-  if (raw === undefined) return fallback;
-  const trimmed = raw.trim().toLowerCase();
-  if (!trimmed) return fallback;
-  if (!allowed.includes(trimmed as T)) {
-    throw new Error(`${envName} must be one of: ${allowed.join(",")} (received "${raw}")`);
-  }
-  return trimmed as T;
-}
-
-/**
  * Parses the backend list for runtime pane operations.
  *
  * @param raw Raw env value.
@@ -276,12 +144,13 @@ function parseRuntimeBackendsEnv(raw: string | undefined): RuntimeBackend[] {
   const deduped: RuntimeBackend[] = [];
   const seen = new Set<RuntimeBackend>();
   for (const backend of selected) {
-    if (!SUPPORTED_RUNTIME_BACKENDS.includes(backend as RuntimeBackend)) {
+    const normalizedBackend = backend === "oly" ? "managed" : backend;
+    if (!SUPPORTED_RUNTIME_BACKENDS.includes(normalizedBackend as RuntimeBackend)) {
       throw new Error(
-        `COMMANDRELAY_RUNTIME_BACKENDS contains unsupported backend "${backend}" (supported: ${SUPPORTED_RUNTIME_BACKENDS.join(",")})`
+        `COMMANDRELAY_RUNTIME_BACKENDS contains unsupported backend "${backend}" (supported: ${SUPPORTED_RUNTIME_BACKENDS.join(",")}, legacy alias: oly->managed)`
       );
     }
-    const runtimeBackend = backend as RuntimeBackend;
+    const runtimeBackend = normalizedBackend as RuntimeBackend;
     if (seen.has(runtimeBackend)) continue;
     seen.add(runtimeBackend);
     deduped.push(runtimeBackend);
@@ -306,9 +175,33 @@ function isLoopbackHost(host: string): boolean {
  * @returns Normalized runtime configuration.
  */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
+  const managedCommandEnv = readAliasedEnv(
+    env,
+    "COMMANDRELAY_MANAGED_COMMAND",
+    "COMMANDRELAY_OLY_COMMAND"
+  );
+  const managedStateDirEnv = readAliasedEnv(
+    env,
+    "COMMANDRELAY_MANAGED_STATE_DIR",
+    "COMMANDRELAY_OLY_STATE_DIR"
+  );
+  const managedTimeoutEnv = readAliasedEnv(
+    env,
+    "COMMANDRELAY_MANAGED_TIMEOUT_MS",
+    "COMMANDRELAY_OLY_TIMEOUT_MS"
+  );
+
   return {
     runtimeBackends: parseRuntimeBackendsEnv(env.COMMANDRELAY_RUNTIME_BACKENDS),
     cmuxCommand: parseStringEnv(env.COMMANDRELAY_CMUX_COMMAND, "cmux"),
+    managedCommand: parseStringEnv(managedCommandEnv.value, "oly"),
+    managedStateDir: parseOptionalStringEnv(managedStateDirEnv.value),
+    managedCommandTimeoutMs: parseStrictIntEnv(
+      managedTimeoutEnv.value,
+      8_000,
+      { min: 1_000, max: 60_000 },
+      managedTimeoutEnv.source
+    ),
     host: env.COMMANDRELAY_HOST || "127.0.0.1",
     port: parseIntEnv(env.COMMANDRELAY_PORT, 8787, { min: 1, max: 65535 }),
     transportMode: parseEnumEnv(

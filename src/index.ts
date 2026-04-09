@@ -119,6 +119,9 @@ async function main() {
 
   const runtimeBackends = createRuntimeBackends(config.runtimeBackends, {
     cmuxCommand: config.cmuxCommand,
+    managedCommand: config.managedCommand,
+    managedStateDir: config.managedStateDir,
+    managedCommandTimeoutMs: config.managedCommandTimeoutMs,
     transportConfig
   });
   const backendAvailability = await checkRuntimeBackendAvailability(runtimeBackends);
@@ -140,7 +143,7 @@ async function main() {
   logStartupProfileReport(startupProfile);
   assertStartupProfilePass(startupProfile);
 
-  const runtimeAdapter = createRuntimeAdapter(config.runtimeBackends, runtimeBackends);
+  const runtimeAdapter = createRuntimeAdapter(runtimeBackends);
   const proxySettings = loadProxySettings();
   const proxyFactory = new ProxyAgentFactory({ settings: proxySettings });
 

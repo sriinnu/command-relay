@@ -53,6 +53,14 @@ test("defaults cmux command to cmux", () => {
   assert.equal(config.cmuxCommand, "cmux");
 });
 
+test("defaults managed command and timeout values", () => {
+  const config = loadConfig({});
+
+  assert.equal(config.managedCommand, "oly");
+  assert.equal(config.managedStateDir, null);
+  assert.equal(config.managedCommandTimeoutMs, 8_000);
+});
+
 test("parses and trims cmux command env value", () => {
   const custom = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "  /opt/bin/cmux  " });
   const blank = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "   " });
@@ -61,11 +69,59 @@ test("parses and trims cmux command env value", () => {
   assert.equal(blank.cmuxCommand, "cmux");
 });
 
+test("parses managed command and state directory env values", () => {
+  const custom = loadConfig({
+    COMMANDRELAY_MANAGED_COMMAND: "  /opt/bin/oly  ",
+    COMMANDRELAY_MANAGED_STATE_DIR: "  /tmp/oly-state  "
+  });
+  const blank = loadConfig({
+    COMMANDRELAY_MANAGED_COMMAND: "   ",
+    COMMANDRELAY_MANAGED_STATE_DIR: "   "
+  });
+
+  assert.equal(custom.managedCommand, "/opt/bin/oly");
+  assert.equal(custom.managedStateDir, "/tmp/oly-state");
+  assert.equal(blank.managedCommand, "oly");
+  assert.equal(blank.managedStateDir, null);
+});
+
+test("parses and validates managed timeout env value", () => {
+  const custom = loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "12000" });
+
+  assert.equal(custom.managedCommandTimeoutMs, 12_000);
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "999" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "60001" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "8.5" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+});
+
 test("parses, normalizes, and deduplicates runtime backend list", () => {
   const config = loadConfig({
-    COMMANDRELAY_RUNTIME_BACKENDS: " tmux , cmux,tmux "
+    COMMANDRELAY_RUNTIME_BACKENDS: " tmux , managed , cmux,tmux,oly "
   });
-  assert.deepEqual(config.runtimeBackends, ["tmux", "cmux"]);
+  assert.deepEqual(config.runtimeBackends, ["tmux", "managed", "cmux"]);
+});
+
+test("accepts legacy oly env aliases and normalizes runtime backend id", () => {
+  const config = loadConfig({
+    COMMANDRELAY_RUNTIME_BACKENDS: "oly",
+    COMMANDRELAY_OLY_COMMAND: "/opt/bin/oly",
+    COMMANDRELAY_OLY_STATE_DIR: "/tmp/oly-state",
+    COMMANDRELAY_OLY_TIMEOUT_MS: "9000"
+  });
+
+  assert.deepEqual(config.runtimeBackends, ["managed"]);
+  assert.equal(config.managedCommand, "/opt/bin/oly");
+  assert.equal(config.managedStateDir, "/tmp/oly-state");
+  assert.equal(config.managedCommandTimeoutMs, 9_000);
 });
 
 test("rejects unsupported runtime backend values", () => {

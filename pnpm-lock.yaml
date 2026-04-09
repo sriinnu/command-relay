@@ -114,6 +114,15 @@ importers:
       '@commandrelay/client':
         specifier: workspace:^
         version: link:../commandrelay-client
+      '@commandrelay/run-core':
+        specifier: workspace:^
+        version: link:../run-core
+      '@commandrelay/run-orchestrator':
+        specifier: workspace:^
+        version: link:../run-orchestrator
+      '@commandrelay/terminal-discovery':
+        specifier: workspace:^
+        version: link:../terminal-discovery
     devDependencies:
       '@types/node':
         specifier: ^25.3.0
@@ -249,6 +258,131 @@ importers:
       undici:
         specifier: ^7.16.0
         version: 7.24.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/run-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/run-orchestrator:
+    dependencies:
+      '@commandrelay/run-core':
+        specifier: workspace:^
+        version: link:../run-core
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:../runtime-managed
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:../runtime-tmux
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-cmux:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-managed:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-ssh:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-tmux:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/terminal-discovery:
     devDependencies:
       '@types/node':
         specifier: ^25.3.0

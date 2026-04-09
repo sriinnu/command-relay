@@ -23,7 +23,7 @@ export const STARTUP_PROFILE_MIN_NODE_MAJOR = 22;
  */
 export type StartupProfileCheckId =
   | "node_runtime_version"
-  | "tmux_backend_signal"
+  | "runtime_backend_signal"
   | "app_static_dir_policy"
   | "audit_log_path_policy";
 
@@ -82,7 +82,10 @@ export async function evaluateStartupProfile(context: StartupProfileContext): Pr
   const nodeVersion = context.nodeVersion ?? process.versions.node;
   const checks: StartupProfileCheckResult[] = [
     evaluateNodeRuntimeVersionPolicy(nodeVersion),
-    evaluateTmuxBackendSignalPolicy(context.config.runtimeBackends, context.runtimeAvailability),
+    ...evaluateRuntimeBackendSignalPolicies(
+      context.config.runtimeBackends,
+      context.runtimeAvailability
+    ),
     await evaluateAppStaticDirPolicy(context.config.appStaticEnabled, context.config.appStaticDir),
     await evaluateAuditLogPathPolicy(context.config.auditLogPath)
   ];
@@ -192,44 +195,53 @@ function evaluateNodeRuntimeVersionPolicy(nodeVersion: string): StartupProfileCh
   };
 }
 
-function evaluateTmuxBackendSignalPolicy(
+function evaluateRuntimeBackendSignalPolicies(
   runtimeBackends: BridgeConfig["runtimeBackends"],
   runtimeAvailability: RuntimeBackendAvailability[]
-): StartupProfileCheckResult {
-  if (!runtimeBackends.includes("tmux")) {
-    return {
-      id: "tmux_backend_signal",
-      status: "skip",
-      detail: "tmux backend is not configured in COMMANDRELAY_RUNTIME_BACKENDS",
-      metadata: { configured: false }
-    };
+): StartupProfileCheckResult[] {
+  if (runtimeBackends.length === 0) {
+    return [
+      {
+        id: "runtime_backend_signal",
+        status: "skip",
+        detail: "No runtime backends are configured in COMMANDRELAY_RUNTIME_BACKENDS",
+        metadata: { configured: false, backendId: null }
+      }
+    ];
   }
 
-  const signal = runtimeAvailability.find((backend) => backend.backendId === "tmux");
+  return runtimeBackends.map((backendId) => evaluateRuntimeBackendSignalPolicy(backendId, runtimeAvailability));
+}
+
+function evaluateRuntimeBackendSignalPolicy(
+  backendId: BridgeConfig["runtimeBackends"][number],
+  runtimeAvailability: RuntimeBackendAvailability[]
+): StartupProfileCheckResult {
+  const signal = runtimeAvailability.find((backend) => backend.backendId === backendId);
   if (!signal) {
     return {
-      id: "tmux_backend_signal",
+      id: "runtime_backend_signal",
       status: "fail",
-      detail: "tmux backend availability signal is missing from startup probe results",
-      remediation: "Ensure tmux is included in runtime startup availability probing",
-      metadata: { configured: true }
+      detail: `${backendId} backend availability signal is missing from startup probe results`,
+      remediation: `Ensure ${backendId} is included in runtime startup availability probing`,
+      metadata: { configured: true, backendId, signaled: false, available: null }
     };
   }
   if (!signal.available) {
     return {
-      id: "tmux_backend_signal",
+      id: "runtime_backend_signal",
       status: "fail",
-      detail: "tmux backend reported unavailable during startup probe",
-      remediation: "Install/start tmux on the host or remove tmux from COMMANDRELAY_RUNTIME_BACKENDS",
-      metadata: { configured: true, signaled: true, available: false }
+      detail: `${backendId} backend reported unavailable during startup probe`,
+      remediation: `Install/start ${backendId} on the host or remove ${backendId} from COMMANDRELAY_RUNTIME_BACKENDS`,
+      metadata: { configured: true, backendId, signaled: true, available: false }
     };
   }
 
   return {
-    id: "tmux_backend_signal",
+    id: "runtime_backend_signal",
     status: "pass",
-    detail: "tmux backend availability signal is present and healthy",
-    metadata: { configured: true, signaled: true, available: true }
+    detail: `${backendId} backend availability signal is present and healthy`,
+    metadata: { configured: true, backendId, signaled: true, available: true }
   };
 }
 
