@@ -3,6 +3,8 @@
 `@commandrelay/relay-proxy` is a small WebSocket relay sidecar for exposing a controlled
 `/ws` surface in front of an upstream WebSocket backend.
 
+A lean relay layer for controlled WebSocket exposure and status visibility.
+
 - Validates and normalizes upstream TLS options.
 - Provides deterministic upstream/downstream byte accounting and heartbeat metrics.
 - Exposes:

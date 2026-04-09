@@ -6,6 +6,8 @@
 
 `@commandrelay/proxy-got` provides a production-ready got adapter baseline that resolves and applies proxy-aware Node agents without importing got at runtime.
 
+A got adapter that applies proxy routing without extra runtime weight.
+
 ## Install
 
 ```bash

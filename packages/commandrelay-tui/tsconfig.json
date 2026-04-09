@@ -8,7 +8,14 @@
     "types": ["node"],
     "paths": {
       "@commandrelay/client": ["../commandrelay-client/src/index.ts"],
-      "@commandrelay/protocol": ["../commandrelay-protocol/src/index.ts"]
+      "@commandrelay/protocol": ["../commandrelay-protocol/src/index.ts"],
+      "@commandrelay/run-core": ["../run-core/src/index.ts"],
+      "@commandrelay/run-orchestrator": ["../run-orchestrator/src/index.ts"],
+      "@commandrelay/runtime-core": ["../runtime-core/src/index.ts"],
+      "@commandrelay/runtime-managed": ["../runtime-managed/src/index.ts"],
+      "@commandrelay/runtime-ssh": ["../runtime-ssh/src/index.ts"],
+      "@commandrelay/runtime-tmux": ["../runtime-tmux/src/index.ts"],
+      "@commandrelay/terminal-discovery": ["../terminal-discovery/src/index.ts"]
     },
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,

@@ -4,6 +4,8 @@
 
 Protocol-aware proxy agent factory for Node.js clients that accept `http.Agent`/`https.Agent`.
 
+Deterministic proxy agent selection for Node.js clients that need stable routing.
+
 - Supports `http`, `https`, `socks*`, and `pac+*` proxy URLs
 - Resolves routing from standard proxy env vars (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`)
 - Reuses agents with bounded cache for low overhead across repeated requests

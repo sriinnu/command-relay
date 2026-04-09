@@ -4,6 +4,8 @@
 
 `@commandrelay/proxy-runtime` provides a production-ready runtime controller for proxy decisions, settings rotation, and proxy-agent cache lifecycle.
 
+Runtime lifecycle control for proxy settings, caching, and diagnostics.
+
 It wraps `@commandrelay/proxy-agent` with:
 
 - deterministic decision metadata (`proxy`, `no_proxy`, direct)

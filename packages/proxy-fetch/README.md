@@ -7,6 +7,8 @@
 `@commandrelay/proxy-fetch` provides a production-ready proxy-aware wrapper around Node fetch.
 It resolves Undici dispatchers through `@commandrelay/proxy-undici`, supports explicit settings/env inputs, and includes JSON parsing safeguards with typed failures.
 
+A fetch wrapper that keeps proxy behavior predictable and typed.
+
 ## Install
 
 ```bash

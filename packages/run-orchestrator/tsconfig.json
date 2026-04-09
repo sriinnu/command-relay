@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "paths": {
+      "@commandrelay/run-core": ["../run-core/src/index.ts"],
+      "@commandrelay/runtime-core": ["../runtime-core/src/index.ts"],
+      "@commandrelay/runtime-managed": ["../runtime-managed/src/index.ts"],
+      "@commandrelay/runtime-tmux": ["../runtime-tmux/src/index.ts"]
+    },
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

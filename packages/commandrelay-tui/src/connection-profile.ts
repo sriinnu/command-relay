@@ -257,7 +257,7 @@ function normalizeProfileCandidate(
   const url = typeof record.url === "string" ? record.url.trim() : "";
   if (!isValidProfileUrl(url)) return null;
 
-  const backend = typeof record.backend === "string" && ["tmux", "ghostty", "console"].includes(record.backend)
+  const backend = typeof record.backend === "string" && isSupportedProfileBackend(record.backend)
     ? (record.backend as Backend)
     : undefined;
   const authToken = typeof record.authToken === "string" ? record.authToken : null;
@@ -276,4 +276,17 @@ function normalizeProfileCandidate(
     updatedAt,
     lastUsedAt
   };
+}
+
+function isSupportedProfileBackend(value: string): boolean {
+  return [
+    "tmux",
+    "ghostty",
+    "terminal.app",
+    "windows-terminal",
+    "cmd",
+    "powershell",
+    "wsl",
+    "console"
+  ].includes(value);
 }

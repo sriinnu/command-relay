@@ -8,13 +8,14 @@ import {
   resolveProfileSelection,
   touchProfile
 } from "./connection-profile.js";
-import { isBackend, detectTerminalBackend } from "./backend.js";
+import { isBackend, detectTerminalBackend, type Backend } from "./backend.js";
 import { resolveStoredAuthToken, promptToken } from "./token.js";
 import { createCliCommandHandlers } from "./cli-commands.js";
 import { createCliRuntime, RECONNECT_COOLDOWN_MS, RECONNECT_FAILURE_THRESHOLD } from "./cli-runtime.js";
 import { createInitialCliState } from "./cli-state.js";
 import type { CliState } from "./cli-state.js";
 import { createQaModeUsage, resolveSelectedSectionsFromCliArg, runProductionQaMode } from "./qa-mode.js";
+import { executeRunCliInvocation, parseRunCliArgs } from "./run-cli.js";
 import { loadCommandRelayClientModule } from "./commandrelay-client-loader.js";
 
 const DEFAULT_WS_URL = "ws://127.0.0.1:8787/ws";
@@ -26,7 +27,7 @@ interface CliArgs {
   url: string;
   profile: string | null;
   command: string;
-  backend: "tmux" | "ghostty" | "console" | null;
+  backend: Backend | null;
   qaMode: boolean;
   qaSections: string[];
   qaSkipInstall: boolean;
@@ -41,9 +42,21 @@ let commandRelayClientModule: CommandRelayClientModule | null = null;
  * Entry-point command loop for the terminal UI.
  */
 async function main(): Promise<void> {
+  const rawArgv = process.argv.slice(2);
+  const runInvocation = parseRunCliArgs(rawArgv);
+  if (runInvocation) {
+    try {
+      await executeRunCliInvocation(runInvocation, writeLine);
+    } catch (error) {
+      writeLine(`run command failed: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   let args: CliArgs;
   try {
-    args = parseArgs(process.argv.slice(2));
+    args = parseArgs(rawArgv);
   } catch (error) {
     printUsage();
     writeLine(`error: ${error instanceof Error ? error.message : String(error)}`);
@@ -316,7 +329,9 @@ function parseArgs(argv: string[]): CliArgs {
 }
 
 function printUsage(): void {
-  writeLine("Usage: commandrelay-tui [--url ws-url] [--profile name] [--backend tmux|ghostty|console] [command]");
+  writeLine("Usage: commandrelay-tui [--url ws-url] [--profile name] [--backend tmux|ghostty|terminal.app|windows-terminal|cmd|powershell|wsl|console] [command]");
+  writeLine("Usage: commandrelay-tui run [--runtime managed|tmux|ssh-tmux] [--title text] [--cwd path] [--shell shell] [--run-dir path] [--detach] [--open ghostty|terminal.app|wt|powershell|cmd|wsl|console] -- <command>");
+  writeLine("Usage: commandrelay-tui runs [ls [--run-dir path]|inspect <run-id> [--run-dir path]|open <run-id> [--open ghostty|terminal.app|wt|powershell|cmd|wsl|console] [--run-dir path]|stop <run-id> [--run-dir path]|reconcile [<run-id>|--all] [--run-dir path]]");
   writeLine("Usage: commandrelay-tui --qa [--qa-sections <deps,ci,release,relay,smoke|all|1,2,3..>] [--qa-skip-install] [--qa-artifact <path>]");
   writeLine("  Runs the production checklist with check-off section progress and final PASS/FAIL summary.");
   writeLine(createQaModeUsage());

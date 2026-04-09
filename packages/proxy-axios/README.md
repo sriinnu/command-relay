@@ -6,6 +6,8 @@
 
 Axios-friendly proxy agent adapter for Node.js. It provides typed config contracts and helpers so you can apply proxy routing with `@commandrelay/proxy-agent` without importing axios at runtime.
 
+Typed axios integration that keeps proxy routing explicit and portable.
+
 ## Install
 
 ```bash
