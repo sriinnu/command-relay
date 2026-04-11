@@ -17,9 +17,9 @@ npm install @commandrelay/tui
 
 ## Use Cases
 
-- Shared protocol-level primitives for CommandRelay components
-- Internal composition point for package-level clients and transports
-- Reusable utilities for CommandRelay runtimes and toolchains
+- Interactively connect to a CommandRelay deployment from the terminal
+- Authenticate, attach to sessions or targets, and navigate active connections
+- Operate and monitor CommandRelay workflows through a cross-platform TUI
 
 ## Notes
 
