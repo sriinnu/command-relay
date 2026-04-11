@@ -64,7 +64,7 @@ Recommended wire shape:
 3. `timestamp` MUST be a safe integer `>= 0`.
 4. `payload` MUST be an object.
 5. `requestId` format: 1..128 ASCII printable chars, no leading/trailing spaces.
-6. `requestId` is required for: `auth`, `list_sessions`, `attach`, `detach`, `enable_input`, `disable_input`, `disconnect`, `input`, `ack`, `error`.
+6. `requestId` is required for: `auth`, `list_sessions`, `attach`, `detach`, `enable_input`, `disable_input`, `disconnect`, `input`, and `ack`. Stream-level `error` events may omit `requestId`.
 7. Maximum encoded message size is 64 KiB.
 
 ## 3. Message Contracts
@@ -82,6 +82,8 @@ Sent once on connection open.
 {
   "clientId": "uuid",
   "requiresAuth": true,
+  "authModes": ["device"],
+  "authChallenge": "base64url-nonce",
   "inputEnabled": false,
   "globalInputDisabled": false,
   "maxInputBytes": 4096,
@@ -91,7 +93,7 @@ Sent once on connection open.
 
 ### 3.2 `auth` (`C->S`) and auth responses
 
-Request payload:
+Request payloads:
 
 ```json
 {
@@ -99,12 +101,24 @@ Request payload:
 }
 ```
 
+```json
+{
+  "mode": "device",
+  "deviceId": "device-uuid",
+  "accessToken": "opaque-access-token",
+  "challengeProof": "base64url-signature"
+}
+```
+
 Behavior:
 
-1. If server has no configured auth token, server responds `auth_ok` with `{ "mode": "open" }`.
-2. If token auth is configured, `payload.token` is required and compared via timing-safe equality.
-3. Invalid token returns `auth_error` with `{ "code": "invalid_token" }`.
-4. Before successful auth (when required), all non-`auth` requests return `error` with `code=auth_required`.
+1. `hello.payload.authModes` advertises supported auth modes (`open`, `token`, `device`).
+2. If server has no configured auth requirement, server responds `auth_ok` with `{ "mode": "open", "accessLevel": "full_control" }`.
+3. If token auth is configured, `payload.token` is required and compared via timing-safe equality.
+4. If device auth is configured, the client signs `hello.payload.authChallenge` and sends device credentials in `payload.mode=device`.
+5. Successful auth returns `auth_ok` with `mode`, `capabilities`, `accessLevel`, and optional `expiresAt`.
+6. Invalid credentials return `auth_error` with codes such as `invalid_token`, `invalid_access_token`, `invalid_access_proof`, `invalid_auth_payload`, or `device_auth_disabled`.
+7. Before successful auth (when required), all non-`auth` requests return `error` with `code=auth_required`.
 
 ### 3.3 `list_sessions` (`C->S`) and `session_list` (`S->C`)
 
@@ -180,6 +194,7 @@ Rules:
 6. Both requests return `policy_update` with effective policy.
 7. Web control lane follows the same `enable_input`/`disable_input` flow as native clients; there are no web-only event types in v1.
 8. For web clients, lane identity is the WebSocket connection (`hello.payload.clientId`), which maps to a browser tab/window instance.
+9. Clients authenticated with `accessLevel=read_only` receive `error.code=insufficient_capability` for `enable_input`.
 
 ### 3.7 `input` (`C->S`)
 
@@ -205,7 +220,7 @@ Acceptance requirements:
 Responses:
 
 1. Success: `ack` with `{ action: "input", paneId, bytes }`.
-2. Rejections: `input_rate_limited`, `input_disabled`, `invalid_input`, `pane_not_attached`, `input_too_large`, `input_lane_conflict`.
+2. Rejections: `insufficient_capability`, `input_rate_limited`, `input_disabled`, `invalid_input`, `pane_not_attached`, `input_too_large`, `input_lane_conflict`.
 
 ### 3.8 `heartbeat` (`C->S`) and `heartbeat_ack` (`S->C`)
 

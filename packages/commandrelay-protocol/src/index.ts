@@ -89,8 +89,7 @@ const V1_REQUEST_ID_REQUIRED_TYPES = new Set<string>([
   "disable_input",
   "disconnect",
   "input",
-  "ack",
-  "error"
+  "ack"
 ]);
 
 /**

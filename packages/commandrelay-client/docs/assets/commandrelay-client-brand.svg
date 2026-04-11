@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/client">
+  <title>@commandrelay/client</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <rect x="18" y="28" width="24" height="18" rx="6" fill="none" stroke="#14b8a6" stroke-width="3"/>
+  <rect x="54" y="50" width="24" height="18" rx="6" fill="none" stroke="#fb7185" stroke-width="3"/>
+  <path d="M42 37L54 57" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="31" cy="37" r="3.5" fill="#14b8a6"/>
+  <circle cx="66" cy="59" r="3.5" fill="#fb7185"/>
+  
+</svg>

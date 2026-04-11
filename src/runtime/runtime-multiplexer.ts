@@ -1,4 +1,4 @@
 export {
   RuntimeMultiplexer,
   type RuntimeMultiplexerOptions
-} from "../../packages/runtime-core/src/index.js";
+} from "@commandrelay/runtime-core";

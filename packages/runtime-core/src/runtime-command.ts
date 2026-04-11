@@ -7,6 +7,92 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+const DEFAULT_MAX_CONCURRENT_COMMANDS = 12;
+const MIN_CONCURRENT_COMMANDS = 1;
+const MAX_CONCURRENT_COMMANDS = 64;
+const MAX_RUNTIME_COMMAND_OUTPUT_BYTES = 4 * 1024 * 1024;
+const DEFAULT_MAX_RUNTIME_COMMAND_QUEUE_SIZE = 256;
+const MIN_RUNTIME_COMMAND_QUEUE_SIZE = 1;
+const MAX_RUNTIME_COMMAND_QUEUE_SIZE = 4_096;
+
+function normalizePositiveInt(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+interface QueuedRuntimeCommand {
+  execute: () => Promise<void>;
+}
+
+const commandQueue: QueuedRuntimeCommand[] = [];
+let activeCommandCount = 0;
+
+function getRuntimeCommandLimits(): {
+  maxConcurrentRuntimeCommands: number;
+  maxRuntimeCommandQueueSize: number;
+} {
+  return {
+    maxConcurrentRuntimeCommands: normalizePositiveInt(
+      process.env.COMMANDRELAY_RUNTIME_MAX_CONCURRENT_COMMANDS,
+      DEFAULT_MAX_CONCURRENT_COMMANDS,
+      MIN_CONCURRENT_COMMANDS,
+      MAX_CONCURRENT_COMMANDS
+    ),
+    maxRuntimeCommandQueueSize: normalizePositiveInt(
+      process.env.COMMANDRELAY_RUNTIME_MAX_QUEUED_COMMANDS
+        ?? process.env.COMMANDRELAY_RUNTIME_MAX_COMMAND_QUEUE,
+      DEFAULT_MAX_RUNTIME_COMMAND_QUEUE_SIZE,
+      MIN_RUNTIME_COMMAND_QUEUE_SIZE,
+      MAX_RUNTIME_COMMAND_QUEUE_SIZE
+    )
+  };
+}
+
+function withRuntimeCommandConcurrencyLimit<T>(runCommand: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const { maxRuntimeCommandQueueSize } = getRuntimeCommandLimits();
+    if (commandQueue.length >= maxRuntimeCommandQueueSize) {
+      reject(
+        new Error(`runtime command queue full (max ${maxRuntimeCommandQueueSize} pending commands)`)
+      );
+      return;
+    }
+
+    commandQueue.push({
+      execute: async () => {
+        try {
+          resolve(await runCommand());
+        } catch (error) {
+          reject(error);
+        }
+      }
+    });
+    drainRuntimeCommandQueue();
+  });
+}
+
+function drainRuntimeCommandQueue(): void {
+  const { maxConcurrentRuntimeCommands } = getRuntimeCommandLimits();
+  while (activeCommandCount < maxConcurrentRuntimeCommands) {
+    const queued = commandQueue.shift();
+    if (!queued) {
+      return;
+    }
+
+    activeCommandCount += 1;
+    void queued.execute().finally(() => {
+      activeCommandCount -= 1;
+      drainRuntimeCommandQueue();
+    });
+  }
+}
+
 /**
  * Command execution options for runtime backends.
  */
@@ -50,14 +136,16 @@ export async function execRuntimeCommand(
   options: RuntimeCommandOptionsArg = {}
 ): Promise<string> {
   const normalizedOptions = normalizeRuntimeCommandOptions(options);
-  const { stdout } = await execFileAsync(command, args, {
-    timeout: normalizedOptions.timeoutMs ?? 5_000,
-    windowsHide: true,
-    encoding: "utf8",
-    maxBuffer: 4 * 1024 * 1024,
-    env: normalizedOptions.env
+  return withRuntimeCommandConcurrencyLimit(async () => {
+    const { stdout } = await execFileAsync(command, args, {
+      timeout: normalizedOptions.timeoutMs ?? 5_000,
+      windowsHide: true,
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
+      env: normalizedOptions.env
+    });
+    return stdout;
   });
-  return stdout;
 }
 
 /**
@@ -77,58 +165,89 @@ export async function execRuntimeCommandWithInput(
 ): Promise<string> {
   const normalizedOptions = normalizeRuntimeCommandOptions(options);
   const timeoutMs = normalizedOptions.timeoutMs ?? 5_000;
-  return await new Promise<string>((resolve, reject) => {
-    const child = spawn(command, args, {
-      windowsHide: true,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: normalizedOptions.env
-    });
+  return withRuntimeCommandConcurrencyLimit(async () => {
+    const result = await new Promise<string>((resolve, reject) => {
+      const child = spawn(command, args, {
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "pipe"],
+        env: normalizedOptions.env
+      });
 
-    let stdout = "";
-    let stderr = "";
-    let done = false;
+      const stdoutChunks: string[] = [];
+      const stderrChunks: string[] = [];
+      let bufferedBytes = 0;
+      let done = false;
+      let limitExceeded = false;
 
-    const finish = (callback: () => void): void => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      callback();
-    };
+      const finish = (callback: () => void): void => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        callback();
+      };
 
-    const timer = setTimeout(() => {
-      child.kill();
-      finish(() => reject(new Error(`Command timed out after ${timeoutMs}ms: ${command}`)));
-    }, timeoutMs);
+      const rejectForOutputLimit = (): void => {
+        if (limitExceeded) return;
+        limitExceeded = true;
+        child.kill();
+        finish(() =>
+          reject(
+            new Error(
+              `Command output exceeded ${MAX_RUNTIME_COMMAND_OUTPUT_BYTES} bytes: ${command}`
+            )
+          )
+        );
+      };
 
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    child.on("error", (error) => {
-      finish(() => reject(error));
-    });
-    child.on("close", (code, signal) => {
-      finish(() => {
-        if (code === 0) {
-          resolve(stdout);
+      const appendChunk = (chunks: string[], chunk: string): void => {
+        if (limitExceeded) return;
+        const chunkBytes = Buffer.byteLength(chunk, "utf8");
+        if (bufferedBytes + chunkBytes > MAX_RUNTIME_COMMAND_OUTPUT_BYTES) {
+          rejectForOutputLimit();
           return;
         }
+        bufferedBytes += chunkBytes;
+        chunks.push(chunk);
+      };
 
-        const signalSuffix = signal ? ` signal=${signal}` : "";
-        const stderrSuffix = stderr.trim() ? ` stderr=${stderr.trim()}` : "";
-        reject(new Error(`Command failed (${code})${signalSuffix}: ${command}${stderrSuffix}`));
+      const timer = setTimeout(() => {
+        child.kill();
+        finish(() => reject(new Error(`Command timed out after ${timeoutMs}ms: ${command}`)));
+      }, timeoutMs);
+
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        appendChunk(stdoutChunks, chunk);
       });
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        appendChunk(stderrChunks, chunk);
+      });
+
+      child.on("error", (error) => {
+        finish(() => reject(error));
+      });
+      child.on("close", (code, signal) => {
+        finish(() => {
+          if (code === 0) {
+            resolve(stdoutChunks.join(""));
+            return;
+          }
+
+          const signalSuffix = signal ? ` signal=${signal}` : "";
+          const stderr = stderrChunks.join("");
+          const stderrSuffix = stderr.trim() ? ` stderr=${stderr.trim()}` : "";
+          reject(new Error(`Command failed (${code})${signalSuffix}: ${command}${stderrSuffix}`));
+        });
+      });
+
+      child.stdin.on("error", () => {
+        // Ignore stdin closure races on exit.
+      });
+      child.stdin.end(input);
     });
 
-    child.stdin.on("error", () => {
-      // Ignore stdin closure races on exit.
-    });
-    child.stdin.end(input);
+    return result;
   });
 }
 

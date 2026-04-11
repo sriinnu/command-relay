@@ -13,6 +13,9 @@ interface CapturePaneMock {
 
 /**
  * Creates a deterministic tmux capture mock with queued outputs.
+ *
+ * @param outputs Ordered pane outputs to return.
+ * @returns Capture mock and call log.
  */
 function createCapturePaneMock(outputs: string[]): CapturePaneMock {
   const queue = [...outputs];
@@ -31,13 +34,9 @@ function createCapturePaneMock(outputs: string[]): CapturePaneMock {
   };
 }
 
-test("attach emits initial snapshot and starts polling", async (t) => {
-  const setIntervalMock = t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  const clearIntervalMock = t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("attach emits initial snapshot and starts polling", async () => {
   const outputEvents: Array<{ clientId: string; event: BridgePaneEvent }> = [];
   const captureMock = createCapturePaneMock(["line-1\nline-2\n"]);
-
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
     replayLines: 100,
@@ -60,19 +59,15 @@ test("attach emits initial snapshot and starts polling", async (t) => {
       streamSeq: 1
     }
   });
-  assert.equal(setIntervalMock.mock.calls.length, 1);
+  assert.equal(engine.getStats().polling, true);
 
   engine.detach("client-a", "%1");
-  assert.equal(clearIntervalMock.mock.calls.length, 1);
+  assert.equal(engine.getStats().polling, false);
 });
 
-test("pollOnce emits delta when output is appended", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("pollOnce emits delta when output is appended", async () => {
   const outputEvents: Array<{ clientId: string; event: BridgePaneEvent }> = [];
   const captureMock = createCapturePaneMock(["build...", "build...done"]);
-
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
     replayLines: 80,
@@ -94,15 +89,13 @@ test("pollOnce emits delta when output is appended", async (t) => {
       streamSeq: 2
     }
   });
+
+  engine.detach("client-a", "%2");
 });
 
-test("pollOnce emits snapshot when output diverges", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("pollOnce emits snapshot when output diverges", async () => {
   const outputEvents: Array<{ clientId: string; event: BridgePaneEvent }> = [];
   const captureMock = createCapturePaneMock(["old output", "replacement"]);
-
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
     replayLines: 80,
@@ -124,15 +117,13 @@ test("pollOnce emits snapshot when output diverges", async (t) => {
       streamSeq: 2
     }
   });
+
+  engine.detach("client-a", "%3");
 });
 
-test("attach replays only events newer than sinceSeq", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("attach replays only events newer than sinceSeq", async () => {
   const outputEvents: Array<{ clientId: string; event: BridgePaneEvent }> = [];
   const captureMock = createCapturePaneMock(["a", "ab", "abc"]);
-
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
     replayLines: 80,
@@ -152,17 +143,15 @@ test("attach replays only events newer than sinceSeq", async (t) => {
     { mode: "delta", paneId: "%4", chunk: "b", streamSeq: 2 },
     { mode: "delta", paneId: "%4", chunk: "c", streamSeq: 3 }
   ]);
-
   assert.equal(captureMock.calls.length, 3);
+
+  engine.detach("client-a", "%4");
+  engine.detach("client-b", "%4");
 });
 
-test("pollOnce does not emit an event when pane output is unchanged", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("pollOnce does not emit an event when pane output is unchanged", async () => {
   const outputEvents: Array<{ clientId: string; event: BridgePaneEvent }> = [];
   const captureMock = createCapturePaneMock(["steady", "steady"]);
-
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
     replayLines: 40,
@@ -181,12 +170,11 @@ test("pollOnce does not emit an event when pane output is unchanged", async (t) 
     chunk: "steady",
     streamSeq: 1
   });
+
+  engine.detach("client-a", "%5");
 });
 
-test("attach propagates capture failures and does not invoke poll error callback", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("attach propagates capture failures and does not invoke poll error callback", async () => {
   const captureError = new Error("no server running on /tmp/tmux-1000/default");
   const captureMock: CapturePaneMock = {
     calls: [],
@@ -201,7 +189,9 @@ test("attach propagates capture failures and does not invoke poll error callback
     replayLines: 40,
     pollIntervalMs: 25,
     onOutput: () => assert.fail("onOutput should not be called"),
-    onError: () => { onErrorCalls += 1; }
+    onError: () => {
+      onErrorCalls += 1;
+    }
   });
 
   await assert.rejects(async () => {
@@ -209,6 +199,27 @@ test("attach propagates capture failures and does not invoke poll error callback
   }, captureError);
   assert.equal(onErrorCalls, 0);
   assert.equal(engine.getStats().watchedPanes, 0);
+});
+
+test("attach cleans up a watcher when the first snapshot callback fails", async () => {
+  const captureMock = createCapturePaneMock(["line-1\n"]);
+  const snapshotError = new Error("snapshot delivery failed");
+  const engine = new BridgeEngine({
+    tmux: { capturePane: captureMock.capturePane },
+    replayLines: 40,
+    pollIntervalMs: 25,
+    onOutput: () => {
+      throw snapshotError;
+    },
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await assert.rejects(async () => {
+    await engine.attach("client-a", "%7");
+  }, snapshotError);
+
+  assert.equal(engine.getStats().watchedPanes, 0);
+  assert.deepEqual(engine.getReplayOffsetsSnapshot(), []);
 });
 
 test("getReplayOffsetsSnapshot returns empty rows before any pane attaches", () => {
@@ -223,10 +234,7 @@ test("getReplayOffsetsSnapshot returns empty rows before any pane attaches", () 
   assert.deepEqual(engine.getReplayOffsetsSnapshot(), []);
 });
 
-test("getReplayOffsetsSnapshot reports latest replay offset per watched pane", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("getReplayOffsetsSnapshot reports latest replay offset per watched pane", async () => {
   const captureMock = createCapturePaneMock(["a", "ab", "abc", "abcd"]);
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
@@ -244,12 +252,12 @@ test("getReplayOffsetsSnapshot reports latest replay offset per watched pane", a
   await engine.pollOnce();
 
   assert.deepEqual(engine.getReplayOffsetsSnapshot(), [{ paneId: "%1", replayOffset: 4 }]);
+
+  engine.detach("client-a", "%1");
+  engine.detach("client-b", "%1");
 });
 
-test("getReplayOffsetsSnapshot rows are sorted by paneId", async (t) => {
-  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
-  t.mock.method(globalThis, "clearInterval", () => undefined);
-
+test("getReplayOffsetsSnapshot rows are sorted by paneId", async () => {
   const captureMock = createCapturePaneMock(["a", "b"]);
   const engine = new BridgeEngine({
     tmux: { capturePane: captureMock.capturePane },
@@ -266,4 +274,7 @@ test("getReplayOffsetsSnapshot rows are sorted by paneId", async (t) => {
     { paneId: "%1", replayOffset: 1 },
     { paneId: "%2", replayOffset: 1 }
   ]);
+
+  engine.detach("client-a", "%1");
+  engine.detach("client-a", "%2");
 });

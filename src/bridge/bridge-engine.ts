@@ -1,7 +1,4 @@
-/**
- * @file Polling bridge engine that streams tmux pane output to subscribers.
- */
-
+/** @file Polling bridge engine that streams tmux pane output to subscribers. */
 export interface BridgePaneEvent {
   mode: "snapshot" | "delta";
   paneId: string;
@@ -9,9 +6,6 @@ export interface BridgePaneEvent {
   streamSeq: number;
 }
 
-/**
- * Metadata describing how attach replay resolution was handled.
- */
 export interface BridgeAttachReplayMetadata {
   paneId: string;
   requestedLastSeq: number | null;
@@ -24,9 +18,6 @@ export interface BridgeAttachReplayMetadata {
   replayGapDetected: boolean;
 }
 
-/**
- * Snapshot row describing host replay offset for a watched pane.
- */
 export interface BridgeReplayOffsetSnapshotRow {
   paneId: string;
   replayOffset: number;
@@ -37,6 +28,10 @@ interface PaneWatcher {
   lastOutput: string;
   streamSeq: number;
   history: BridgePaneEvent[];
+  nextPollAt: number;
+  idlePollStreak: number;
+  errorPollStreak: number;
+  inFlightCapture: Promise<string> | null;
 }
 
 interface BridgeEngineDeps {
@@ -44,23 +39,30 @@ interface BridgeEngineDeps {
   replayLines: number;
   pollIntervalMs: number;
   maxHistoryEvents?: number;
+  maxPollIntervalMs?: number;
+  now?: () => number;
   onOutput: (clientId: string, event: BridgePaneEvent) => void;
   onError: (clientId: string, paneId: string, error: unknown) => void;
 }
 
-/**
- * Streaming engine that polls tmux panes and computes output diffs.
- */
+const MAX_IDLE_POLL_BACKOFF_MULTIPLIER = 8;
+const MAX_ERROR_POLL_BACKOFF_MULTIPLIER = 16;
+
+/** Streaming engine that polls tmux panes and computes output diffs. */
 export class BridgeEngine {
   private readonly tmux: BridgeEngineDeps["tmux"];
   private readonly replayLines: number;
   private readonly pollIntervalMs: number;
   private readonly maxHistoryEvents: number;
+  private readonly now: () => number;
+  private readonly maxPollDelayMs: number;
+  private readonly maxErrorPollDelayMs: number;
   private readonly onOutput: BridgeEngineDeps["onOutput"];
   private readonly onError: BridgeEngineDeps["onError"];
   private readonly panes: Map<string, PaneWatcher>;
   private pollTimer: NodeJS.Timeout | null;
   private isPolling: boolean;
+  private isShuttingDown: boolean;
 
   /**
    * @param deps Engine dependencies.
@@ -70,21 +72,27 @@ export class BridgeEngine {
     this.replayLines = deps.replayLines;
     this.pollIntervalMs = deps.pollIntervalMs;
     this.maxHistoryEvents = deps.maxHistoryEvents ?? 300;
+    this.now = deps.now ?? (() => Date.now());
+    this.maxPollDelayMs =
+      deps.maxPollIntervalMs ?? this.pollIntervalMs * MAX_IDLE_POLL_BACKOFF_MULTIPLIER;
+    this.maxErrorPollDelayMs = Math.max(
+      this.maxPollDelayMs,
+      this.pollIntervalMs * MAX_ERROR_POLL_BACKOFF_MULTIPLIER
+    );
     this.onOutput = deps.onOutput;
     this.onError = deps.onError;
     this.panes = new Map<string, PaneWatcher>();
     this.pollTimer = null;
     this.isPolling = false;
+    this.isShuttingDown = false;
   }
 
   /**
    * Starts polling when at least one pane has subscribers.
    */
   ensureStarted(): void {
-    if (this.pollTimer) return;
-    this.pollTimer = setInterval(() => {
-      void this.pollOnce();
-    }, this.pollIntervalMs);
+    if (this.isShuttingDown || this.pollTimer) return;
+    this.scheduleNextPollIfNeeded();
   }
 
   /**
@@ -92,8 +100,21 @@ export class BridgeEngine {
    */
   stopIfIdle(): void {
     if (this.panes.size > 0 || !this.pollTimer) return;
-    clearInterval(this.pollTimer);
+    clearTimeout(this.pollTimer);
     this.pollTimer = null;
+  }
+
+  /**
+   * Shuts down polling and releases all pane watchers.
+   */
+  close(): void {
+    this.isShuttingDown = true;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.isPolling = false;
+    this.panes.clear();
   }
 
   /**
@@ -128,14 +149,13 @@ export class BridgeEngine {
     paneId: string,
     sinceSeq: number | null = null
   ): Promise<BridgeAttachReplayMetadata> {
+    if (this.isShuttingDown) {
+      throw new Error("bridge engine is shutting down");
+    }
+
     let watcher = this.panes.get(paneId);
     if (!watcher) {
-      watcher = {
-        subscribers: new Set<string>(),
-        lastOutput: "",
-        streamSeq: 0,
-        history: []
-      };
+      watcher = this.createWatcher();
       this.panes.set(paneId, watcher);
     }
 
@@ -157,6 +177,7 @@ export class BridgeEngine {
           for (const event of replayed) {
             this.onOutput(clientId, event);
           }
+          this.scheduleWatcherAfterAttach(watcher);
           this.ensureStarted();
           return {
             paneId,
@@ -177,6 +198,7 @@ export class BridgeEngine {
           chunk: watcher.lastOutput,
           streamSeq: watcher.streamSeq
         });
+        this.scheduleWatcherAfterAttach(watcher);
         this.ensureStarted();
         return {
           paneId,
@@ -198,6 +220,7 @@ export class BridgeEngine {
           chunk: watcher.lastOutput,
           streamSeq: watcher.streamSeq
         });
+        this.scheduleWatcherAfterAttach(watcher);
         this.ensureStarted();
         const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
         return {
@@ -213,16 +236,29 @@ export class BridgeEngine {
         };
       }
 
-      const snapshot = await this.tmux.capturePane(paneId, this.replayLines);
-      watcher.lastOutput = snapshot;
-      const event = this.nextEvent(watcher, paneId, "snapshot", snapshot);
-      this.onOutput(clientId, event);
+      const snapshot = await this.capturePaneOutput(watcher, paneId);
+      let latestSeq = watcher.streamSeq;
+      if (watcher.streamSeq === 0) {
+        watcher.lastOutput = snapshot;
+        const event = this.nextEvent(watcher, paneId, "snapshot", snapshot);
+        latestSeq = event.streamSeq;
+        this.onOutput(clientId, event);
+      } else {
+        this.onOutput(clientId, {
+          mode: "snapshot",
+          paneId,
+          chunk: watcher.lastOutput,
+          streamSeq: watcher.streamSeq
+        });
+      }
+
+      this.resetWatcherBackoff(watcher, this.now());
       const historyBySeq = [...watcher.history].sort((a, b) => a.streamSeq - b.streamSeq);
       this.ensureStarted();
       return {
         paneId,
         requestedLastSeq,
-        latestSeq: watcher.streamSeq,
+        latestSeq,
         oldestHistorySeq: historyBySeq.at(0)?.streamSeq ?? null,
         latestHistorySeq: historyBySeq.at(-1)?.streamSeq ?? null,
         replayedCount: 0,
@@ -232,7 +268,7 @@ export class BridgeEngine {
       };
     } catch (error) {
       watcher.subscribers.delete(clientId);
-      if (watcher.subscribers.size === 0 && watcher.streamSeq === 0) {
+      if (watcher.subscribers.size === 0) {
         this.panes.delete(paneId);
       }
       this.stopIfIdle();
@@ -257,39 +293,96 @@ export class BridgeEngine {
    * Detaches a client from all panes.
    */
   detachAll(clientId: string): void {
+    if (this.isShuttingDown) return;
     for (const [paneId] of this.panes) {
       this.detach(clientId, paneId);
     }
   }
 
   /**
-   * Polls all active panes for incremental output.
+   * Polls due panes for incremental output.
    */
-  async pollOnce(): Promise<void> {
-    if (this.isPolling || this.panes.size === 0) return;
+  async pollOnce(force = true, reschedule = false): Promise<void> {
+    if (this.isShuttingDown || this.isPolling || this.panes.size === 0) return;
     this.isPolling = true;
 
-    const entries = Array.from(this.panes.entries());
-    for (const [paneId, watcher] of entries) {
-      try {
-        const output = await this.tmux.capturePane(paneId, this.replayLines);
-        const delta = computeDelta(watcher.lastOutput, output);
-        if (!delta) continue;
-
-        watcher.lastOutput = output;
-        const event = this.nextEvent(watcher, paneId, delta.mode, delta.chunk);
-
-        for (const clientId of watcher.subscribers) {
-          this.onOutput(clientId, event);
+    try {
+      const entries = Array.from(this.panes.entries());
+      for (const [paneId, watcher] of entries) {
+        if (!force && this.now() < watcher.nextPollAt) {
+          continue;
         }
-      } catch (error) {
-        for (const clientId of watcher.subscribers) {
-          this.onError(clientId, paneId, error);
+
+        try {
+          const output = await this.capturePaneOutput(watcher, paneId);
+          const completedAtMs = this.now();
+          const delta = computeDelta(watcher.lastOutput, output);
+          if (!delta) {
+            this.applyIdleBackoff(watcher, completedAtMs);
+            continue;
+          }
+
+          watcher.lastOutput = output;
+          const event = this.nextEvent(watcher, paneId, delta.mode, delta.chunk);
+          this.resetWatcherBackoff(watcher, completedAtMs);
+
+          for (const clientId of watcher.subscribers) {
+            this.onOutput(clientId, event);
+          }
+        } catch (error) {
+          this.applyErrorBackoff(watcher, this.now());
+          for (const clientId of watcher.subscribers) {
+            this.onError(clientId, paneId, error);
+          }
         }
       }
+    } finally {
+      this.isPolling = false;
+      if (reschedule && !this.isShuttingDown && this.panes.size > 0) {
+        this.scheduleNextPollIfNeeded();
+      }
+    }
+  }
+
+  /**
+   * Schedules the next poll tick based on the earliest pane deadline.
+   */
+  private scheduleNextPollIfNeeded(): void {
+    if (this.isShuttingDown) return;
+    if (this.panes.size === 0) return;
+
+    const delayMs = this.computeNextPollDelayMs();
+    if (delayMs <= 0) {
+      if (this.pollTimer) return;
+      void this.pollOnce(false);
+      return;
     }
 
-    this.isPolling = false;
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+    }
+
+    this.pollTimer = setTimeout(() => {
+      this.pollTimer = null;
+      void this.pollOnce(false, true);
+    }, delayMs);
+  }
+
+  /**
+   * Computes delay to the next pane capture deadline.
+   */
+  private computeNextPollDelayMs(): number {
+    const nowMs = this.now();
+    let nextMs = Number.POSITIVE_INFINITY;
+    for (const watcher of this.panes.values()) {
+      if (watcher.nextPollAt < nextMs) {
+        nextMs = watcher.nextPollAt;
+      }
+    }
+    if (nextMs === Number.POSITIVE_INFINITY) {
+      return this.pollIntervalMs;
+    }
+    return Math.max(0, Math.min(this.maxPollDelayMs, nextMs - nowMs));
   }
 
   /**
@@ -316,6 +409,79 @@ export class BridgeEngine {
 
     return event;
   }
+
+  /**
+   * Creates a watcher with polling disabled until the first attach snapshot lands.
+   */
+  private createWatcher(): PaneWatcher {
+    return {
+      subscribers: new Set<string>(),
+      lastOutput: "",
+      streamSeq: 0,
+      history: [],
+      nextPollAt: Number.POSITIVE_INFINITY,
+      idlePollStreak: 0,
+      errorPollStreak: 0,
+      inFlightCapture: null
+    };
+  }
+
+  /**
+   * Shares one capture operation per pane so attach and poll do not duplicate work.
+   */
+  private async capturePaneOutput(watcher: PaneWatcher, paneId: string): Promise<string> {
+    if (watcher.inFlightCapture) {
+      return watcher.inFlightCapture;
+    }
+
+    const capture = this.tmux.capturePane(paneId, this.replayLines);
+    const inFlightCapture = capture.finally(() => {
+      if (watcher.inFlightCapture === inFlightCapture) {
+        watcher.inFlightCapture = null;
+      }
+    });
+    watcher.inFlightCapture = inFlightCapture;
+    return inFlightCapture;
+  }
+
+  /**
+   * Pulls the next poll forward after a new attach so stale snapshots refresh quickly.
+   */
+  private scheduleWatcherAfterAttach(watcher: PaneWatcher): void {
+    const nextPollAt = this.now() + this.pollIntervalMs;
+    watcher.nextPollAt = Math.min(watcher.nextPollAt, nextPollAt);
+  }
+
+  /**
+   * Resets polling cadence when a pane produces fresh output.
+   */
+  private resetWatcherBackoff(watcher: PaneWatcher, completedAtMs: number): void {
+    watcher.idlePollStreak = 0;
+    watcher.errorPollStreak = 0;
+    watcher.nextPollAt = completedAtMs + this.pollIntervalMs;
+  }
+
+  /**
+   * Backs off idle panes exponentially so stable panes stop hammering tmux.
+   */
+  private applyIdleBackoff(watcher: PaneWatcher, completedAtMs: number): void {
+    watcher.idlePollStreak += 1;
+    watcher.errorPollStreak = 0;
+    watcher.nextPollAt =
+      completedAtMs +
+      computeBackoffDelay(this.pollIntervalMs, watcher.idlePollStreak, this.maxPollDelayMs);
+  }
+
+  /**
+   * Slows repeated failures harder than idle panes so broken runtimes stop thrashing.
+   */
+  private applyErrorBackoff(watcher: PaneWatcher, completedAtMs: number): void {
+    watcher.errorPollStreak += 1;
+    watcher.idlePollStreak = 0;
+    watcher.nextPollAt =
+      completedAtMs +
+      computeBackoffDelay(this.pollIntervalMs, watcher.errorPollStreak, this.maxErrorPollDelayMs);
+  }
 }
 
 /**
@@ -332,4 +498,11 @@ function computeDelta(
     return { mode: "delta", chunk };
   }
   return { mode: "snapshot", chunk: current };
+}
+
+/**
+ * Computes an exponentially increasing delay bounded by a safe maximum.
+ */
+function computeBackoffDelay(baseMs: number, streak: number, maxDelayMs: number): number {
+  return Math.min(maxDelayMs, baseMs * (2 ** streak));
 }

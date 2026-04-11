@@ -194,8 +194,7 @@ test("strict v1 parser requires requestId for request-response correlated event 
     "disable_input",
     "disconnect",
     "input",
-    "ack",
-    "error"
+    "ack"
   ];
 
   for (const type of requiredRequestIdTypes) {
@@ -206,10 +205,12 @@ test("strict v1 parser requires requestId for request-response correlated event 
   const heartbeat = parseMessage(buildStrictRaw("heartbeat"), { strictV1: true });
   const output = parseMessage(buildStrictRaw("output"), { strictV1: true });
   const policy = parseMessage(buildStrictRaw("policy_update"), { strictV1: true });
+  const error = parseMessage(buildStrictRaw("error"), { strictV1: true });
 
   assert.equal(heartbeat.ok, true);
   assert.equal(output.ok, true);
   assert.equal(policy.ok, true);
+  assert.equal(error.ok, true);
 });
 
 test("strict v1 parser rejects events larger than 64KiB", () => {

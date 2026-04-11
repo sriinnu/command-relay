@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "checkJs": false,
+    "maxNodeModuleJsDepth": 0
+  },
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/dist-test/**",
+    "**/.test-dist/**",
+    "**/.commandrelay/**",
+    "**/artifacts/**",
+    "scripts/checkpoints/runs/**"
+  ]
+}

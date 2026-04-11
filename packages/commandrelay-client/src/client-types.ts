@@ -4,9 +4,14 @@ export interface GatewayPayload {
   readonly [key: string]: unknown;
 }
 
+export type ClientAuthMode = "open" | "token" | "device";
+export type ClientAccessLevel = "read_only" | "write" | "full_control";
+
 export interface HelloPayload extends GatewayPayload {
   readonly clientId: string;
   readonly requiresAuth: boolean;
+  readonly authModes?: readonly ClientAuthMode[];
+  readonly authChallenge?: string;
   readonly inputEnabled: boolean;
   readonly globalInputDisabled: boolean;
   readonly maxInputBytes?: number;
@@ -14,7 +19,10 @@ export interface HelloPayload extends GatewayPayload {
 }
 
 export interface AuthOkPayload extends GatewayPayload {
-  readonly mode: "open" | "token";
+  readonly mode: ClientAuthMode;
+  readonly capabilities?: readonly string[];
+  readonly accessLevel?: ClientAccessLevel;
+  readonly expiresAt?: string;
 }
 
 export interface AuthErrorPayload extends GatewayPayload {
@@ -51,6 +59,22 @@ export interface GatewayEnvelope<TPayload extends GatewayPayload = GatewayPayloa
   readonly payload: TPayload;
   readonly requestId: string | undefined;
 }
+
+export interface TokenAuthRequestPayload extends GatewayPayload {
+  readonly mode?: "token";
+  readonly token: string;
+}
+
+export interface DeviceAuthRequestPayload extends GatewayPayload {
+  readonly mode: "device";
+  readonly deviceId: string;
+  readonly accessToken: string;
+  readonly challengeProof: string;
+  readonly clientId?: string;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export type AuthRequestPayload = TokenAuthRequestPayload | DeviceAuthRequestPayload;
 
 export interface CommandRelayClientEvents {
   open: () => void;

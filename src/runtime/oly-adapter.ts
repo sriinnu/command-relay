@@ -2,7 +2,7 @@ import {
   ManagedRuntimeAdapter,
   type ManagedRuntimeAdapterOptions,
   type ManagedRuntimePane
-} from "../../packages/runtime-managed/src/index.js";
+} from "@commandrelay/runtime-managed";
 
 /**
  * Legacy constructor options retained for `oly` compatibility.

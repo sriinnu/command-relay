@@ -46,7 +46,10 @@ targets=(
   "root"
   "web-smoke"
 )
-mapfile -t package_targets < <(
+package_targets=()
+while IFS= read -r package_target; do
+  package_targets+=("${package_target}")
+done < <(
   node <<'NODE'
 const fs = require("node:fs");
 const path = require("node:path");
@@ -56,25 +59,75 @@ if (!fs.existsSync(packagesDir)) {
   process.exit(0);
 }
 
-const entries = fs
-  .readdirSync(packagesDir, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name)
-  .sort();
+const packages = new Map();
+for (const entry of fs.readdirSync(packagesDir, { withFileTypes: true })) {
+  if (!entry.isDirectory()) {
+    continue;
+  }
 
-for (const entry of entries) {
-  const packageJsonPath = path.join(packagesDir, entry, "package.json");
+  const packageJsonPath = path.join(packagesDir, entry.name, "package.json");
   if (!fs.existsSync(packageJsonPath)) {
     continue;
   }
 
-  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-  const scripts = pkg?.scripts ?? {};
-  if (!Object.prototype.hasOwnProperty.call(scripts, "test")) {
+  const manifest = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  if (typeof manifest.name !== "string" || !manifest.name.startsWith("@commandrelay/")) {
+    continue;
+  }
+  packages.set(manifest.name, {
+    dirName: entry.name,
+    manifest
+  });
+}
+
+const inDegree = new Map();
+const adjacency = new Map();
+for (const packageName of packages.keys()) {
+  inDegree.set(packageName, 0);
+  adjacency.set(packageName, new Set());
+}
+
+for (const [packageName, info] of packages.entries()) {
+  const dependencySections = {
+    ...(info.manifest.dependencies ?? {}),
+    ...(info.manifest.devDependencies ?? {}),
+    ...(info.manifest.peerDependencies ?? {})
+  };
+
+  for (const dependencyName of Object.keys(dependencySections)) {
+    if (!packages.has(dependencyName)) {
+      continue;
+    }
+    adjacency.get(dependencyName).add(packageName);
+    inDegree.set(packageName, (inDegree.get(packageName) ?? 0) + 1);
+  }
+}
+
+const queue = [...packages.keys()]
+  .filter((packageName) => (inDegree.get(packageName) ?? 0) === 0)
+  .sort((left, right) => left.localeCompare(right));
+const buildOrder = [];
+
+while (queue.length > 0) {
+  const current = queue.shift();
+  buildOrder.push(current);
+  for (const dependant of adjacency.get(current) ?? []) {
+    inDegree.set(dependant, (inDegree.get(dependant) ?? 0) - 1);
+    if ((inDegree.get(dependant) ?? 0) === 0) {
+      queue.push(dependant);
+      queue.sort((left, right) => left.localeCompare(right));
+    }
+  }
+}
+
+for (const packageName of buildOrder.reverse()) {
+  const info = packages.get(packageName);
+  const scripts = info?.manifest?.scripts ?? {};
+  if (!info || !Object.prototype.hasOwnProperty.call(scripts, "test")) {
     continue;
   }
 
-  process.stdout.write(`package:${entry}\n`);
+  process.stdout.write(`package:${info.dirName}\n`);
 }
 NODE
 )

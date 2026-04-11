@@ -278,6 +278,104 @@ test("repeated reconnect replay from the same lastSeq is deterministic", async (
   assertStrictlyIncreasing(replayOne.map((event) => event.streamSeq));
 });
 
+test("reconnect replay stays ordered after idle backoff periods", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  let nowMs = 0;
+  const capture = createCapturePaneMock(["a", "a", "ab", "abc"]);
+  const outputEvents: RecordedOutput[] = [];
+
+  const engine = new BridgeEngine({
+    tmux: { capturePane: capture.capturePane },
+    replayLines: 80,
+    pollIntervalMs: 25,
+    maxHistoryEvents: 20,
+    now: () => nowMs,
+    onOutput: (clientId, event) => outputEvents.push({ clientId, event }),
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("seed-client", "%11");
+
+  nowMs = 25;
+  await engine.pollOnce(false);
+  nowMs = 75;
+  await engine.pollOnce(false);
+  nowMs = 100;
+  await engine.pollOnce(false);
+
+  const metadata = await engine.attach("reconnect-client", "%11", 1);
+  const replayed = outputEvents
+    .filter((entry) => entry.clientId === "reconnect-client")
+    .map((entry) => entry.event);
+
+  assert.deepEqual(replayed.map((event) => event.streamSeq), [2, 3]);
+  assert.deepEqual(replayed.map((event) => event.chunk), ["b", "c"]);
+  assertStrictlyIncreasing(replayed.map((event) => event.streamSeq));
+  assert.deepEqual(metadata, {
+    paneId: "%11",
+    requestedLastSeq: 1,
+    latestSeq: 3,
+    oldestHistorySeq: 1,
+    latestHistorySeq: 3,
+    replayedCount: 2,
+    replayUsed: true,
+    fallbackToSnapshot: false,
+    replayGapDetected: false
+  } satisfies BridgeAttachReplayMetadata);
+});
+
+test("replay works correctly after backoff-only unchanged polls", async (t) => {
+  t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
+  t.mock.method(globalThis, "clearInterval", () => undefined);
+
+  const capture = createCapturePaneMock(["a", "ab", "abc", "abc", "abcd"]);
+  const outputEvents: RecordedOutput[] = [];
+
+  let now = 0;
+  const engine = new BridgeEngine({
+    tmux: { capturePane: capture.capturePane },
+    replayLines: 80,
+    pollIntervalMs: 10,
+    maxPollIntervalMs: 40,
+    now: () => now,
+    onOutput: (clientId, event) => outputEvents.push({ clientId, event }),
+    onError: () => assert.fail("onError should not be called")
+  });
+
+  await engine.attach("seed-client", "%1");
+
+  now += 10;
+  await engine.pollOnce(false);
+  now += 10;
+  await engine.pollOnce(false);
+  now += 10;
+  await engine.pollOnce(false);
+
+  now += 10;
+  await engine.pollOnce(false);
+
+  const metadata = await engine.attach("reconnect-client", "%1", 2);
+  const replayed = outputEvents
+    .filter((entry) => entry.clientId === "reconnect-client")
+    .map((entry) => entry.event);
+
+  assert.deepEqual(replayed.map((event) => event.streamSeq), [3]);
+  assert.deepEqual(replayed.map((event) => event.chunk), ["c"]);
+  assert.deepEqual(metadata, {
+    paneId: "%1",
+    requestedLastSeq: 2,
+    latestSeq: 3,
+    oldestHistorySeq: 1,
+    latestHistorySeq: 3,
+    replayedCount: 1,
+    replayUsed: true,
+    fallbackToSnapshot: false,
+    replayGapDetected: false
+  } satisfies BridgeAttachReplayMetadata);
+});
+
 test("multi-pane replay preserves per-pane ordering with deterministic fixture output", async (t) => {
   t.mock.method(globalThis, "setInterval", () => ({}) as NodeJS.Timeout);
   t.mock.method(globalThis, "clearInterval", () => undefined);

@@ -118,7 +118,8 @@ test("uses HTTPS_PROXY over HTTP_PROXY for https endpoints", async () => {
   });
 
   await client.claimPairing({
-    pairingCode: "pair-001",
+    pairingSessionId: "pair-session-001",
+    pairingToken: "pair-token-001",
     publicKey: "pk-123",
     deviceName: "iPhone",
     platform: "ios"
@@ -128,6 +129,31 @@ test("uses HTTPS_PROXY over HTTP_PROXY for https endpoints", async () => {
   assert.equal(captured[0].path, "/pair/claim");
   assert.equal(captured[0].proxyUrl, "http://proxy-https.local:8443/");
   assert.equal(captured[0].viaProxy, true);
+});
+
+test("calls pairing session, proof, confirm, refresh, and revoke endpoints", async () => {
+  const captured: CapturedRequest[] = [];
+  const client = createControlPlaneClientFromEnv({
+    baseUrl: "https://secure-control-plane.local",
+    env: {},
+    requestFn: createCaptureRequest(captured)
+  });
+
+  await client.createPairingSession({
+    apiBaseUrl: "https://secure-control-plane.local",
+    relayEndpoint: "wss://secure-control-plane.local/ws",
+    relayId: "relay-1",
+    relayFingerprintHint: "abcd1234"
+  });
+  await client.provePairing({ claimId: "claim-1", challengeProof: "proof" });
+  await client.confirmPairing({ claimId: "claim-1", verificationCode: "123456" });
+  await client.refreshDeviceAccess({ deviceId: "device-1", refreshToken: "refresh-1" });
+  await client.revokeDevice({ deviceId: "device-1" });
+
+  assert.deepEqual(
+    captured.map((entry) => entry.path),
+    ["/pair/sessions", "/pair/prove", "/pair/confirm", "/auth/refresh", "/devices/revoke"]
+  );
 });
 
 test("falls back to ALL_PROXY when protocol-specific env vars are unset", async () => {

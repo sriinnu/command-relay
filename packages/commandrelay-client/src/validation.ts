@@ -33,6 +33,8 @@ export function isHelloPayload(value: GatewayPayload): value is HelloPayload {
   if (!isRecord(value)) return false;
   if (!isString(value.clientId)) return false;
   if (!isBoolean(value.requiresAuth)) return false;
+  if (value.authModes !== undefined && !isStringArray(value.authModes, ["open", "token", "device"])) return false;
+  if (value.authChallenge !== undefined && !isString(value.authChallenge)) return false;
   if (!isBoolean(value.inputEnabled)) return false;
   if (!isBoolean(value.globalInputDisabled)) return false;
   if (value.maxInputBytes !== undefined && !isNonNegativeInteger(value.maxInputBytes)) return false;
@@ -41,7 +43,19 @@ export function isHelloPayload(value: GatewayPayload): value is HelloPayload {
 }
 
 export function isAuthOkPayload(value: GatewayPayload): value is AuthOkPayload {
-  return isRecord(value) && (value.mode === "open" || value.mode === "token");
+  if (!isRecord(value)) return false;
+  if (value.mode !== "open" && value.mode !== "token" && value.mode !== "device") return false;
+  if (value.capabilities !== undefined && !isStringArray(value.capabilities)) return false;
+  if (
+    value.accessLevel !== undefined &&
+    value.accessLevel !== "read_only" &&
+    value.accessLevel !== "write" &&
+    value.accessLevel !== "full_control"
+  ) {
+    return false;
+  }
+  if (value.expiresAt !== undefined && !isString(value.expiresAt)) return false;
+  return true;
 }
 
 export function isAuthErrorPayload(value: GatewayPayload): value is AuthErrorPayload {
@@ -81,6 +95,19 @@ function isString(value: unknown): value is string {
 
 function isBoolean(value: unknown): value is boolean {
   return typeof value === "boolean";
+}
+
+function isStringArray(
+  value: unknown,
+  allowedValues?: readonly string[]
+): value is string[] | readonly string[] {
+  if (!Array.isArray(value) || value.some((entry) => !isString(entry))) {
+    return false;
+  }
+  if (!allowedValues) {
+    return true;
+  }
+  return value.every((entry) => allowedValues.includes(entry));
 }
 
 function isRecord(value: unknown): value is GatewayPayload {

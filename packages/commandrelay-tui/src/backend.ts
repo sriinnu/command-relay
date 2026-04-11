@@ -27,9 +27,20 @@ export interface BackendDetectionOptions {
 }
 
 /**
+ * Optional overrides used to test duplicate detached-launch suppression.
+ */
+export interface LaunchSuppressionOptions {
+  nowMs?: number;
+  recentLaunches?: Map<string, number>;
+  suppressionWindowMs?: number;
+}
+
+/**
  * Default shell used when no explicit command is provided.
  */
 export const defaultShell = process.platform === "win32" ? process.env.COMSPEC ?? "cmd" : process.env.SHELL ?? "sh";
+const REPEATED_DETACHED_LAUNCH_WINDOW_MS = 1_500;
+const recentDetachedLaunches = new Map<string, number>();
 
 /**
  * Runtime type guard for backend values.
@@ -104,6 +115,9 @@ export function detectTerminalBackend(
  * @param command Command or shell string to execute.
  */
 export function launchLocalTerminal(backend: Backend, command: string): void {
+  if (shouldSuppressDetachedLaunch(backend, command)) {
+    return;
+  }
   if (backend === "tmux") {
     launchWithTmux(command);
     return;
@@ -127,6 +141,35 @@ export function launchLocalTerminal(backend: Backend, command: string): void {
     return;
   }
   launchWithConsole(command);
+}
+
+/**
+ * Suppresses identical detached launcher requests inside a short debounce window.
+ *
+ * @param backend Terminal backend selected by the caller.
+ * @param command Command text that will be launched.
+ * @param options Optional deterministic hooks for tests.
+ * @returns True when the launch should be skipped as a rapid duplicate.
+ */
+export function shouldSuppressDetachedLaunch(
+  backend: Backend,
+  command: string,
+  options: LaunchSuppressionOptions = {}
+): boolean {
+  if (backend === "console") {
+    return false;
+  }
+
+  const normalizedCommand = command.trim() || defaultShell;
+  const nowMs = options.nowMs ?? Date.now();
+  const recentLaunches = options.recentLaunches ?? recentDetachedLaunches;
+  const suppressionWindowMs = options.suppressionWindowMs ?? REPEATED_DETACHED_LAUNCH_WINDOW_MS;
+  pruneRecentLaunches(recentLaunches, nowMs, suppressionWindowMs);
+
+  const key = `${backend}\u0000${normalizedCommand}`;
+  const previousLaunchAtMs = recentLaunches.get(key);
+  recentLaunches.set(key, nowMs);
+  return typeof previousLaunchAtMs === "number" && nowMs - previousLaunchAtMs < suppressionWindowMs;
 }
 
 function hasBackendExecutable(backend: Backend): boolean {
@@ -199,13 +242,14 @@ function isExecutablePath(candidate: string): boolean {
 
 function launchWithTmux(command: string): void {
   const shell = process.platform === "win32" ? "cmd" : process.env.SHELL ?? "bash";
-  try {
-    spawn("tmux", ["new-window", "-n", "commandrelay", "-c", process.cwd(), `${shell} -lc ${shellQuote(command)}`], {
-      stdio: "ignore",
-      detached: true,
-      cwd: process.cwd()
-    });
-  } catch {
+  if (!tryDetachedSpawn("tmux", [
+    "new-window",
+    "-n",
+    "commandrelay",
+    "-c",
+    process.cwd(),
+    `${shell} -lc ${shellQuote(command)}`
+  ])) {
     launchWithConsole(command);
   }
 }
@@ -318,6 +362,19 @@ function tryDetachedSpawn(command: string, args: string[]): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+function pruneRecentLaunches(
+  recentLaunches: Map<string, number>,
+  nowMs: number,
+  suppressionWindowMs: number
+): void {
+  const staleAfterMs = suppressionWindowMs * 4;
+  for (const [key, launchedAtMs] of recentLaunches.entries()) {
+    if (nowMs - launchedAtMs >= staleAfterMs) {
+      recentLaunches.delete(key);
+    }
   }
 }
 

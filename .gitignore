@@ -4,6 +4,7 @@ node_modules/
 # Local agent/runtime state
 .claude/
 .chitragupta/
+.commandrelay/
 .npmrc
 .mcp.json
 CLAUDE.md
@@ -11,9 +12,11 @@ CLAUDE.md
 # OS/editor noise
 .DS_Store
 Thumbs.db
+.vscode/
 
 # Logs and temporary files
 *.log
+*.tgz
 tmp/
 .tmp/
 .ci-artifacts/
@@ -21,6 +24,7 @@ artifacts/
 
 # Generated package artifacts (build output; never commit)
 packages/*/dist/
+packages/*/dist-test/
 packages/*/.test-dist/
 
 # iOS generated artifacts

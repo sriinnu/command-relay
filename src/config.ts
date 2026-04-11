@@ -43,10 +43,18 @@ export interface BridgeConfig {
   maxAttachedPanes: number;
   maxMessagesPerMinute: number;
   maxInputsPerMinute: number;
+  maxWsClients?: number;
+  wsIdleTimeoutMs?: number;
   globalInputDisabled: boolean;
   allowInputOwnershipOverride: boolean;
   inputLaneLeaseMs: number;
   authToken: string | null;
+  trustedDeviceAuthEnabled: boolean;
+  trustedDevicePairingTtlMs: number;
+  trustedDeviceAccessTokenTtlMs: number;
+  trustedDeviceRefreshTokenTtlMs: number;
+  publicApiBaseUrl: string | null;
+  publicWebSocketUrl: string | null;
   auditLogPath: string | null;
 }
 
@@ -170,6 +178,35 @@ function isLoopbackHost(host: string): boolean {
 }
 
 /**
+ * Parses and validates an optional absolute URL environment variable.
+ *
+ * @param raw Raw env value.
+ * @param envName Environment variable name for error messages.
+ * @param allowedProtocols Allowed protocol prefixes.
+ * @returns Normalized URL string or null.
+ */
+function parseOptionalAbsoluteUrlEnv(
+  raw: string | undefined,
+  envName: string,
+  allowedProtocols: readonly string[]
+): string | null {
+  const parsed = parseOptionalStringEnv(raw);
+  if (!parsed) return null;
+  let url: URL;
+  try {
+    url = new URL(parsed);
+  } catch {
+    throw new Error(`${envName} must be an absolute URL (received "${raw}")`);
+  }
+  if (!allowedProtocols.includes(url.protocol)) {
+    throw new Error(
+      `${envName} must use one of: ${allowedProtocols.join(",")} (received "${raw}")`
+    );
+  }
+  return url.toString();
+}
+
+/**
  * Loads bridge configuration from environment variables.
  *
  * @returns Normalized runtime configuration.
@@ -258,6 +295,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
     maxAttachedPanes: parseIntEnv(env.COMMANDRELAY_MAX_ATTACHED_PANES, 8, { min: 1, max: 64 }),
     maxMessagesPerMinute: parseIntEnv(env.COMMANDRELAY_MAX_MSG_PER_MIN, 240, { min: 30, max: 5000 }),
     maxInputsPerMinute: parseIntEnv(env.COMMANDRELAY_MAX_INPUT_PER_MIN, 60, { min: 5, max: 2000 }),
+    maxWsClients: parseIntEnv(env.COMMANDRELAY_MAX_WS_CLIENTS, 128, { min: 1, max: 10_000 }),
+    wsIdleTimeoutMs: parseIntEnv(env.COMMANDRELAY_WS_IDLE_TIMEOUT_MS, 120_000, { min: 1_000, max: 600_000 }),
     globalInputDisabled: parseBooleanEnv(
       env.COMMANDRELAY_INPUT_KILL_SWITCH,
       false,
@@ -274,6 +313,36 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
       { min: 1_000, max: 300_000 }
     ),
     authToken: parseOptionalStringEnv(env.COMMANDRELAY_AUTH_TOKEN),
+    trustedDeviceAuthEnabled: parseBooleanEnv(
+      env.COMMANDRELAY_TRUSTED_DEVICE_AUTH,
+      false,
+      "COMMANDRELAY_TRUSTED_DEVICE_AUTH"
+    ),
+    trustedDevicePairingTtlMs: parseIntEnv(
+      env.COMMANDRELAY_TRUSTED_DEVICE_PAIRING_TTL_MS,
+      60_000,
+      { min: 15_000, max: 300_000 }
+    ),
+    trustedDeviceAccessTokenTtlMs: parseIntEnv(
+      env.COMMANDRELAY_TRUSTED_DEVICE_ACCESS_TTL_MS,
+      300_000,
+      { min: 60_000, max: 900_000 }
+    ),
+    trustedDeviceRefreshTokenTtlMs: parseIntEnv(
+      env.COMMANDRELAY_TRUSTED_DEVICE_REFRESH_TTL_MS,
+      30 * 24 * 60 * 60_000,
+      { min: 60_000, max: 90 * 24 * 60 * 60_000 }
+    ),
+    publicApiBaseUrl: parseOptionalAbsoluteUrlEnv(
+      env.COMMANDRELAY_PUBLIC_API_BASE_URL,
+      "COMMANDRELAY_PUBLIC_API_BASE_URL",
+      ["http:", "https:"]
+    ),
+    publicWebSocketUrl: parseOptionalAbsoluteUrlEnv(
+      env.COMMANDRELAY_PUBLIC_WS_URL,
+      "COMMANDRELAY_PUBLIC_WS_URL",
+      ["ws:", "wss:"]
+    ),
     auditLogPath: parseOptionalStringEnv(env.COMMANDRELAY_AUDIT_LOG)
   };
 }
@@ -285,9 +354,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
  * @returns Nothing.
  */
 export function validateStartupConfig(config: BridgeConfig): void {
-  if (!isLoopbackHost(config.host) && !config.authToken) {
+  if (
+    !isLoopbackHost(config.host) &&
+    !config.authToken &&
+    !config.trustedDeviceAuthEnabled
+  ) {
     throw new Error(
-      "COMMANDRELAY_AUTH_TOKEN is required when COMMANDRELAY_HOST is not loopback"
+      "COMMANDRELAY_AUTH_TOKEN or COMMANDRELAY_TRUSTED_DEVICE_AUTH is required when COMMANDRELAY_HOST is not loopback"
+    );
+  }
+  if (config.publicApiBaseUrl && !config.trustedDeviceAuthEnabled) {
+    throw new Error(
+      "COMMANDRELAY_PUBLIC_API_BASE_URL requires COMMANDRELAY_TRUSTED_DEVICE_AUTH=true"
+    );
+  }
+  if (config.publicWebSocketUrl && !config.trustedDeviceAuthEnabled) {
+    throw new Error(
+      "COMMANDRELAY_PUBLIC_WS_URL requires COMMANDRELAY_TRUSTED_DEVICE_AUTH=true"
     );
   }
   if (config.transportMode === "ssh" && !config.sshTarget) {

@@ -8,6 +8,21 @@ importers:
 
   .:
     dependencies:
+      '@commandrelay/runtime-cmux':
+        specifier: workspace:^
+        version: link:packages/runtime-cmux
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:packages/runtime-core
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:packages/runtime-managed
+      '@commandrelay/runtime-ssh':
+        specifier: workspace:^
+        version: link:packages/runtime-ssh
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:packages/runtime-tmux
       http-proxy-agent:
         specifier: ^7.0.2
         version: 7.0.2
@@ -120,6 +135,15 @@ importers:
       '@commandrelay/run-orchestrator':
         specifier: workspace:^
         version: link:../run-orchestrator
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:../runtime-managed
+      '@commandrelay/runtime-ssh':
+        specifier: workspace:^
+        version: link:../runtime-ssh
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:../runtime-tmux
       '@commandrelay/terminal-discovery':
         specifier: workspace:^
         version: link:../terminal-discovery
@@ -224,6 +248,9 @@ importers:
 
   packages/proxy-http-client:
     devDependencies:
+      '@commandrelay/proxy-core':
+        specifier: workspace:^
+        version: link:../proxy-core
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.0

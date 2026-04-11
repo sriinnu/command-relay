@@ -33,6 +33,19 @@ test("parses lane lease duration with bounded defaults", () => {
   assert.equal(invalid.inputLaneLeaseMs, 30_000);
 });
 
+test("parses websocket connection and idle timeout guardrails", () => {
+  const defaults = loadConfig({});
+  const custom = loadConfig({
+    COMMANDRELAY_MAX_WS_CLIENTS: "64",
+    COMMANDRELAY_WS_IDLE_TIMEOUT_MS: "45000"
+  });
+
+  assert.equal(defaults.maxWsClients, 128);
+  assert.equal(defaults.wsIdleTimeoutMs, 120_000);
+  assert.equal(custom.maxWsClients, 64);
+  assert.equal(custom.wsIdleTimeoutMs, 45_000);
+});
+
 test("defaults strict protocol parsing on and supports legacy toggle alias", () => {
   const defaults = loadConfig({});
   const strictOffPrimary = loadConfig({ COMMANDRELAY_STRICT_PROTOCOL_PARSING: "false" });
@@ -152,6 +165,41 @@ test("accepts loopback host without auth and non-loopback host with auth", () =>
     COMMANDRELAY_AUTH_TOKEN: "token-value"
   });
   validateStartupConfig(remoteConfig);
+});
+
+test("accepts non-loopback host when trusted-device auth is enabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_HOST: "0.0.0.0",
+    COMMANDRELAY_TRUSTED_DEVICE_AUTH: "true"
+  });
+  validateStartupConfig(config);
+});
+
+test("parses trusted-device ttl and public url overrides", () => {
+  const config = loadConfig({
+    COMMANDRELAY_TRUSTED_DEVICE_AUTH: "true",
+    COMMANDRELAY_TRUSTED_DEVICE_PAIRING_TTL_MS: "90000",
+    COMMANDRELAY_TRUSTED_DEVICE_ACCESS_TTL_MS: "420000",
+    COMMANDRELAY_TRUSTED_DEVICE_REFRESH_TTL_MS: "172800000",
+    COMMANDRELAY_PUBLIC_API_BASE_URL: "https://relay.example.test",
+    COMMANDRELAY_PUBLIC_WS_URL: "wss://relay.example.test/ws"
+  });
+
+  assert.equal(config.trustedDeviceAuthEnabled, true);
+  assert.equal(config.trustedDevicePairingTtlMs, 90_000);
+  assert.equal(config.trustedDeviceAccessTokenTtlMs, 420_000);
+  assert.equal(config.trustedDeviceRefreshTokenTtlMs, 172_800_000);
+  assert.equal(config.publicApiBaseUrl, "https://relay.example.test/");
+  assert.equal(config.publicWebSocketUrl, "wss://relay.example.test/ws");
+  validateStartupConfig(config);
+});
+
+test("rejects trusted-device public urls when trusted-device auth is disabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_PUBLIC_API_BASE_URL: "https://relay.example.test"
+  });
+
+  assert.throws(() => validateStartupConfig(config), /COMMANDRELAY_PUBLIC_API_BASE_URL/);
 });
 
 test("defaults transport to ws with ssh-safe defaults", () => {

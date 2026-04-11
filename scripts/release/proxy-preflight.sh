@@ -181,6 +181,10 @@ while (($# > 0)); do
       print_help
       exit "$EXIT_OK"
       ;;
+    --)
+      shift
+      break
+      ;;
     *)
       die_usage "unknown argument: $1 (use --help)"
       ;;
@@ -230,16 +234,122 @@ assert_non_empty_file() {
   fi
 }
 
+assert_artifact_kv_value() {
+  local path="$1"
+  local key="$2"
+  local expected="$3"
+  local label="$4"
+
+  local actual
+  actual="$(node - "$path" "$key" <<'NODE'
+const fs = require('node:fs');
+
+const [path, key] = process.argv.slice(2);
+try {
+  const data = fs.readFileSync(path, 'utf8');
+  for (const line of data.split(/\r?\n/)) {
+    if (line.startsWith(`${key}=`)) {
+      process.stdout.write(line.slice(key.length + 1));
+      break;
+    }
+  }
+} catch {
+  process.stdout.write('');
+}
+NODE
+)"
+
+  if [[ -z "$actual" ]]; then
+    record_failure "${label}: missing ${key}"
+    return
+  fi
+
+  if [[ "$actual" != "$expected" ]]; then
+    record_failure "${label}: expected ${key}='${expected}', got '${actual}'"
+    return
+  fi
+
+  printf 'PASS %s: %s=%s\n' "$label" "$key" "$expected"
+}
+
+assert_branch_protection_field() {
+  local path="$1"
+  local field_path="$2"
+  local expected="$3"
+  local label="$4"
+
+  local actual
+  actual="$(node - "$path" "$field_path" <<'NODE'
+const fs = require('node:fs');
+
+const [path, fieldPath] = process.argv.slice(2);
+const payload = JSON.parse(fs.readFileSync(path, 'utf8'));
+const fieldParts = fieldPath.split('.');
+let value = payload;
+
+for (const field of fieldParts) {
+  if (!value || typeof value !== 'object' || !(field in value)) {
+    process.stdout.write('');
+    process.exit(0);
+  }
+  value = value[field];
+}
+
+if (typeof value === 'boolean' || typeof value === 'number') {
+  process.stdout.write(String(value));
+} else if (typeof value === 'string') {
+  process.stdout.write(value);
+}
+NODE
+)"
+
+  if [[ -z "$actual" ]]; then
+    record_failure "${label}: missing ${field_path}"
+    return
+  fi
+
+  if [[ "$actual" != "$expected" ]]; then
+    record_failure "${label}: expected ${field_path}='${expected}', got '${actual}'"
+    return
+  fi
+
+  printf 'PASS %s: %s=%s\n' "$label" "$field_path" "$expected"
+}
+
 assert_no_legacy_namespace_references() {
+  local legacy_namespace_pattern="@""termina/"
   local legacy_hits
-  legacy_hits="$(rg -n "@termina/" "$REPO_ROOT" | sed -n '1,10p' || true)"
-  if [[ -z "$legacy_hits" ]]; then
-    printf 'PASS legacy namespace sweep: no @termina/ references found\n'
+  local -a search_roots=(
+    "package.json"
+    "pnpm-workspace.yaml"
+    ".github"
+    "src"
+    "packages"
+    "docs/production-test-runbook.md"
+    "docs/release/proxy-publish.md"
+  )
+  local -a existing_roots=()
+  local root
+
+  for root in "${search_roots[@]}"; do
+    if [[ -e "$root" ]]; then
+      existing_roots+=("$root")
+    fi
+  done
+
+  if ((${#existing_roots[@]} == 0)); then
+    printf 'PASS legacy namespace sweep: no tracked scan roots found\n'
     return 0
   fi
 
-  printf 'FAIL legacy namespace sweep: @termina/ references remain\n%s\n' "$legacy_hits" >&2
-  record_failure "legacy namespace references (@termina/) present"
+  legacy_hits="$(rg -n "$legacy_namespace_pattern" "${existing_roots[@]}" | sed -n '1,10p' || true)"
+  if [[ -z "$legacy_hits" ]]; then
+    printf 'PASS legacy namespace sweep: no legacy namespace references found\n'
+    return 0
+  fi
+
+  printf 'FAIL legacy namespace sweep: legacy namespace references remain\n%s\n' "$legacy_hits" >&2
+  record_failure "legacy namespace references remain"
 }
 
 printf 'INFO batch-date=%s selector=%s\n' "$BATCH_DATE" "$PACKAGE_SELECTOR"
@@ -276,11 +386,22 @@ done
 assert_non_empty_file "${GOVERNANCE_ARTIFACT_DIR}/npm-token-presence.txt" "governance artifact"
 assert_non_empty_file "${GOVERNANCE_ARTIFACT_DIR}/npm-publish-environment.txt" "governance artifact"
 assert_non_empty_file "${GOVERNANCE_ARTIFACT_DIR}/default-branch-protection.json" "governance artifact"
+assert_artifact_kv_value "${GOVERNANCE_ARTIFACT_DIR}/npm-token-presence.txt" "status" "ok" "governance: npm token presence evidence"
+assert_artifact_kv_value "${GOVERNANCE_ARTIFACT_DIR}/npm-token-presence.txt" "contains_NPM_TOKEN" "true" "governance: npm token secret existence check"
+assert_artifact_kv_value "${GOVERNANCE_ARTIFACT_DIR}/npm-publish-environment.txt" "status" "ok" "governance: npm-publish environment presence"
+assert_artifact_kv_value "${GOVERNANCE_ARTIFACT_DIR}/npm-publish-environment.txt" "npm_publish_environment_present" "true" "governance: npm-publish environment configuration"
+assert_artifact_kv_value "${GOVERNANCE_ARTIFACT_DIR}/npm-publish-environment.txt" "environment_details_status" "ok" "governance: npm-publish environment details"
+assert_branch_protection_field "${GOVERNANCE_ARTIFACT_DIR}/default-branch-protection.json" "branch_status" "ok" "governance: default branch metadata"
+assert_branch_protection_field "${GOVERNANCE_ARTIFACT_DIR}/default-branch-protection.json" "protection_status" "ok" "governance: default branch protection API"
+assert_branch_protection_field "${GOVERNANCE_ARTIFACT_DIR}/default-branch-protection.json" "branch_summary.protected" "true" "governance: default branch is protected"
 
 assert_non_empty_file "$CHECKPOINT_FILE" "dry-run checkpoint"
 assert_non_empty_file "$ROOT_TAP_EVIDENCE" "root TAP evidence"
 
-mapfile -t selected_packages < <(collect_selected_packages)
+selected_packages=()
+while IFS= read -r selected_package; do
+  selected_packages+=("$selected_package")
+done < <(collect_selected_packages)
 if ((${#selected_packages[@]} == 0)); then
   record_failure "no packages matched selector (${PACKAGE_SELECTOR})"
 else

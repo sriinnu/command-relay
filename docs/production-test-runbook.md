@@ -148,10 +148,7 @@ Additional commands:
 ```bash
 cd /mnt/c/sriinnu/personal/Kaala-brahma/terminal
 
-# Namespace sweep
-rg -n "@termina/" .
-
-# Release workflow artifact check (optional)
+# Release workflow artifact check (includes legacy namespace sweep)
 pnpm run release:proxy:guardrails -- --batch-date 2026-03-20 --package-selector "@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
 
 # Relay status check scripts
@@ -273,7 +270,7 @@ Use this for all environments:
 - [ ] Relay `/health` + `/status` assertions pass
 - [ ] `/status` includes `statusContractVersion`, `configFingerprint`, `heartbeat`
 - [ ] Relay rotation block includes stable status (`disabled|monitoring|restart_required|unavailable|unsupported`)
-- [ ] `rg -n "@termina/"` sweep shows no production references remaining
+- [ ] release guardrails report a clean legacy-namespace sweep
 
 ## Reporting format
 

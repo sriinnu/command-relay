@@ -174,6 +174,8 @@ function isAlignedDependencySpecifier(specifier: string, alignedVersion: string)
     const workspaceSpecifier = specifier.slice("workspace:".length);
     return (
       workspaceSpecifier === "*" ||
+      workspaceSpecifier === "^" ||
+      workspaceSpecifier === "~" ||
       workspaceSpecifier === alignedVersion ||
       workspaceSpecifier === `^${alignedVersion}` ||
       workspaceSpecifier === `~${alignedVersion}`

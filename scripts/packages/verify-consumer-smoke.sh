@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-RUN_PHASE_SCRIPT="${SCRIPT_DIR}/run-phase.sh"
 NODE_CMD=(npm exec -- node)
 
 PACKAGE_DIRS=(
@@ -17,6 +16,15 @@ PACKAGE_DIRS=(
 
 log() {
   printf '==> %s\n' "$*"
+}
+
+run_package_build() {
+  local package_dir="$1"
+  log "Building ${package_dir}"
+  (
+    cd "${REPO_ROOT}/${package_dir}"
+    pnpm run build
+  )
 }
 
 require_command() {
@@ -311,7 +319,9 @@ export npm_config_fund="false"
 export npm_config_update_notifier="false"
 
 log "Building package artifacts"
-"${RUN_PHASE_SCRIPT}" build
+for package_dir in "${PACKAGE_DIRS[@]}"; do
+  run_package_build "${package_dir}"
+done
 
 for package_dir in "${PACKAGE_DIRS[@]}"; do
   package_json="${REPO_ROOT}/${package_dir}/package.json"

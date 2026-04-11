@@ -70,6 +70,10 @@ while (($# > 0)); do
       usage
       exit "$EXIT_OK"
       ;;
+    --)
+      shift
+      break
+      ;;
     *)
       die_usage "unknown argument: $1"
       ;;

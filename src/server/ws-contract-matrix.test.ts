@@ -39,7 +39,7 @@ const STRICT_TS = 1_771_934_131_735;
 const PROTOCOL_V1_DOC = new URL("../../docs/protocol-v1.md", import.meta.url);
 const SSH_TRANSPORT_CONTRACT_DOC = new URL("../../docs/ssh-transport-contract.md", import.meta.url);
 const CONTRACT_PLAN_REFERENCE_IDS = ["TP-WS-MATRIX-COMPAT", "TP-WS-MATRIX-RECONNECT", "TP-WS-MATRIX-ASSERTIONS"] as const;
-const REQUIRED_REQUEST_ID_TYPES = new Set<ProtocolV1RequiredEventType>(["auth", "list_sessions", "attach", "input", "ack", "error"]);
+const REQUIRED_REQUEST_ID_TYPES = new Set<ProtocolV1RequiredEventType>(["auth", "list_sessions", "attach", "input", "ack"]);
 
 function buildStrictRaw(
   type: string,

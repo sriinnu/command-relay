@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { detectTerminalBackend, isBackend } from "../src/backend.js";
+import { detectTerminalBackend, isBackend, shouldSuppressDetachedLaunch } from "../src/backend.js";
 
 test("isBackend accepts supported launcher ids", () => {
   assert.equal(isBackend("terminal.app"), true);
@@ -37,4 +37,44 @@ test("detectTerminalBackend falls back to console for remote ssh sessions withou
   });
 
   assert.equal(backend, "console");
+});
+
+test("shouldSuppressDetachedLaunch suppresses rapid duplicate detached launches", () => {
+  const recentLaunches = new Map<string, number>();
+
+  assert.equal(
+    shouldSuppressDetachedLaunch("ghostty", "node dist/cli.js", {
+      nowMs: 1_000,
+      recentLaunches
+    }),
+    false
+  );
+  assert.equal(
+    shouldSuppressDetachedLaunch("ghostty", "node dist/cli.js", {
+      nowMs: 1_800,
+      recentLaunches
+    }),
+    true
+  );
+  assert.equal(
+    shouldSuppressDetachedLaunch("ghostty", "node dist/cli.js", {
+      nowMs: 3_000,
+      recentLaunches
+    }),
+    true
+  );
+  assert.equal(
+    shouldSuppressDetachedLaunch("ghostty", "node dist/cli.js", {
+      nowMs: 4_600,
+      recentLaunches
+    }),
+    false
+  );
+  assert.equal(
+    shouldSuppressDetachedLaunch("console", "node dist/cli.js", {
+      nowMs: 4_700,
+      recentLaunches
+    }),
+    false
+  );
 });

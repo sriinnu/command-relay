@@ -64,6 +64,8 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
   private readonly pollDelayMs: number;
   private readonly runCommandImpl: RuntimeCommandRunner;
   private daemonReady = false;
+  private daemonStatusFlight: Promise<boolean> | null = null;
+  private daemonStartFlight: Promise<void> | null = null;
 
   /**
    * @param options Optional adapter settings.
@@ -89,9 +91,7 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
 
   async listPanes(): Promise<ManagedRuntimePane[]> {
     await this.ensureDaemonRunning();
-    const stdout = await this.runManaged(["ls", "--json", "--limit", "500"]);
-    const payload = parseListResponse(stdout);
-    return payload.items?.map((item) => toPane(item)).filter((pane): pane is ManagedRuntimePane => pane !== null) ?? [];
+    return this.readPanes();
   }
 
   async capturePane(paneId: string, lines: number): Promise<string> {
@@ -128,7 +128,7 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
    */
   async startCommand(request: RuntimeLaunchRequest): Promise<RuntimeStartedPane> {
     await this.ensureDaemonRunning();
-    const beforeIds = new Set((await this.listPanes()).map((pane) => pane.paneId));
+    const beforeIds = new Set((await this.readPanes()).map((pane) => pane.paneId));
     const invocation = buildRuntimeShellInvocation(request.command, request.shell);
     await this.runManaged([
       "start",
@@ -142,7 +142,7 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
     ]);
 
     for (let attempt = 0; attempt < this.pollAttempts; attempt += 1) {
-      const panes = await this.listPanes();
+      const panes = await this.readPanes();
       const pane = resolveManagedStartedPane(panes, beforeIds, request.title);
       if (pane) {
         return {
@@ -187,16 +187,18 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
   }
 
   private async ensureDaemonRunning(): Promise<void> {
-    if (this.daemonReady) return;
-    if (await this.checkDaemonStatus()) {
+    const daemonRunning = await this.checkDaemonStatus();
+    if (daemonRunning) {
       this.daemonReady = true;
       return;
     }
+
+    this.daemonReady = false;
     if (!this.autoStartDaemon) {
       throw new Error("managed runtime daemon is unavailable");
     }
 
-    await this.runManaged(["daemon", "start", "--detach", "--no-http", "--no-auth"]);
+    await this.startDaemon();
     if (!(await this.checkDaemonStatus())) {
       throw new Error("managed runtime daemon did not become ready after startup");
     }
@@ -204,16 +206,55 @@ export class ManagedRuntimeAdapter implements RunnableRuntimeBackend {
   }
 
   private async checkDaemonStatus(): Promise<boolean> {
+    if (this.daemonStatusFlight) {
+      return this.daemonStatusFlight;
+    }
+
+    const flight = (async (): Promise<boolean> => {
+      try {
+        await this.runManaged(["daemon", "status"]);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+
+    this.daemonStatusFlight = flight;
     try {
-      await this.runManaged(["daemon", "status"]);
-      return true;
-    } catch {
-      return false;
+      return await flight;
+    } finally {
+      if (this.daemonStatusFlight === flight) {
+        this.daemonStatusFlight = null;
+      }
+    }
+  }
+
+  private async startDaemon(): Promise<void> {
+    if (this.daemonStartFlight) {
+      return this.daemonStartFlight;
+    }
+
+    const flight = (async (): Promise<void> => {
+      await this.runManaged(["daemon", "start", "--detach", "--no-http", "--no-auth"]);
+    })();
+    this.daemonStartFlight = flight;
+    try {
+      await flight;
+    } finally {
+      if (this.daemonStartFlight === flight) {
+        this.daemonStartFlight = null;
+      }
     }
   }
 
   private async runManaged(args: string[]): Promise<string> {
     return await this.runCommandImpl(this.command, args, buildCommandOptions(this.commandTimeoutMs, this.stateDir));
+  }
+
+  private async readPanes(): Promise<ManagedRuntimePane[]> {
+    const stdout = await this.runManaged(["ls", "--json", "--limit", "500"]);
+    const payload = parseListResponse(stdout);
+    return payload.items?.map((item) => toPane(item)).filter((pane): pane is ManagedRuntimePane => pane !== null) ?? [];
   }
 }
 

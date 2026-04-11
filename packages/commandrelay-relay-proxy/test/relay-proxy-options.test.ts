@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   createRelayProxyServer,
@@ -106,25 +109,39 @@ test("supports boolean on/off values", () => {
 });
 
 test("normalizes TLS watch interval and restart flags from env", async () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), "commandrelay-relay-proxy-"));
+  const caFile = path.join(tempDir, "ca.pem");
+  const caBundleFile = path.join(tempDir, "ca-bundle.pem");
+  const certFile = path.join(tempDir, "client.pem");
+  const keyFile = path.join(tempDir, "client.key");
+
+  writeFileSync(caFile, "ca");
+  writeFileSync(caBundleFile, "ca-bundle");
+  writeFileSync(certFile, "cert");
+  writeFileSync(keyFile, "key");
+
   const parsed = parseRelayProxyEnv({
     COMMANDRELAY_RELAY_UPSTREAM_TLS_WATCH_INTERVAL_MS: "750",
     COMMANDRELAY_RELAY_UPSTREAM_TLS_RESTART_ON_CHANGE: "true",
-    COMMANDRELAY_RELAY_UPSTREAM_TLS_CA_FILE: "/tmp/ca.pem,/tmp/ca-bundle.pem",
-    COMMANDRELAY_RELAY_UPSTREAM_TLS_CERT_FILE: "/tmp/client.pem",
-    COMMANDRELAY_RELAY_UPSTREAM_TLS_KEY_FILE: "/tmp/client.key",
-    COMMANDRELAY_RELAY_UPSTREAM_TLS_PFX_FILE: "/tmp/client.pfx"
+    COMMANDRELAY_RELAY_UPSTREAM_TLS_CA_FILE: `${caFile},${caBundleFile}`,
+    COMMANDRELAY_RELAY_UPSTREAM_TLS_CERT_FILE: certFile,
+    COMMANDRELAY_RELAY_UPSTREAM_TLS_KEY_FILE: keyFile
   });
-  const options = normalizeRelayOptions(parsed);
 
-  assert.equal(options.upstreamTlsWatchIntervalMs, 750);
-  assert.equal(options.upstreamTlsRestartOnChange, true);
-  assert.deepEqual(options.upstreamTlsSourcePaths, [
-    "/tmp/ca.pem",
-    "/tmp/ca-bundle.pem",
-    "/tmp/client.pem",
-    "/tmp/client.key",
-    "/tmp/client.pfx"
-  ]);
+  try {
+    const options = normalizeRelayOptions(parsed);
+
+    assert.equal(options.upstreamTlsWatchIntervalMs, 750);
+    assert.equal(options.upstreamTlsRestartOnChange, true);
+    assert.deepEqual(options.upstreamTlsSourcePaths, [
+      caFile,
+      caBundleFile,
+      certFile,
+      keyFile
+    ]);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("returns contract metadata in stats config", async () => {

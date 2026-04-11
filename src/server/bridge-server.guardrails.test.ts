@@ -18,6 +18,10 @@ interface FakeSocket {
   OPEN: number;
   readyState: number;
   send: (message: string) => void;
+  close: (code?: number, reason?: string) => void;
+  terminate: () => void;
+  closeCalls: Array<{ code?: number; reason?: string }>;
+  terminateCalls: number;
 }
 
 function createSocketRecorder(): { socket: FakeSocket; sent: SentEnvelope[] } {
@@ -25,7 +29,15 @@ function createSocketRecorder(): { socket: FakeSocket; sent: SentEnvelope[] } {
   const socket: FakeSocket = {
     OPEN: 1,
     readyState: 1,
-    send: (message: string) => sent.push(JSON.parse(message) as SentEnvelope)
+    send: (message: string) => sent.push(JSON.parse(message) as SentEnvelope),
+    close: (code?: number, reason?: string) => {
+      socket.closeCalls.push({ code, reason });
+    },
+    terminate: () => {
+      socket.terminateCalls += 1;
+    },
+    closeCalls: [],
+    terminateCalls: 0
   };
   return { socket, sent };
 }
@@ -111,4 +123,42 @@ test("input_too_large returns size metadata and requestId", async () => {
   assert.equal(sizeError.payload.maxInputBytes, 8);
   assert.equal(sizeError.payload.receivedBytes, 10);
   assert.equal(sentInputs.length, 0);
+});
+
+test("unauthenticated messages close the socket after auth_required", async () => {
+  const { socket, sent } = createSocketRecorder();
+  const ctx = {
+    client: {
+      id: "client-unauth",
+      socket,
+      authenticated: false,
+      inputEnabled: false,
+      attachedPanes: new Set<string>()
+    },
+    tmux: {
+      listPanes: async () => [],
+      sendInput: async () => undefined
+    },
+    engine: { attach: async () => {}, detach: () => {}, detachAll: () => {} },
+    config: {
+      authToken: null,
+      maxInputBytes: 8,
+      maxAttachedPanes: 4,
+      globalInputDisabled: false
+    },
+    inputLimiter: new SlidingWindowRateLimiter({ maxEvents: 1, windowMs: 60_000 }),
+    type: "input",
+    payload: { paneId: "pane-1", data: "echo nope\n" },
+    requestId: "req-unauth",
+    audit: new AuditLogger({ path: null, logger: console })
+  } as Parameters<typeof handleClientMessage>[0];
+
+  await handleClientMessage(ctx);
+
+  const error = sent[sent.length - 1];
+  assert.equal(error.type, "error");
+  assert.equal(error.requestId, "req-unauth");
+  assert.equal(error.payload.code, "auth_required");
+  assert.deepEqual(socket.closeCalls, [{ code: 1008, reason: "auth_required" }]);
+  assert.equal(socket.terminateCalls, 0);
 });

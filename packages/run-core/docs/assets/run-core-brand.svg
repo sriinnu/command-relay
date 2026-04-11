@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/run-core">
+  <title>@commandrelay/run-core</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <path d="M36 28L66 48L36 68Z" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M28 22H68A6 6 0 0 1 74 28V68A6 6 0 0 1 68 74H28A6 6 0 0 1 22 68V28A6 6 0 0 1 28 22Z" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="66" cy="48" r="4.5" fill="#fb7185"/>
+  
+</svg>

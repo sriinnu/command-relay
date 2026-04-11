@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-NODE_CMD=(npm exec -- node)
-TSX_CMD=(npm exec -- tsx)
+NODE_CMD=(pnpm exec node)
+TSX_CMD=(pnpm exec tsx)
 
 usage() {
   cat <<'USAGE'
@@ -209,7 +209,10 @@ run_web_smoke() {
     return 0
   fi
 
-  mapfile -t web_source_files < <(
+  web_source_files=()
+  while IFS= read -r web_source_file; do
+    web_source_files+=("${web_source_file}")
+  done < <(
     find "${web_root}" \
       -type d \
       \( \
@@ -241,7 +244,10 @@ run_web_smoke() {
     return 1
   fi
 
-  mapfile -t js_files < <(
+  js_files=()
+  while IFS= read -r js_file; do
+    js_files+=("${js_file}")
+  done < <(
     find "${web_root}" \
       -type d \
       \( \
@@ -315,7 +321,10 @@ run_root() {
   local log_file
   log_file="$(mktemp)"
 
-  mapfile -t test_files < <(
+  test_files=()
+  while IFS= read -r test_file; do
+    test_files+=("${test_file}")
+  done < <(
     cd "${REPO_ROOT}"
     find src -type f -name '*.test.ts' | LC_ALL=C sort
   )
@@ -368,19 +377,19 @@ run_package_test() {
     return 0
   fi
 
-  if (cd "${pkg_dir}" && npm run test) >"${log_file}" 2>&1; then
+  if (cd "${pkg_dir}" && pnpm run test) >"${log_file}" 2>&1; then
     {
       echo "TAP version 13"
       echo "1..1"
       echo "ok 1 - ${package_name} tests"
       echo "  ---"
-      echo "  message: npm run test passed in packages/${package_dir_name}"
+      echo "  message: pnpm run test passed in packages/${package_dir_name}"
       echo "  ..."
     } >"${tap_file}"
     rm -f "${log_file}"
     return 0
   else
-    write_failure_tap "${tap_file}" "${package_name} tests" "npm run test failed." "${log_file}"
+    write_failure_tap "${tap_file}" "${package_name} tests" "pnpm run test failed." "${log_file}"
     rm -f "${log_file}"
     return 1
   fi

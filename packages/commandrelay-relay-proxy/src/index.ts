@@ -595,8 +595,8 @@ function normalizeUpstreamTls(
     pfx: loadTlsMaterialAsBuffer(values.upstreamTlsPfxFile, "upstream TLS pfx"),
     passphrase: values.upstreamTlsPassphrase || undefined,
     servername: values.upstreamTlsServername || undefined,
-    minVersion: values.upstreamTlsMinVersion as SecureVersion | undefined,
-    maxVersion: values.upstreamTlsMaxVersion as SecureVersion | undefined
+    minVersion: (values.upstreamTlsMinVersion || undefined) as SecureVersion | undefined,
+    maxVersion: (values.upstreamTlsMaxVersion || undefined) as SecureVersion | undefined
   };
   validateUpstreamTlsConfig(normalized);
   return normalized;

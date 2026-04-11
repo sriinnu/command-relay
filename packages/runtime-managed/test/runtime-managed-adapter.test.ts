@@ -40,6 +40,28 @@ test("isAvailable starts daemon when initial status check fails", async () => {
   ]);
 });
 
+test("listPanes refreshes daemon readiness after a stale ready probe", async () => {
+  const mock = createRunCommandMock([
+    { stdout: "running" },
+    { error: new Error("daemon stopped") },
+    { stdout: "started" },
+    { stdout: "running" },
+    { stdout: JSON.stringify({ items: [] }) }
+  ]);
+  const adapter = new ManagedRuntimeAdapter({ runCommandImpl: mock.runCommandImpl });
+
+  assert.equal(await adapter.isAvailable(), true);
+  await adapter.listPanes();
+
+  assert.deepEqual(mock.calls.map((call) => call.args), [
+    ["daemon", "status"],
+    ["daemon", "status"],
+    ["daemon", "start", "--detach", "--no-http", "--no-auth"],
+    ["daemon", "status"],
+    ["ls", "--json", "--limit", "500"]
+  ]);
+});
+
 test("startCommand launches a detached managed session and returns attach metadata", async () => {
   const mock = createRunCommandMock([
     { error: new Error("not running") },

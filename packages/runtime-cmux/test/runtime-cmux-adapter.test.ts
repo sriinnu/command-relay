@@ -4,16 +4,26 @@ import { CmuxRuntimeAdapter } from "../src/index.js";
 
 function createRunCommandMock(outcomes: Array<{ stdout?: string; error?: unknown }>) {
   const queue = [...outcomes];
-  const calls: Array<{ command: string; args: string[]; timeoutMs?: number }> = [];
+  const calls: Array<{
+    command: string;
+    args: string[];
+    options?: number | { timeoutMs?: number };
+    timeoutMs?: number;
+  }> = [];
 
   return {
     calls,
     async runCommandImpl(
       command: string,
       args: string[],
-      options: { timeoutMs?: number } = {}
+      options: number | { timeoutMs?: number } = {}
     ): Promise<string> {
-      calls.push({ command, args, timeoutMs: options.timeoutMs });
+      calls.push({
+        command,
+        args,
+        options,
+        timeoutMs: typeof options === "number" ? options : options.timeoutMs
+      });
       const next = queue.shift();
       if (!next) throw new Error("runCommand called with no queued outcome");
       if (next.error) throw next.error;
