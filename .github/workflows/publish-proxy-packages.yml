@@ -46,6 +46,8 @@ jobs:
       count: ${{ steps.select.outputs.count }}
       run_mode: ${{ steps.select.outputs.run_mode }}
       dist_tag: ${{ steps.select.outputs.dist_tag }}
+      selector: ${{ steps.select.outputs.selector }}
+      batch_date: ${{ steps.select.outputs.batch_date }}
 
     steps:
       - name: Checkout
@@ -73,6 +75,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          batch_date="$(date -u +%F)"
           run_mode="dry-run"
           selector="@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*"
           dist_tag="latest"
@@ -83,13 +86,23 @@ jobs:
               echo "count=0" >> "$GITHUB_OUTPUT"
               echo "run_mode=publish" >> "$GITHUB_OUTPUT"
               echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+              echo "selector=$selector" >> "$GITHUB_OUTPUT"
+              echo "batch_date=$batch_date" >> "$GITHUB_OUTPUT"
 
               {
                 echo "### Proxy publish skipped"
                 echo
                 echo "Release tag '$RELEASE_TAG' does not start with 'proxy-'."
+                echo
+                echo "This repository does not publish the private root package."
+                echo "Only proxy package releases use tags matching 'proxy-<semver>' (for example, 'proxy-1.2.3')."
               } >> "$GITHUB_STEP_SUMMARY"
               exit 0
+            fi
+
+            if [[ ! "$RELEASE_TAG" =~ ^proxy-[0-9]+\.[0-9]+\.[0-9]+([-.][A-Za-z0-9.-]+)?$ ]]; then
+              echo "::error::Release tag '$RELEASE_TAG' must match 'proxy-<semver>' for automated publish (for example, proxy-1.2.3)."
+              exit 1
             fi
 
             run_mode="publish"
@@ -219,6 +232,8 @@ jobs:
             echo "count=$count"
             echo "run_mode=$run_mode"
             echo "dist_tag=$dist_tag"
+            echo "selector=$selector"
+            echo "batch_date=$batch_date"
           } >> "$GITHUB_OUTPUT"
 
           {
@@ -235,9 +250,100 @@ jobs:
             node -e "const fs=require('node:fs');const items=JSON.parse(fs.readFileSync('/tmp/proxy-matrix.json','utf8'));for (const item of items){process.stdout.write('- '+item.packageName+'@'+item.version+' ('+item.dir+')\\n');}" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  guardrails:
+    name: Repo Guardrails and Consumer Smoke
+    needs: discover
+    if: needs.discover.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm run build:all
+
+      - name: Run repo guardrails
+        shell: bash
+        env:
+          BATCH_DATE: ${{ needs.discover.outputs.batch_date }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DIST_TAG: ${{ needs.discover.outputs.dist_tag }}
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_SELECTOR: ${{ needs.discover.outputs.selector }}
+          REPO_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          governance_dir="$RUNNER_TEMP/proxy-publish-governance-${BATCH_DATE}"
+          dry_run_dir="$RUNNER_TEMP/proxy-publish-dry-run-${BATCH_DATE}"
+          checkpoint_file="$RUNNER_TEMP/proxy-publish-dry-run-${BATCH_DATE}.md"
+          root_tap_file="$RUNNER_TEMP/root.tap"
+
+          pnpm run release:proxy:capture-governance -- \
+            --batch-date "$BATCH_DATE" \
+            --repo "$REPO_SLUG" \
+            --default-branch "$DEFAULT_BRANCH" \
+            --artifact-dir "$governance_dir"
+
+          pnpm run release:proxy:capture-dry-run -- \
+            --batch-date "$BATCH_DATE" \
+            --package-selector "$PACKAGE_SELECTOR" \
+            --dist-tag "$DIST_TAG" \
+            --artifact-dir "$dry_run_dir" \
+            --checkpoint-file "$checkpoint_file" \
+            --root-tap-file "$root_tap_file"
+
+          pnpm run release:proxy:lockstep
+          pnpm run release:proxy:preflight -- \
+            --batch-date "$BATCH_DATE" \
+            --package-selector "$PACKAGE_SELECTOR" \
+            --checkpoint-file "$checkpoint_file" \
+            --dry-run-artifact-dir "$dry_run_dir" \
+            --governance-artifact-dir "$governance_dir" \
+            --root-tap-evidence "$root_tap_file"
+
+          {
+            echo "### Proxy publish guardrails"
+            echo
+            echo "- Batch date: $BATCH_DATE"
+            echo "- Selector: $PACKAGE_SELECTOR"
+            echo "- Dist-tag: $DIST_TAG"
+            echo "- Repo guardrails: pass"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run consumer smoke flow
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run verify:consumer-smoke
+          {
+            echo "### Consumer smoke"
+            echo
+            echo "- Consumer smoke flow: pass"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   verify:
     name: Verify ${{ matrix.packageName }}
-    needs: discover
+    needs:
+      - discover
+      - guardrails
     if: needs.discover.outputs.count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -253,24 +359,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
+          cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
-        run: npm run build:all
+        run: pnpm run build:all
 
       - name: Check, build, and test
         shell: bash
         env:
-          PACKAGE_DIR: ${{ matrix.dir }}
+          PACKAGE_NAME: ${{ matrix.packageName }}
         run: |
           set -euo pipefail
-          npm --prefix "$PACKAGE_DIR" run check
-          npm --prefix "$PACKAGE_DIR" run build
-          npm --prefix "$PACKAGE_DIR" run test
+          pnpm --filter "$PACKAGE_NAME" run check
+          pnpm --filter "$PACKAGE_NAME" run build
+          pnpm --filter "$PACKAGE_NAME" run test
 
       - name: Pack tarball
         id: pack
