@@ -86,7 +86,7 @@ test("parseRunCliArgs accepts ssh-tmux runtime", () => {
   });
 });
 
-test("parseRunCliArgs accepts ssh-tmux runtime", () => {
+test("parseRunCliArgs accepts ssh-tmux runtime for codex exec commands", () => {
   const invocation = parseRunCliArgs([
     "run",
     "--runtime",
