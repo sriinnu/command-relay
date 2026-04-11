@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/proxy-http-client">
+  <title>@commandrelay/proxy-http-client</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <rect x="20" y="24" width="46" height="34" rx="6" fill="none" stroke="#14b8a6" stroke-width="3"/>
+  <path d="M20 34H66" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="31" cy="30" r="2.7" fill="#fb7185"/>
+  <circle cx="39" cy="30" r="2.7" fill="#f59e0b"/>
+  <circle cx="76" cy="42" r="5" fill="#38bdf8"/>
+  <path d="M66 41H72" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M72 41L64 47" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  
+</svg>

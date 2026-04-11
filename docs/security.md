@@ -13,20 +13,22 @@ CommandRelay treats remote terminal control as high-risk and defaults to read-on
 
 1. New WebSocket clients start with `inputEnabled=false`.
 2. `input` is accepted only when both client input is enabled and global kill switch is off.
-3. Non-authenticated clients are blocked from non-`auth` events when `COMMANDRELAY_AUTH_TOKEN` is configured.
-4. Startup validation requires `COMMANDRELAY_AUTH_TOKEN` for non-loopback bind addresses.
+3. Non-authenticated clients are blocked from non-`auth` events when token or trusted-device auth is enabled.
+4. Startup validation requires `COMMANDRELAY_AUTH_TOKEN` or `COMMANDRELAY_TRUSTED_DEVICE_AUTH=true` for non-loopback bind addresses.
 5. Token validation uses timing-safe comparison (`timingSafeEqual`) with equal-length gate.
-6. Input path is guarded by per-client rate limit, max bytes, and attached-pane checks.
-7. Sensitive actions (`auth_ok`, `auth_fail`, `attach`, `enable_input`, `disable_input`, `input`) are audit logged.
-8. Pane input ownership arbitration is enforced; first successful writer claims pane lane until release or explicit takeover.
+6. Trusted-device auth uses short-lived pairing sessions, signed challenges, short-lived access tokens, and refresh-token rotation.
+7. Input path is guarded by per-client rate limit, max bytes, attached-pane checks, and access-level capability gates.
+8. Sensitive actions (`auth_ok`, `auth_fail`, `attach`, `enable_input`, `disable_input`, `input`) are audit logged.
+9. Pane input ownership arbitration is enforced; first successful writer claims pane lane until release or explicit takeover.
 
 ## Web Route and Auth Surface
 
 1. HTTP route surface includes exact `GET /health`; with static hosting enabled, `GET /` and `GET /app` redirect (`308`) to `/app/`, which serves static assets.
 2. Static serving is rooted at `COMMANDRELAY_APP_STATIC_DIR` (`apps/web` default), with traversal-protection and `404` for missing/forbidden paths.
-3. Non-matching HTTP paths return `404`, and non-`/ws` WebSocket upgrades are rejected.
-4. Auth for web clients is message-based (`auth.payload.token`), not header-based.
-5. When auth token mode is enabled, all non-`auth` events are blocked with `auth_required` until successful auth.
+3. When trusted-device auth is enabled, pairing and token lifecycle routes are exposed at `/pair/*`, `/auth/device`, `/auth/refresh`, and `/devices/revoke`.
+4. Non-matching HTTP paths return `404`, and non-`/ws` WebSocket upgrades are rejected.
+5. Token and device auth for WebSocket clients are message-based (`auth.payload.*`), not header-based.
+6. When token or trusted-device auth is enabled, all non-`auth` events are blocked with `auth_required` until successful auth.
 
 ## Keyboard/Input Security Semantics
 
@@ -39,8 +41,10 @@ CommandRelay treats remote terminal control as high-risk and defaults to read-on
 
 | Threat Area | Concrete Attack | Current Mitigation | Residual Risk / Operator Action |
 | --- | --- | --- | --- |
-| Auth gate | Send `attach`/`input` before auth completes | Server returns `error.code=auth_required` for non-`auth` events until authenticated | If running open mode (no token on loopback), rely on host/network isolation |
-| Auth token guessing and timing attacks | Brute-force `auth.token` or exploit compare timing | Static token is required on non-loopback host; compare uses timing-safe equality and rejects different lengths | Static bearer token has no built-in expiry/rotation; rotate operationally |
+| Auth gate | Send `attach`/`input` before auth completes | Server returns `error.code=auth_required` for non-`auth` events until authenticated | If running open mode (no token and no trusted-device auth on loopback), rely on host/network isolation |
+| Auth token guessing and timing attacks | Brute-force `auth.token` or exploit compare timing | Static token is required on non-loopback host unless trusted-device auth is enabled; compare uses timing-safe equality and rejects different lengths | Static bearer token has no built-in expiry/rotation; rotate operationally |
+| Pairing replay | Reuse stale QR payload or old pairing token | Pairing sessions are short-lived, single-claim, and old idle sessions are revoked when a new one is issued | Operators should keep pairing UI visible only on trusted hosts |
+| Device credential replay | Reuse stolen access token without device key | Device auth requires both access token and valid signature over per-connection `authChallenge` | Refresh token theft still matters; revoke compromised devices immediately |
 | Token disclosure in logs | Leak token through audit/event logging | Auth failures log reason (`invalid_token`) but not the submitted token value | Keep process/stdout logs private; avoid reverse proxies that log frames |
 | Bi-directional input injection | Malicious client sends unsolicited `input` | Input requires: authenticated client, explicit `enable_input`, kill switch off, attached pane, rate limit pass, payload size <= `COMMANDRELAY_MAX_INPUT_BYTES` | Attached pane trust is session-scoped, not user-scoped ACL |
 | Replay on input channel | Re-send old `input` envelope with new transport session | No protocol nonce or anti-replay token for `input`; request correlation is best-effort via `requestId` | Use short-lived network paths and review audit hashes for suspicious duplicates |
@@ -68,7 +72,7 @@ CommandRelay treats remote terminal control as high-risk and defaults to read-on
 ## Operator Hardening Checklist
 
 1. Bind to loopback or private mesh only; avoid direct public exposure.
-2. Set and rotate `COMMANDRELAY_AUTH_TOKEN`; do not reuse across environments.
+2. Prefer trusted-device auth for remote/mobile access; if static tokens remain enabled, set and rotate `COMMANDRELAY_AUTH_TOKEN` and do not reuse it across environments.
 3. Enable `COMMANDRELAY_AUDIT_LOG` and protect log file access.
 4. Keep `COMMANDRELAY_MAX_INPUT_BYTES` and rate limits conservative.
 5. Consider `COMMANDRELAY_ALLOW_INPUT_OVERRIDE=off` for stricter multi-tab control.

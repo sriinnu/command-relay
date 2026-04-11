@@ -229,7 +229,7 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - [x] Prior local npm cache blocker is resolved for this run (scoped cache + successful `npm pack --dry-run --json` and `npm publish --dry-run` evidence).
 - Evidence:
   - [2026-03-03 proxy publish local dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md)
-  - [2026-03-03 proxy publish dry-run artifacts](../artifacts/2026-03-03-proxy-publish-dry-run)
+  - [2026-03-03 proxy governance + gate checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)
   - [Proxy publish runbook follow-up](./release/proxy-publish.md)
 
 ## B2 Status Reconciliation (Docs + Readiness Evidence)
@@ -252,8 +252,8 @@ Source: `docs/TODO.md` -> `Prioritized Immediate Actions (Do Next)`
   - `B2.1 docs pack per package`: `done` ([matrix](./proxy/package-docs-matrix.md)); evidence confirms README usage matrix + NOTES + migration/compat + troubleshooting coverage for all six packages.
   - `B2.2 runnable examples + expected snapshots`: `done` ([matrix](./proxy/package-docs-matrix.md)); evidence confirms snapshot-backed runnable examples across all six packages.
   - `B2.3 CI gates explicit/reproducible at root + packages`: `done` ([root scripts](../package.json), [package scripts](./TODO.md#b2-productization-readiness)).
-  - `B2.4 local publish dry-run path (selector + dist-tag)`: `done` ([workflow](../.github/workflows/publish-proxy-packages.yml), [dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [artifact logs](../artifacts/2026-03-03-proxy-publish-dry-run)); GitHub Actions dry-run remains pending in release runbook follow-up.
-  - `B2.5 npm publish governance validation`: `partial` ([workflow guards](../.github/workflows/publish-proxy-packages.yml), [runbook config checklist](./release/proxy-publish.md#required-github-configuration)); remaining gaps: repository/environment policy verification evidence not yet captured in-repo.
+  - `B2.4 local publish dry-run path (selector + dist-tag)`: `done` ([workflow](../.github/workflows/publish-proxy-packages.yml), [dry-run checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md), [governance + gate checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)); GitHub Actions dry-run is verified in the release runbook follow-up.
+  - `B2.5 npm publish governance validation`: `done` ([workflow guards](../.github/workflows/publish-proxy-packages.yml), [runbook config checklist](./release/proxy-publish.md#required-github-configuration), [governance + gate checkpoint](../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)); repository/environment policy verification evidence is captured in the gate checkpoint.
 
 ### CR-P1-007 Reconcile A2 Runtime Status with Link-Backed Evidence
 

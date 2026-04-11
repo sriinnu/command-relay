@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/proxy-got">
+  <title>@commandrelay/proxy-got</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <path d="M42 20L58 20L50 40L62 40L34 76L44 48L32 48Z" fill="none" stroke="#fb7185" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="36" r="4.5" fill="#f59e0b"/>
+  
+</svg>

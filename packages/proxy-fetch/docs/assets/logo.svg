@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/proxy-fetch">
+  <title>@commandrelay/proxy-fetch</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <path d="M18 56C26 44 34 44 42 56S58 68 66 56S82 44 88 52" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M68 30L78 40L68 50" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="80" cy="40" r="4.5" fill="#14b8a6"/>
+  
+</svg>

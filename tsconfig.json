@@ -1,10 +1,20 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "types": ["node"],
+    "paths": {
+      "@commandrelay/protocol": ["packages/commandrelay-protocol/src/index.ts"],
+      "@commandrelay/proxy-core": ["packages/proxy-core/src/index.ts"],
+      "@commandrelay/runtime-core": ["packages/runtime-core/src/index.ts"],
+      "@commandrelay/runtime-managed": ["packages/runtime-managed/src/index.ts"],
+      "@commandrelay/runtime-cmux": ["packages/runtime-cmux/src/index.ts"],
+      "@commandrelay/runtime-tmux": ["packages/runtime-tmux/src/index.ts"],
+      "@commandrelay/runtime-ssh": ["packages/runtime-ssh/src/index.ts"]
+    },
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,

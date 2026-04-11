@@ -19,25 +19,29 @@ const PANE_FORMAT = [
 interface RunCommandMockCall {
   command: string;
   args: string[];
-  timeoutMs: number;
+  options: number | { timeoutMs?: number } | undefined;
 }
 
 interface RunCommandWithInputMockCall {
   command: string;
   args: string[];
   input: string;
-  timeoutMs: number;
+  options: number | { timeoutMs?: number } | undefined;
 }
 
 interface RunCommandMock {
   calls: RunCommandMockCall[];
   withInputCalls: RunCommandWithInputMockCall[];
-  runCommandImpl: (command: string, args: string[], timeoutMs?: number) => Promise<string>;
+  runCommandImpl: (
+    command: string,
+    args: string[],
+    options?: number | { timeoutMs?: number }
+  ) => Promise<string>;
   runCommandWithInputImpl: (
     command: string,
     args: string[],
     input: string,
-    timeoutMs?: number
+    options?: number | { timeoutMs?: number }
   ) => Promise<string>;
 }
 
@@ -59,8 +63,8 @@ function createRunCommandMock(
   return {
     calls,
     withInputCalls,
-    async runCommandImpl(command: string, args: string[], timeoutMs = 5000): Promise<string> {
-      calls.push({ command, args, timeoutMs });
+    async runCommandImpl(command: string, args: string[], options = 5000): Promise<string> {
+      calls.push({ command, args, options });
       const next = queue.shift();
       if (!next) {
         throw new Error("runCommand called with no queued outcome");
@@ -74,9 +78,9 @@ function createRunCommandMock(
       command: string,
       args: string[],
       input: string,
-      timeoutMs = 5000
+      options = 5000
     ): Promise<string> {
-      withInputCalls.push({ command, args, input, timeoutMs });
+      withInputCalls.push({ command, args, input, options });
       const next = withInputQueue.shift();
       if (!next) {
         throw new Error("runCommandWithInput called with no queued outcome");
@@ -121,7 +125,7 @@ test("isAvailable runs tmux -V over ssh with configured options", async () => {
         "dev@host.example",
         "tmux -V"
       ],
-      timeoutMs: 1234
+      options: { timeoutMs: 1234 }
     }
   ]);
 });
@@ -147,7 +151,7 @@ test("isAvailable returns false on ssh command failure", async () => {
       "dev@host.example",
       "tmux -V"
     ],
-    timeoutMs: 6000
+    options: { timeoutMs: 6000 }
   });
 });
 
@@ -220,13 +224,13 @@ test("isAvailable verifies expected host fingerprint before tmux ssh command", a
   assert.deepEqual(mock.calls[0], {
     command: "ssh-keyscan",
     args: ["-T", "8", "-p", "2201", "host.example"],
-    timeoutMs: 6000
+    options: { timeoutMs: 6000 }
   });
   assert.deepEqual(mock.withInputCalls[0], {
     command: "ssh-keygen",
     args: ["-lf", "-"],
     input: keyscanOutput,
-    timeoutMs: 6000
+    options: { timeoutMs: 6000 }
   });
   assert.equal(mock.calls[1].command, "ssh");
 });
@@ -298,7 +302,7 @@ test("listPanes parses tmux rows and uses escaped format argument", async () => 
       "ops@remote",
       `tmux list-panes -a -F '${PANE_FORMAT}'`
     ],
-    timeoutMs: 6000
+    options: { timeoutMs: 6000 }
   });
   assert.deepEqual(panes, [
     {

@@ -21,7 +21,20 @@ If you previously used `pnpm ... exec tsx .../mcp-entry.ts`, switch to the comma
 
 ## Session Model
 
-Run Codex/Claude inside `tmux` so CommandRelay can discover and control sessions reliably.
+Run Codex/Claude inside a durable runtime backend so CommandRelay can discover and control sessions reliably.
+
+For local long-running work, `tmux` is the default fit. If you want CommandRelay to own the lifecycle directly, use `managed`.
+
+## Background Coding-Agent Workflows
+
+Use a backend that survives client disconnects when you expect the agent to keep running in the background.
+
+1. `tmux` is the local durability path.
+2. `cmux` is for multi-backend aggregation.
+3. `managed` is for direct ownership by CommandRelay when the host terminal is only a launcher.
+4. `ssh-tmux` is the remote path when the target machine owns the runtime over SSH.
+5. Ghostty, Terminal.app, Windows Terminal, `cmd`, PowerShell, and WSL are host terminals, not backends.
+6. PuTTY is a detection boundary on Windows, not a first-class backend.
 
 ## Runtime Backend Selection
 
@@ -34,19 +47,28 @@ COMMANDRELAY_RUNTIME_BACKENDS=tmux
 # Multi-backend:
 COMMANDRELAY_RUNTIME_BACKENDS=tmux,cmux
 
+# Managed runtime:
+COMMANDRELAY_RUNTIME_BACKENDS=managed
+
 # Optional cmux executable override (default: cmux):
 COMMANDRELAY_CMUX_COMMAND=/opt/homebrew/bin/cmux
+
+# Managed runtime overrides:
+COMMANDRELAY_MANAGED_COMMAND=oly
+COMMANDRELAY_MANAGED_STATE_DIR=/var/lib/commandrelay/managed
+COMMANDRELAY_MANAGED_TIMEOUT_MS=8000
 ```
 
 Notes:
 
 1. Default is `tmux`.
-2. Supported values are `tmux` and `cmux`.
+2. Supported values are `tmux`, `cmux`, and `managed`.
 3. In multi-backend mode, pane IDs are namespaced by backend (for example `tmux:%1`, `cmux:<pane-id>`). In tmux-only mode, existing tmux pane IDs remain unchanged.
 4. `COMMANDRELAY_CMUX_COMMAND` is trimmed at startup; blank values fall back to `cmux`.
-5. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
-6. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
-7. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
+5. `COMMANDRELAY_MANAGED_COMMAND`, `COMMANDRELAY_MANAGED_STATE_DIR`, and `COMMANDRELAY_MANAGED_TIMEOUT_MS` are the current names. Legacy `COMMANDRELAY_OLY_*` aliases still map to the same settings.
+6. On startup, the bridge logs each configured backend as available/unavailable. Unavailable backends are warnings.
+7. Startup fails only when all configured backends are unavailable in non-tmux-only mode. tmux-only startup behavior remains unchanged.
+8. When `COMMANDRELAY_TRANSPORT_MODE=ssh`, runtime backends must be tmux-only (`COMMANDRELAY_RUNTIME_BACKENDS=tmux`).
 
 ## SSH Transport Environment
 

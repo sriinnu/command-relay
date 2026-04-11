@@ -4,6 +4,8 @@
 
 Proxy diagnostics CLI for inspecting proxy-related environment variables and explaining route decisions for outbound URLs.
 
+Compact command-line insight into proxy routing and environment state.
+
 ## Install
 
 ```bash

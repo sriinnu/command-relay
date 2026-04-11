@@ -4,10 +4,28 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  basic-ftp: 5.2.2
+
 importers:
 
   .:
     dependencies:
+      '@commandrelay/runtime-cmux':
+        specifier: workspace:^
+        version: link:packages/runtime-cmux
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:packages/runtime-core
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:packages/runtime-managed
+      '@commandrelay/runtime-ssh':
+        specifier: workspace:^
+        version: link:packages/runtime-ssh
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:packages/runtime-tmux
       http-proxy-agent:
         specifier: ^7.0.2
         version: 7.0.2
@@ -114,6 +132,24 @@ importers:
       '@commandrelay/client':
         specifier: workspace:^
         version: link:../commandrelay-client
+      '@commandrelay/run-core':
+        specifier: workspace:^
+        version: link:../run-core
+      '@commandrelay/run-orchestrator':
+        specifier: workspace:^
+        version: link:../run-orchestrator
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:../runtime-managed
+      '@commandrelay/runtime-ssh':
+        specifier: workspace:^
+        version: link:../runtime-ssh
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:../runtime-tmux
+      '@commandrelay/terminal-discovery':
+        specifier: workspace:^
+        version: link:../terminal-discovery
     devDependencies:
       '@types/node':
         specifier: ^25.3.0
@@ -215,6 +251,9 @@ importers:
 
   packages/proxy-http-client:
     devDependencies:
+      '@commandrelay/proxy-core':
+        specifier: workspace:^
+        version: link:../proxy-core
       '@types/node':
         specifier: ^25.3.0
         version: 25.5.0
@@ -249,6 +288,131 @@ importers:
       undici:
         specifier: ^7.16.0
         version: 7.24.6
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/run-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/run-orchestrator:
+    dependencies:
+      '@commandrelay/run-core':
+        specifier: workspace:^
+        version: link:../run-core
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+      '@commandrelay/runtime-managed':
+        specifier: workspace:^
+        version: link:../runtime-managed
+      '@commandrelay/runtime-tmux':
+        specifier: workspace:^
+        version: link:../runtime-tmux
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-cmux:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-core:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-managed:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-ssh:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/runtime-tmux:
+    dependencies:
+      '@commandrelay/runtime-core':
+        specifier: workspace:^
+        version: link:../runtime-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.5.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/terminal-discovery:
     devDependencies:
       '@types/node':
         specifier: ^25.3.0
@@ -435,8 +599,8 @@ packages:
     resolution: {integrity: sha512-x1FCFnFifvYDDzTaLII71vG5uvDwgtmDTEVWAxrgeiR8VjMONcCXJx7E+USjDtHlwFmt9MysbqgF9b9Vjr6w+w==}
     engines: {node: '>=4'}
 
-  basic-ftp@5.2.0:
-    resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
+  basic-ftp@5.2.2:
+    resolution: {integrity: sha512-1tDrzKsdCg70WGvbFss/ulVAxupNauGnOlgpyjKzeQxzyllBLS0CGLV7tjIXTK3ZQA9/FBEm9qyFFN1bciA6pw==}
     engines: {node: '>=10.0.0'}
 
   data-uri-to-buffer@6.0.2:
@@ -665,7 +829,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  basic-ftp@5.2.0: {}
+  basic-ftp@5.2.2: {}
 
   data-uri-to-buffer@6.0.2: {}
 
@@ -731,7 +895,7 @@ snapshots:
 
   get-uri@6.0.5:
     dependencies:
-      basic-ftp: 5.2.0
+      basic-ftp: 5.2.2
       data-uri-to-buffer: 6.0.2
       debug: 4.4.3
     transitivePeerDependencies:

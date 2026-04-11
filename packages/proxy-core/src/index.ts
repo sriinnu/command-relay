@@ -68,7 +68,7 @@ export function loadProxySettings(env: ProxyEnvironment = process.env): ProxySet
         ignoreUppercase: false
       })
     ),
-    noProxy: parseNoProxy(readRawEnv(env, "NO_PROXY", "no_proxy") ?? "")
+    noProxy: parseNoProxy(readRawEnv(env, "no_proxy", "NO_PROXY") ?? "")
   };
 }
 

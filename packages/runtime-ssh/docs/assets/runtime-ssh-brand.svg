@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
+  <title id="title">runtime-ssh brand mark</title>
+  <desc id="desc">A remote connection glyph with a keyhole shield and wordmark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07131c"/>
+      <stop offset="1" stop-color="#16293d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="240" rx="24" fill="url(#bg)"/>
+  <g transform="translate(36 34)">
+    <rect width="172" height="172" rx="26" fill="#0b1320" stroke="#32465f" stroke-width="3"/>
+    <path d="M44 112c0-26 18-46 42-46h14c24 0 42 20 42 46v12H44z" fill="#10253d" stroke="#38bdf8" stroke-width="4"/>
+    <path d="M63 112c0-14 10-24 23-24s23 10 23 24" fill="none" stroke="#38bdf8" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="86" cy="106" r="8" fill="#f8fafc"/>
+    <path d="M98 120l26-26h18" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M122 86l8-8 8 8-8 8z" fill="#f8fafc"/>
+    <path d="M44 56h18m8 0h18m8 0h18" stroke="#f8fafc" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(242 90)">
+    <text x="0" y="0" fill="#eef6ff" font-size="52" font-weight="700" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">runtime-ssh</text>
+    <text x="2" y="38" fill="#38bdf8" font-size="20" font-weight="600" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.08em">REMOTE TMUX OVER SSH</text>
+  </g>
+</svg>

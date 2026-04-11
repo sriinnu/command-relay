@@ -47,6 +47,14 @@ function getCheck(report: StartupProfileReport, id: StartupProfileCheckId) {
   return check;
 }
 
+function getRuntimeBackendCheck(report: StartupProfileReport, backendId: string) {
+  const check = report.checks.find(
+    (entry) => entry.id === "runtime_backend_signal" && entry.metadata?.backendId === backendId
+  );
+  assert.ok(check, `expected runtime backend signal check for "${backendId}"`);
+  return check;
+}
+
 function createLogRecorder(): LogRecorder {
   const infoLines: string[] = [];
   const warnLines: string[] = [];
@@ -86,7 +94,7 @@ test("startup profile passes with healthy runtime/env configuration", async () =
 
   assert.equal(report.failed, 0);
   assert.equal(getCheck(report, "node_runtime_version").status, "pass");
-  assert.equal(getCheck(report, "tmux_backend_signal").status, "pass");
+  assert.equal(getRuntimeBackendCheck(report, "tmux").status, "pass");
   assert.equal(getCheck(report, "app_static_dir_policy").status, "pass");
   assert.equal(getCheck(report, "audit_log_path_policy").status, "pass");
   assert.doesNotThrow(() => assertStartupProfilePass(report));
@@ -111,26 +119,27 @@ test("startup profile fails when node runtime is below policy minimum", async ()
   assert.throws(() => assertStartupProfilePass(report), /node_runtime_version/);
 });
 
-test("startup profile fails when tmux backend signal is unavailable", async () => {
+test("startup profile fails when a configured runtime backend signal is unavailable", async () => {
   const report = await evaluateStartupProfile({
     config: {
-      runtimeBackends: ["tmux", "cmux"],
+      runtimeBackends: ["tmux", "managed"],
       appStaticEnabled: false,
       appStaticDir: "apps/web",
       auditLogPath: null
     },
     runtimeAvailability: [
       { backendId: "tmux", available: false },
-      { backendId: "cmux", available: true }
+      { backendId: "managed", available: true }
     ],
     nodeVersion: "22.1.0"
   });
 
-  const tmuxCheck = getCheck(report, "tmux_backend_signal");
+  const tmuxCheck = getRuntimeBackendCheck(report, "tmux");
   assert.equal(tmuxCheck.status, "fail");
   assert.match(tmuxCheck.detail, /reported unavailable/);
   assert.match(tmuxCheck.remediation ?? "", /Install\/start tmux/);
-  assert.throws(() => assertStartupProfilePass(report), /tmux_backend_signal/);
+  assert.equal(getRuntimeBackendCheck(report, "managed").status, "pass");
+  assert.throws(() => assertStartupProfilePass(report), /runtime_backend_signal/);
 });
 
 test("startup profile fails when static app directory is missing", async () => {
@@ -214,6 +223,8 @@ test("structured startup profile logs include summary and per-check events", asy
 
   const warnPayload = parseLogPayload(recorder.warnLines[0]);
   assert.equal(warnPayload.event, "startup_profile_check");
-  assert.equal(warnPayload.id, "tmux_backend_signal");
+  assert.equal(warnPayload.id, "runtime_backend_signal");
   assert.equal(warnPayload.status, "fail");
+  const metadata = warnPayload.metadata as Record<string, unknown> | undefined;
+  assert.equal(metadata?.backendId, "tmux");
 });

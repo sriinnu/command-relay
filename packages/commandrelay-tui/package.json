@@ -41,7 +41,13 @@
     "cli": "node dist/cli.js"
   },
   "dependencies": {
-    "@commandrelay/client": "workspace:^"
+    "@commandrelay/client": "workspace:^",
+    "@commandrelay/run-core": "workspace:^",
+    "@commandrelay/run-orchestrator": "workspace:^",
+    "@commandrelay/runtime-managed": "workspace:^",
+    "@commandrelay/runtime-ssh": "workspace:^",
+    "@commandrelay/runtime-tmux": "workspace:^",
+    "@commandrelay/terminal-discovery": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

@@ -119,6 +119,9 @@ async function main() {
 
   const runtimeBackends = createRuntimeBackends(config.runtimeBackends, {
     cmuxCommand: config.cmuxCommand,
+    managedCommand: config.managedCommand,
+    managedStateDir: config.managedStateDir,
+    managedCommandTimeoutMs: config.managedCommandTimeoutMs,
     transportConfig
   });
   const backendAvailability = await checkRuntimeBackendAvailability(runtimeBackends);
@@ -140,7 +143,7 @@ async function main() {
   logStartupProfileReport(startupProfile);
   assertStartupProfilePass(startupProfile);
 
-  const runtimeAdapter = createRuntimeAdapter(config.runtimeBackends, runtimeBackends);
+  const runtimeAdapter = createRuntimeAdapter(runtimeBackends);
   const proxySettings = loadProxySettings();
   const proxyFactory = new ProxyAgentFactory({ settings: proxySettings });
 
@@ -155,18 +158,35 @@ async function main() {
     logger: console
   });
 
-  const shutdown = async (signal) => {
+  let shutdownFlight: Promise<void> | null = null;
+  const shutdown = (signal: string): Promise<void> => {
+    if (shutdownFlight) {
+      console.info(`[bridge] received ${signal} during shutdown; ignoring`);
+      return shutdownFlight;
+    }
+
     console.info(`[bridge] received ${signal}; shutting down`);
-    await runtime.close();
-    process.exit(0);
+    shutdownFlight = (async () => {
+      try {
+        await runtime.close();
+        process.exit(0);
+      } catch (error) {
+        console.error("[bridge] shutdown failed", error);
+        process.exit(1);
+      }
+    })();
+    return shutdownFlight;
   };
 
-  process.on("SIGINT", () => {
+  const onSigint = (): void => {
     void shutdown("SIGINT");
-  });
-  process.on("SIGTERM", () => {
+  };
+  const onSigterm = (): void => {
     void shutdown("SIGTERM");
-  });
+  };
+
+  process.on("SIGINT", onSigint);
+  process.on("SIGTERM", onSigterm);
 }
 
 main().catch((error) => {

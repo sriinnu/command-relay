@@ -6,13 +6,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { BridgeConfig } from "../config.js";
 import { TmuxAdapter } from "../tmux/tmux-adapter.js";
+import { ManagedAdapter } from "./managed-adapter.js";
 import {
   checkRuntimeBackendAvailability,
+  createManagedRuntimeAdapter,
+  createRuntimeAdapter,
   createTmuxRuntimeAdapter,
+  createRuntimeBackends,
   logRuntimeBackendAvailability,
   resolveStartupTransportConfig,
   type StartupTransportConfig
 } from "./runtime-adapter-factory.js";
+import { RuntimeMultiplexer } from "./runtime-multiplexer.js";
 import { SshTmuxAdapter } from "./ssh-tmux-adapter.js";
 import type { RuntimeBackend } from "./runtime-backend.js";
 
@@ -177,10 +182,50 @@ test("createTmuxRuntimeAdapter requires ssh target in ssh transport mode", () =>
   );
 });
 
+test("createManagedRuntimeAdapter returns a managed adapter instance", () => {
+  const adapter = createManagedRuntimeAdapter({
+    managedCommand: "oly-custom",
+    managedStateDir: "/tmp/oly",
+    managedCommandTimeoutMs: 9000
+  });
+
+  assert.equal(adapter instanceof ManagedAdapter, true);
+});
+
+test("createRuntimeBackends wires configured managed backends", () => {
+  const backends = createRuntimeBackends(["managed"], {
+    cmuxCommand: "cmux",
+    managedCommand: "oly",
+    managedStateDir: null,
+    managedCommandTimeoutMs: 8000,
+    transportConfig: BASE_TRANSPORT_CONFIG
+  });
+
+  assert.equal(backends.length, 1);
+  assert.equal(backends[0]?.backendId, "managed");
+});
+
+test("createRuntimeAdapter returns a single adapter directly", () => {
+  const backend = createBackendStub("managed", true);
+  const adapter = createRuntimeAdapter([backend]);
+
+  assert.equal(adapter, backend);
+  assert.equal(adapter instanceof RuntimeMultiplexer, false);
+});
+
+test("createRuntimeAdapter multiplexes when multiple backends are configured", () => {
+  const adapter = createRuntimeAdapter([
+    createBackendStub("tmux", true),
+    createBackendStub("managed", true)
+  ]);
+
+  assert.equal(adapter instanceof RuntimeMultiplexer, true);
+});
+
 test("availability checks stay safe and availability logging returns correct count", async () => {
   const availability = await checkRuntimeBackendAvailability([
     createBackendStub("tmux", true),
-    createBackendStub("cmux", false, true)
+    createBackendStub("managed", false, true)
   ]);
 
   const consolePatch = patchConsole();
@@ -189,12 +234,12 @@ test("availability checks stay safe and availability logging returns correct cou
     assert.equal(count, 1);
     assert.deepEqual(availability, [
       { backendId: "tmux", available: true },
-      { backendId: "cmux", available: false }
+      { backendId: "managed", available: false }
     ]);
     assert.equal(consolePatch.infoMessages.length, 1);
     assert.equal(consolePatch.warnMessages.length, 1);
     assert.equal(consolePatch.infoMessages[0], "[bridge] runtime backend available: tmux");
-    assert.equal(consolePatch.warnMessages[0], "[bridge] runtime backend unavailable: cmux");
+    assert.equal(consolePatch.warnMessages[0], "[bridge] runtime backend unavailable: managed");
   } finally {
     consolePatch.restore();
   }

@@ -140,6 +140,10 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --)
+      shift
+      break
+      ;;
     *)
       die "unknown argument: $1"
       ;;
@@ -151,7 +155,7 @@ if [[ "${RUN_CHECK}" -ne 1 && "${RUN_TEST}" -ne 1 && "${RUN_BUILD}" -ne 1 ]]; th
 fi
 
 [[ -f "${REPO_ROOT}/package.json" ]] || die "package.json not found at repo root: ${REPO_ROOT}"
-require_command npm
+require_command pnpm
 require_command node
 
 set_deterministic_env
@@ -163,15 +167,15 @@ else
 fi
 
 if [[ "${RUN_CHECK}" -eq 1 ]]; then
-  run_step "ci:check" npm run ci:check
+  run_step "ci:check" pnpm run ci:check
 fi
 
 if [[ "${RUN_BUILD}" -eq 1 ]]; then
-  run_step "ci:build" npm run ci:build
+  run_step "ci:build" pnpm run ci:build
 fi
 
 if [[ "${RUN_TEST}" -eq 1 ]]; then
-  run_step "ci:test" npm run ci:test
+  run_step "ci:test" pnpm run ci:test
 fi
 
 printf 'deterministic validation complete\n'

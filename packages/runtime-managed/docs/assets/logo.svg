@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/runtime-managed">
+  <title>@commandrelay/runtime-managed</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <path d="M26 28H70" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M26 48H70" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M26 68H70" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="38" cy="28" r="4" fill="#14b8a6"/>
+  <circle cx="56" cy="48" r="4" fill="#f59e0b"/>
+  <circle cx="44" cy="68" r="4" fill="#fb7185"/>
+  
+</svg>

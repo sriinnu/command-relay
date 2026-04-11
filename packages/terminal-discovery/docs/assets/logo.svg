@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="@commandrelay/terminal-discovery">
+  <title>@commandrelay/terminal-discovery</title>
+  <rect x="8" y="8" width="80" height="80" rx="22" fill="none" stroke="#0f172a" stroke-width="3.5"/>
+  
+  <path d="M48 18V78" fill="none" stroke="#14b8a6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M18 48H78" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 34L62 62" fill="none" stroke="#f59e0b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 62L62 34" fill="none" stroke="#fb7185" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="48" cy="48" r="6" fill="#14b8a6"/>
+  
+</svg>

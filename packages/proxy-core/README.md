@@ -5,6 +5,8 @@
 Transport-agnostic proxy resolution primitives for Node.js and TypeScript.
 Use this package as the stable core in `proxy-*` package families across repos.
 
+Shared proxy decision logic for the CommandRelay proxy family.
+
 ## Install
 
 ```bash

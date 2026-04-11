@@ -6,6 +6,8 @@
 
 Proxy-aware JSON HTTP client for Node.js services and CLIs. Designed for reusable app-level integrations with strict protocol checks, timeout and abort controls, response size limits, and typed errors.
 
+A reusable HTTP client core with strict proxy-aware transport controls.
+
 ## Install
 
 ```bash

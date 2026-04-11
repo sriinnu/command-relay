@@ -2,6 +2,8 @@
 
 This repository ships scoped npm packages under `@commandrelay/proxy-*`, `@commandrelay/relay-proxy`, and `@commandrelay/proxy-*`.
 The publish workflow is `.github/workflows/publish-proxy-packages.yml`.
+The repository root package (`commandrelay-bridge`) is intentionally `private` and is not part of the npm publish surface.
+Non-`proxy-<semver>` GitHub release tags are ignored by publish automation for that reason.
 
 ## Safety model
 
@@ -10,7 +12,7 @@ The publish workflow is `.github/workflows/publish-proxy-packages.yml`.
   - `mode=publish`
   - `confirm_publish=publish-proxy-packages`
   - running from the default branch
-- `release.published` only triggers publish when the release tag starts with `proxy-`.
+- `release.published` only triggers publish when the release tag matches the pattern `proxy-<semver>` (for example `proxy-1.2.3`).
 - Production publish job uses the `npm-publish` environment and npm provenance (`--provenance`).
 - Existing versions are detected and skipped to avoid republish failures.
 
@@ -67,12 +69,15 @@ Governance placeholders for this runbook:
 Run these before any publish-mode trigger:
 
 ```bash
-npm run release:proxy:capture-governance -- --batch-date 2026-03-03 --repo sriinnu/command-relay --default-branch main
-npm run release:proxy:lockstep
-npm run release:proxy:preflight -- --batch-date 2026-03-03 --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*
+pnpm run release:proxy:capture-governance -- --batch-date 2026-04-10 --repo sriinnu/command-relay --default-branch main
+pnpm run release:proxy:capture-dry-run -- --batch-date 2026-04-10 --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-* --dist-tag latest
+pnpm run release:proxy:lockstep
+pnpm run release:proxy:preflight -- --batch-date 2026-04-10 --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*
 ```
 
 `release:proxy:capture-governance` writes the required governance artifact files under `artifacts/<batch>-proxy-publish-governance` without exposing secret values.
+
+`release:proxy:capture-dry-run` writes the dry-run checkpoint, root TAP evidence, and per-package `check`/`build`/`test`/`pack`/`publish` logs required by `release:proxy:preflight`.
 
 `release:proxy:lockstep` verifies all `@commandrelay/proxy-*`, `@commandrelay/relay-proxy`, and `@commandrelay/proxy-*` package versions are aligned.
 
@@ -111,7 +116,11 @@ FAIL preflight: 2 guardrail(s) failed for batch 2026-03-03
 
 ## Dry run (recommended before every publish)
 
-Trigger `Publish Proxy Packages` with:
+Capture local dry-run evidence first:
+
+- `pnpm run release:proxy:capture-dry-run -- --batch-date <YYYY-MM-DD> --package-selector <selector> --dist-tag <dist_tag>`
+
+Then trigger `Publish Proxy Packages` with:
 
 - `mode`: `dry-run`
 - `package_selector`: default `@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*` or a specific package (for example `@commandrelay/relay-proxy`)
@@ -123,6 +132,12 @@ Dry run performs:
 - `check`, `build`, `test`
 - tarball creation (`npm pack`)
 - `npm publish --dry-run --access public --tag <dist_tag>`
+
+Local dry-run capture writes:
+
+- `scripts/checkpoints/runs/<YYYY-MM-DD>-proxy-publish-dry-run.md`
+- `artifacts/tap-local/root.tap`
+- `artifacts/<YYYY-MM-DD>-proxy-publish-dry-run/*`
 
 No package is published in dry-run mode.
 
@@ -144,7 +159,7 @@ Publish flow:
 
 ## Release-triggered publish
 
-Creating a GitHub release with a tag starting `proxy-` triggers publish mode automatically.
+Creating a GitHub release with a tag matching `proxy-<semver>` (for example `proxy-1.2.3`) triggers publish mode automatically.
 
 - prerelease release -> `dist_tag=next`
 - normal release -> `dist_tag=latest`
@@ -153,42 +168,29 @@ Use this only when your release process already guarantees approval and version 
 
 ## Current Batch Follow-up
 
-- [x] Record package versions for the current cut:
-  - `@commandrelay/proxy-core@0.1.0`
-  - `@commandrelay/proxy-agent@0.1.0`
-  - `@commandrelay/proxy-http-client@0.1.0`
-  - `@commandrelay/relay-proxy@0.1.0`
-  - `@commandrelay/proxy-fetch@0.1.0`
-  - `@commandrelay/proxy-undici@0.1.0`
-  - `@commandrelay/proxy-axios@0.1.0`
-  - `@commandrelay/proxy-got@0.1.0`
-  - `@commandrelay/proxy-runtime@0.1.0`
-- [x] Record validation evidence for the current environment:
-  - root TAP `22/22` pass ([root TAP](../../artifacts/tap-local/root.tap))
-  - `proxy-core` package test summary `14/14` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-core-test.log))
-  - `proxy-agent` package test summary `39/39` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-agent-test.log))
-  - `proxy-http-client` package test summary `22/22` pass ([test log](../../artifacts/2026-03-03-proxy-publish-dry-run/proxy-http-client-test.log))
-- [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
-- [x] Trigger GitHub Actions dry-run publish (`mode=dry-run`, `package_selector=@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*`, `dist_tag=latest`). Status (2026-03-04): run `22670960699` completed `success` on `main` ([Gate 0/1/3 checkpoint](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)).
-- [x] Verify GitHub policy (`NPM_TOKEN`, `npm-publish` reviewers, default-branch protections). Status (2026-03-04): governance recapture is compliant (`contains_NPM_TOKEN=true`, `npm_publish_environment_present=true`, `environment_details_status=ok`, branch protection configured) ([governance capture log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-capture-governance.log), [npm-token evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt), [environment evidence](../../artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt), [branch protection evidence](../../artifacts/2026-03-03-proxy-publish-governance/default-branch-protection.json)).
-- [x] Capture dry-run artifact summary in checkpoint/release notes before any publish-mode trigger. Artifact: [`scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md`](../../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md). Status: `done` (`check/build/test` passed for all selected packages; `npm pack --dry-run --json` and `npm publish --dry-run` succeeded for all selected packages with scoped cache artifacts in [`artifacts/2026-03-03-proxy-publish-dry-run`](../../artifacts/2026-03-03-proxy-publish-dry-run)).
-- [x] Capture Gate 0/1/3 status checkpoint for the batch. Artifact: [`scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md`](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md). Status: `done` (Gate 0 `partial`, Gate 1 `partial`, Gate 3 `pass`, all with command evidence links).
-- [x] Capture governance artifacts for current batch:
-  - [`artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt`](../../artifacts/2026-03-03-proxy-publish-governance/npm-token-presence.txt)
-  - [`artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt`](../../artifacts/2026-03-03-proxy-publish-governance/npm-publish-environment.txt)
-  - [`artifacts/2026-03-03-proxy-publish-governance/default-branch-protection.json`](../../artifacts/2026-03-03-proxy-publish-governance/default-branch-protection.json)
-  - Generated by: `npm run release:proxy:capture-governance -- --batch-date 2026-03-03 --repo sriinnu/command-relay --default-branch main`.
-- [x] Run release guardrails for current batch:
-  - `npm run release:proxy:lockstep`
-  - `npm run release:proxy:preflight -- --batch-date 2026-03-03 --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*`
-  - Status (2026-03-03): lockstep is green ([lockstep log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-lockstep.log)); preflight is green on a clean worktree ([clean-worktree preflight log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-preflight-clean-worktree.log)) and fails only on dirty-tree guardrail in active in-flight workspace ([active-tree preflight log](../../artifacts/2026-03-03-proxy-governance-gates/release-proxy-preflight-active-tree.log)).
+- [ ] Capture governance artifacts for the active batch:
+  - `pnpm run release:proxy:capture-governance -- --batch-date <YYYY-MM-DD> --repo sriinnu/command-relay --default-branch main`
+  - expected outputs under `artifacts/<YYYY-MM-DD>-proxy-publish-governance/`
+- [ ] Capture local dry-run artifacts for the active batch:
+  - `pnpm run release:proxy:capture-dry-run -- --batch-date <YYYY-MM-DD> --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-* --dist-tag latest`
+  - expected outputs under `artifacts/<YYYY-MM-DD>-proxy-publish-dry-run/`
+  - expected checkpoint at `scripts/checkpoints/runs/<YYYY-MM-DD>-proxy-publish-dry-run.md`
+- [ ] Run release guardrails for the active batch:
+  - `pnpm run release:proxy:lockstep`
+  - `pnpm run release:proxy:preflight -- --batch-date <YYYY-MM-DD> --package-selector @commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*`
+- [ ] Run full validation on the designated Mac environment:
+  - `pnpm run check && pnpm test && pnpm run test:ci:all`
+- [ ] Trigger GitHub Actions dry-run publish for the same selector/dist-tag and attach the resulting run URL to the batch checkpoint.
+- Historical example checkpoints:
+  - [2026-03-03 local dry-run checkpoint](../../scripts/checkpoints/runs/2026-03-03-proxy-publish-dry-run.md)
+  - [2026-03-03 governance + gate checkpoint](../../scripts/checkpoints/runs/2026-03-03-proxy-governance-gates.md)
 
 ## Internal v0.1 Gate Checklist (tag prep only)
 
 This checklist is for internal `v0.1` readiness planning. It does not create git tags.
 
 - [x] Confirm proxy package versions/changelog entries are final for this cut.
-- [ ] Run full validation on home Mac: `npm run check && npm test && npm run test:ci:all`.
+- [ ] Run full validation on home Mac: `pnpm run check && pnpm test && pnpm run test:ci:all`.
 - [x] Run publish workflow in `dry-run` mode for `@commandrelay/proxy-*,@commandrelay/relay-proxy,@commandrelay/proxy-*` with target `dist_tag`. Status (2026-03-04): Gate 3 run `22670960699` succeeded.
 - [x] Verify `NPM_TOKEN`, `npm-publish` environment reviewers, and default-branch protections. Status (2026-03-04): governance recapture is compliant.
 - [ ] Record dry-run artifacts and approval outcome in release notes before any publish-mode trigger.

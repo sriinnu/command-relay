@@ -33,6 +33,19 @@ test("parses lane lease duration with bounded defaults", () => {
   assert.equal(invalid.inputLaneLeaseMs, 30_000);
 });
 
+test("parses websocket connection and idle timeout guardrails", () => {
+  const defaults = loadConfig({});
+  const custom = loadConfig({
+    COMMANDRELAY_MAX_WS_CLIENTS: "64",
+    COMMANDRELAY_WS_IDLE_TIMEOUT_MS: "45000"
+  });
+
+  assert.equal(defaults.maxWsClients, 128);
+  assert.equal(defaults.wsIdleTimeoutMs, 120_000);
+  assert.equal(custom.maxWsClients, 64);
+  assert.equal(custom.wsIdleTimeoutMs, 45_000);
+});
+
 test("defaults strict protocol parsing on and supports legacy toggle alias", () => {
   const defaults = loadConfig({});
   const strictOffPrimary = loadConfig({ COMMANDRELAY_STRICT_PROTOCOL_PARSING: "false" });
@@ -53,6 +66,14 @@ test("defaults cmux command to cmux", () => {
   assert.equal(config.cmuxCommand, "cmux");
 });
 
+test("defaults managed command and timeout values", () => {
+  const config = loadConfig({});
+
+  assert.equal(config.managedCommand, "oly");
+  assert.equal(config.managedStateDir, null);
+  assert.equal(config.managedCommandTimeoutMs, 8_000);
+});
+
 test("parses and trims cmux command env value", () => {
   const custom = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "  /opt/bin/cmux  " });
   const blank = loadConfig({ COMMANDRELAY_CMUX_COMMAND: "   " });
@@ -61,11 +82,59 @@ test("parses and trims cmux command env value", () => {
   assert.equal(blank.cmuxCommand, "cmux");
 });
 
+test("parses managed command and state directory env values", () => {
+  const custom = loadConfig({
+    COMMANDRELAY_MANAGED_COMMAND: "  /opt/bin/oly  ",
+    COMMANDRELAY_MANAGED_STATE_DIR: "  /tmp/oly-state  "
+  });
+  const blank = loadConfig({
+    COMMANDRELAY_MANAGED_COMMAND: "   ",
+    COMMANDRELAY_MANAGED_STATE_DIR: "   "
+  });
+
+  assert.equal(custom.managedCommand, "/opt/bin/oly");
+  assert.equal(custom.managedStateDir, "/tmp/oly-state");
+  assert.equal(blank.managedCommand, "oly");
+  assert.equal(blank.managedStateDir, null);
+});
+
+test("parses and validates managed timeout env value", () => {
+  const custom = loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "12000" });
+
+  assert.equal(custom.managedCommandTimeoutMs, 12_000);
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "999" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "60001" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+  assert.throws(
+    () => loadConfig({ COMMANDRELAY_MANAGED_TIMEOUT_MS: "8.5" }),
+    /COMMANDRELAY_MANAGED_TIMEOUT_MS/
+  );
+});
+
 test("parses, normalizes, and deduplicates runtime backend list", () => {
   const config = loadConfig({
-    COMMANDRELAY_RUNTIME_BACKENDS: " tmux , cmux,tmux "
+    COMMANDRELAY_RUNTIME_BACKENDS: " tmux , managed , cmux,tmux,oly "
   });
-  assert.deepEqual(config.runtimeBackends, ["tmux", "cmux"]);
+  assert.deepEqual(config.runtimeBackends, ["tmux", "managed", "cmux"]);
+});
+
+test("accepts legacy oly env aliases and normalizes runtime backend id", () => {
+  const config = loadConfig({
+    COMMANDRELAY_RUNTIME_BACKENDS: "oly",
+    COMMANDRELAY_OLY_COMMAND: "/opt/bin/oly",
+    COMMANDRELAY_OLY_STATE_DIR: "/tmp/oly-state",
+    COMMANDRELAY_OLY_TIMEOUT_MS: "9000"
+  });
+
+  assert.deepEqual(config.runtimeBackends, ["managed"]);
+  assert.equal(config.managedCommand, "/opt/bin/oly");
+  assert.equal(config.managedStateDir, "/tmp/oly-state");
+  assert.equal(config.managedCommandTimeoutMs, 9_000);
 });
 
 test("rejects unsupported runtime backend values", () => {
@@ -96,6 +165,41 @@ test("accepts loopback host without auth and non-loopback host with auth", () =>
     COMMANDRELAY_AUTH_TOKEN: "token-value"
   });
   validateStartupConfig(remoteConfig);
+});
+
+test("accepts non-loopback host when trusted-device auth is enabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_HOST: "0.0.0.0",
+    COMMANDRELAY_TRUSTED_DEVICE_AUTH: "true"
+  });
+  validateStartupConfig(config);
+});
+
+test("parses trusted-device ttl and public url overrides", () => {
+  const config = loadConfig({
+    COMMANDRELAY_TRUSTED_DEVICE_AUTH: "true",
+    COMMANDRELAY_TRUSTED_DEVICE_PAIRING_TTL_MS: "90000",
+    COMMANDRELAY_TRUSTED_DEVICE_ACCESS_TTL_MS: "420000",
+    COMMANDRELAY_TRUSTED_DEVICE_REFRESH_TTL_MS: "172800000",
+    COMMANDRELAY_PUBLIC_API_BASE_URL: "https://relay.example.test",
+    COMMANDRELAY_PUBLIC_WS_URL: "wss://relay.example.test/ws"
+  });
+
+  assert.equal(config.trustedDeviceAuthEnabled, true);
+  assert.equal(config.trustedDevicePairingTtlMs, 90_000);
+  assert.equal(config.trustedDeviceAccessTokenTtlMs, 420_000);
+  assert.equal(config.trustedDeviceRefreshTokenTtlMs, 172_800_000);
+  assert.equal(config.publicApiBaseUrl, "https://relay.example.test/");
+  assert.equal(config.publicWebSocketUrl, "wss://relay.example.test/ws");
+  validateStartupConfig(config);
+});
+
+test("rejects trusted-device public urls when trusted-device auth is disabled", () => {
+  const config = loadConfig({
+    COMMANDRELAY_PUBLIC_API_BASE_URL: "https://relay.example.test"
+  });
+
+  assert.throws(() => validateStartupConfig(config), /COMMANDRELAY_PUBLIC_API_BASE_URL/);
 });
 
 test("defaults transport to ws with ssh-safe defaults", () => {

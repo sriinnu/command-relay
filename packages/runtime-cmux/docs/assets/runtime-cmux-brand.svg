@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240" role="img" aria-labelledby="title desc">
+  <title id="title">runtime-cmux brand mark</title>
+  <desc id="desc">A clustered surface grid with a strong central spine and wordmark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08121d"/>
+      <stop offset="1" stop-color="#16263a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="240" rx="24" fill="url(#bg)"/>
+  <g transform="translate(36 34)">
+    <rect width="172" height="172" rx="26" fill="#0b1320" stroke="#2f4058" stroke-width="3"/>
+    <path d="M86 28v116M28 86h116" stroke="#a78bfa" stroke-width="8" stroke-linecap="round"/>
+    <path d="M42 42h34v34H42zM100 42h30v34h-30zM42 100h34v30H42zM100 100h30v30h-30z" fill="#10243b" stroke="#22d3ee" stroke-width="4"/>
+    <path d="M28 86c18-18 36-28 58-32 22 4 40 14 58 32" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M52 142h68" stroke="#dbeafe" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(242 90)">
+    <text x="0" y="0" fill="#eef6ff" font-size="52" font-weight="700" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">runtime-cmux</text>
+    <text x="2" y="38" fill="#22d3ee" font-size="20" font-weight="600" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" letter-spacing="0.08em">STRUCTURED CMUX SURFACES</text>
+  </g>
+</svg>

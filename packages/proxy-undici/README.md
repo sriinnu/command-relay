@@ -1,6 +1,10 @@
 # @commandrelay/proxy-undici
 
+![@commandrelay/proxy-undici brand mark](./docs/assets/proxy-undici-brand.svg)
+
 `@commandrelay/proxy-undici` provides proxy-aware Undici dispatcher resolution for Node services and SDK clients.
+
+Proxy-aware Undici dispatchers for services that want clean Node defaults.
 
 It reuses `@commandrelay/proxy-core` for environment parsing and `NO_PROXY` matching, then creates direct or proxy dispatchers for HTTP/HTTPS targets.
 
@@ -133,3 +137,4 @@ Operational guidance and release details: [NOTES.md](./NOTES.md).
 ## License
 
 MIT
+

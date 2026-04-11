@@ -4,7 +4,7 @@
     "noEmit": false,
     "declaration": false,
     "sourceMap": false,
-    "outDir": "dist"
+    "outDir": "dist-test"
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

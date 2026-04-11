@@ -9,12 +9,16 @@ import { CmuxAdapter } from "./cmux-adapter.js";
 interface RunCommandMockCall {
   command: string;
   args: string[];
-  timeoutMs: number;
+  options: number | { timeoutMs?: number } | undefined;
 }
 
 interface RunCommandMock {
   calls: RunCommandMockCall[];
-  runCommandImpl: (command: string, args: string[], timeoutMs?: number) => Promise<string>;
+  runCommandImpl: (
+    command: string,
+    args: string[],
+    options?: number | { timeoutMs?: number }
+  ) => Promise<string>;
 }
 
 /**
@@ -29,8 +33,8 @@ function createRunCommandMock(outcomes: Array<{ stdout?: string; error?: unknown
 
   return {
     calls,
-    async runCommandImpl(command: string, args: string[], timeoutMs = 5000): Promise<string> {
-      calls.push({ command, args, timeoutMs });
+    async runCommandImpl(command: string, args: string[], options = 5000): Promise<string> {
+      calls.push({ command, args, options });
       const next = queue.shift();
       if (!next) {
         throw new Error("runCommand called with no queued outcome");
@@ -53,7 +57,7 @@ test("isAvailable checks cmux capabilities --json", async () => {
   assert.deepEqual(mock.calls[0], {
     command: "cmux",
     args: ["capabilities", "--json"],
-    timeoutMs: 1111
+    options: { timeoutMs: 1111 }
   });
 });
 
@@ -107,7 +111,7 @@ test("listPanes parses payload.surfaces and filters non-terminal rows", async ()
   assert.deepEqual(mock.calls[0], {
     command: "cmux",
     args: ["list-surfaces", "--json"],
-    timeoutMs: 6000
+    options: { timeoutMs: 6000 }
   });
   assert.deepEqual(panes, [
     {
@@ -183,7 +187,7 @@ test("sendInput passes text as a single send command argument", async () => {
     {
       command: "cmux-bin",
       args: ["send", "--surface", "surface-7", "echo hello && pwd"],
-      timeoutMs: 6000
+      options: { timeoutMs: 6000 }
     }
   ]);
 });

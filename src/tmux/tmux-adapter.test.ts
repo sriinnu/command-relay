@@ -9,12 +9,16 @@ import { TmuxAdapter } from "./tmux-adapter.js";
 interface RunCommandMockCall {
   command: string;
   args: string[];
-  timeoutMs: number;
+  options: number | { timeoutMs?: number } | undefined;
 }
 
 interface RunCommandMock {
   calls: RunCommandMockCall[];
-  runCommandImpl: (command: string, args: string[], timeoutMs?: number) => Promise<string>;
+  runCommandImpl: (
+    command: string,
+    args: string[],
+    options?: number | { timeoutMs?: number }
+  ) => Promise<string>;
 }
 
 /**
@@ -26,8 +30,8 @@ function createRunCommandMock(outcomes: Array<{ stdout?: string; error?: unknown
 
   return {
     calls,
-    async runCommandImpl(command: string, args: string[], timeoutMs = 5000): Promise<string> {
-      calls.push({ command, args, timeoutMs });
+    async runCommandImpl(command: string, args: string[], options = 5000): Promise<string> {
+      calls.push({ command, args, options });
       const next = queue.shift();
       if (!next) {
         throw new Error("runCommand called with no queued outcome");
@@ -67,7 +71,7 @@ test("listPanes parses tmux output rows and normalizes numeric values", async ()
       "-F",
       "#{session_name}\t#{window_index}\t#{window_name}\t#{pane_index}\t#{pane_id}\t#{pane_title}\t#{pane_current_command}"
     ],
-    timeoutMs: 1234
+    options: { timeoutMs: 1234 }
   });
 
   assert.deepEqual(panes, [

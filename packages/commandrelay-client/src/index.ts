@@ -2,29 +2,15 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
 import type { ParseMessageOptions, ProtocolV1AllowedEventType } from "@commandrelay/protocol";
-export { 
-  type AuthErrorPayload,
-  type AuthOkPayload,
-  type CommandRelayClientEvents,
-  type GatewayEnvelope,
-  type GatewayPayload,
-  type GatewayErrorPayload,
-  type HelloPayload,
-  type OutputPayload,
-  type PolicyUpdatePayload,
-  type SessionListPayload
-} from "./client-types.js";
 import type {
-  AuthErrorPayload,
-  AuthOkPayload,
-  CommandRelayClientEvents,
-  GatewayEnvelope,
-  GatewayPayload,
-  GatewayErrorPayload,
-  HelloPayload,
-  OutputPayload,
-  PolicyUpdatePayload,
-  SessionListPayload
+  AuthErrorPayload, AuthOkPayload, AuthRequestPayload, CommandRelayClientEvents,
+  DeviceAuthRequestPayload, GatewayEnvelope, GatewayErrorPayload, GatewayPayload,
+  HelloPayload, OutputPayload, PolicyUpdatePayload, SessionListPayload, TokenAuthRequestPayload
+} from "./client-types.js";
+export type {
+  AuthErrorPayload, AuthOkPayload, AuthRequestPayload, CommandRelayClientEvents,
+  DeviceAuthRequestPayload, GatewayEnvelope, GatewayErrorPayload, GatewayPayload,
+  HelloPayload, OutputPayload, PolicyUpdatePayload, SessionListPayload, TokenAuthRequestPayload
 } from "./client-types.js";
 import {
   isAuthErrorPayload,
@@ -37,63 +23,11 @@ import {
   isSessionListPayload,
   isUnknownResponseTypeAllowed
 } from "./validation.js";
-import {
-  ClientOptions,
-  DEFAULT_REQUEST_TIMEOUT_MS,
-  PendingRequest,
-  EXPECTED_RESPONSE_TYPES_BY_COMMAND
-} from "./commandrelay-client-types.js";
+import { ClientOptions, type ClientCommand, DEFAULT_REQUEST_TIMEOUT_MS, PendingRequest, EXPECTED_RESPONSE_TYPES_BY_COMMAND } from "./commandrelay-client-types.js";
 import { loadProtocolRuntime, type ProtocolModule } from "./protocol-runtime-loader.js";
-
-export type ClientCommand =
-  | "auth"
-  | "list_sessions"
-  | "attach"
-  | "detach"
-  | "enable_input"
-  | "disable_input"
-  | "input"
-  | "heartbeat"
-  | "disconnect";
-
-export type CommandRelayProtocolErrorKind = "error" | "auth_error";
-
-/**
- * Structured protocol error surfaced from request-response frames.
- */
-export class CommandRelayProtocolError extends Error {
-  public readonly kind: CommandRelayProtocolErrorKind;
-  public readonly code: string;
-  public readonly recoverable: boolean;
-  public readonly payload: GatewayErrorPayload | AuthErrorPayload;
-
-  /**
-   * @param kind Envelope event type that carried the error.
-   * @param payload Payload for the protocol error.
-   */
-  public constructor(kind: CommandRelayProtocolErrorKind, payload: GatewayErrorPayload | AuthErrorPayload) {
-    const code = typeof payload.code === "string" ? payload.code : "error";
-    const message = String(payload.message ?? payload.code ?? kind);
-    super(message);
-    this.name = "CommandRelayProtocolError";
-    this.kind = kind;
-    this.code = code;
-    this.recoverable = Boolean((payload as { recoverable?: unknown }).recoverable);
-    this.payload = payload;
-  }
-}
-
-/**
- * Check whether an error is an authentication failure response.
- *
- * @param error Error instance from client protocol interactions.
- */
-export function isAuthenticationError(error: unknown): error is CommandRelayProtocolError {
-  if (!(error instanceof Error)) return false;
-  if (!(error instanceof CommandRelayProtocolError)) return false;
-  if (error.code === "invalid_token") return true;
-  return error.kind === "auth_error";
-}
+import { CommandRelayProtocolError, isAuthenticationError, type CommandRelayProtocolErrorKind } from "./errors.js";
+import { normalizeIncomingFrame } from "./frame-utils.js";
+export { CommandRelayProtocolError, isAuthenticationError, type ClientCommand, type CommandRelayProtocolErrorKind };
 
 export class CommandRelayClient extends EventEmitter {
   private socket: WebSocket | null;
@@ -222,8 +156,9 @@ export class CommandRelayClient extends EventEmitter {
    * @param token Token string.
    * @returns Auth confirmation payload.
    */
-  public async authenticate(token: string): Promise<AuthOkPayload> {
-    const response = await this.sendRequest("auth", { token });
+  public async authenticate(credentials: string | AuthRequestPayload): Promise<AuthOkPayload> {
+    const payload = normalizeAuthRequest(credentials);
+    const response = await this.sendRequest("auth", payload);
     if (response.type !== "auth_ok") throw new Error(`unexpected response: ${response.type}`);
     return response.payload as AuthOkPayload;
   }
@@ -349,33 +284,32 @@ export class CommandRelayClient extends EventEmitter {
 
   private dispatchIncoming(message: GatewayEnvelope<GatewayPayload>): void {
     const requestId = message.requestId;
-    if (requestId === undefined) {
-      return;
-    }
-    const pending = this.pendingRequests.get(requestId);
-    if (pending) {
-      if (!isUnknownResponseTypeAllowed(pending.expectedResponseTypes, message.type)) {
-        pending.reject(new Error(`unexpected response type: ${message.type}`));
+    if (requestId !== undefined) {
+      const pending = this.pendingRequests.get(requestId);
+      if (pending) {
+        if (!isUnknownResponseTypeAllowed(pending.expectedResponseTypes, message.type)) {
+          pending.reject(new Error(`unexpected response type: ${message.type}`));
+          clearTimeout(pending.timeoutAt);
+          this.pendingRequests.delete(requestId);
+          return;
+        }
+
+        if (!isResponsePayloadValid(message.type, message.payload)) {
+          pending.reject(new Error(`invalid response payload for ${message.type}`));
+          clearTimeout(pending.timeoutAt);
+          this.pendingRequests.delete(requestId);
+          return;
+        }
+
+        if (message.type === "error" || message.type === "auth_error") {
+          pending.reject(new CommandRelayProtocolError(message.type, message.payload as GatewayErrorPayload | AuthErrorPayload));
+        } else {
+          pending.resolve(message);
+        }
         clearTimeout(pending.timeoutAt);
         this.pendingRequests.delete(requestId);
         return;
       }
-
-      if (!isResponsePayloadValid(message.type, message.payload)) {
-        pending.reject(new Error(`invalid response payload for ${message.type}`));
-        clearTimeout(pending.timeoutAt);
-        this.pendingRequests.delete(requestId);
-        return;
-      }
-
-      if (message.type === "error" || message.type === "auth_error") {
-        pending.reject(new CommandRelayProtocolError(message.type, message.payload as GatewayErrorPayload | AuthErrorPayload));
-      } else {
-        pending.resolve(message);
-      }
-      clearTimeout(pending.timeoutAt);
-      this.pendingRequests.delete(requestId);
-      return;
     }
 
     switch (message.type) {
@@ -493,10 +427,11 @@ export class CommandRelayClient extends EventEmitter {
   }
 }
 
-function normalizeIncomingFrame(data: unknown): string {
-  if (typeof data === "string") return data;
-  if (data instanceof Buffer) return data.toString("utf8");
-  if (data instanceof ArrayBuffer) return Buffer.from(data).toString("utf8");
-  if (ArrayBuffer.isView(data)) return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
-  return String(data);
+function normalizeAuthRequest(
+  credentials: string | AuthRequestPayload
+): TokenAuthRequestPayload | DeviceAuthRequestPayload {
+  if (typeof credentials === "string") {
+    return { token: credentials };
+  }
+  return credentials;
 }

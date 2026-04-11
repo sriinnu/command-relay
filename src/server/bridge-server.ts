@@ -1,23 +1,42 @@
 import { createServer } from "node:http";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { extname, normalize, resolve, sep } from "node:path";
 import { WebSocketServer } from "ws";
-import { envelope, parseMessage } from "../protocol.js";
+import { envelope } from "../protocol.js";
 import { BridgeEngine } from "../bridge/bridge-engine.js";
 import { BridgeTelemetryCollector } from "../telemetry/bridge-telemetry.js";
 import { SlidingWindowRateLimiter } from "./rate-limiter.js";
 import { AuditLogger } from "./audit-log.js";
-import { parseNonEmptyString, parseOptionalBoolean, parseOptionalInt } from "./message-validation.js";
-import { PaneInputOwnershipArbiter, claimPaneInputOwnership, clearClientAttachLag, groupSessionsByName, releaseClientInputOwnership, releasePaneInputOwnership, sendEnvelope as send, sendPolicyUpdateEnvelope, snapshotPaneInputOwnership, tokenEquals } from "./bridge-server-utils.js";
+import { PaneInputOwnershipArbiter, clearClientAttachLag, releaseClientInputOwnership, sendEnvelope as send } from "./bridge-server-utils.js";
 import { buildInputPolicyState, isInputAllowed } from "./input-policy.js";
 import {
   classifyBridgeCloseFailure,
-  classifyBridgeRuntimeFailure,
-  classifyReplaySnapshotFallbackReason
+  classifyBridgeRuntimeFailure
 } from "./bridge-runtime-failures.js";
-import { buildSessionListRuntimeMetadata } from "./session-list-runtime-metadata.js";
-/** @typedef {{ id: string; socket: import("ws").WebSocket; authenticated: boolean; inputEnabled: boolean; attachedPanes: Set<string> }} ClientState */
+import {
+  createInitialBridgeAuthState,
+  type BridgeClientAuthState,
+  isBridgeAuthRequired,
+  resolveBridgeAuthModes
+} from "./bridge-auth.js";
+import { TrustedDeviceAuthority } from "./trusted-device-authority.js";
+import { handleTrustedDeviceHttpRequest } from "./trusted-device-http.js";
+import { handleClientMessage, parseIncomingClientMessage } from "./bridge-message-handler.js";
+
+interface ClientState extends BridgeClientAuthState {
+  id: string;
+  socket: import("ws").WebSocket;
+  lastActivityAtMs: number;
+  inputEnabled: boolean;
+  attachedPanes: Set<string>;
+}
+
+interface CachedSessionList {
+  createdAtMs: number;
+  panes: Array<Record<string, unknown>>;
+}
+
 const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -27,6 +46,25 @@ const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon"
 };
+
+const DEFAULT_MAX_WS_CLIENTS = 128;
+const MIN_WS_CLIENTS = 1;
+const MAX_WS_CLIENTS = 10_000;
+const DEFAULT_WS_IDLE_TIMEOUT_MS = 120_000;
+const MIN_WS_IDLE_TIMEOUT_MS = 1_000;
+const MAX_WS_IDLE_TIMEOUT_MS = 600_000;
+
+function normalizePositiveInt(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
 /** Starts the CommandRelay bridge server. @param {object} deps Runtime dependencies. @returns {Promise<{ close: () => Promise<void> }>} Close handle for shutdown. */
 export async function startBridgeServer(deps) {
   const { config, tmux } = deps;
@@ -34,6 +72,15 @@ export async function startBridgeServer(deps) {
   if (!(await tmux.isAvailable())) {
     throw new Error("runtime backend is unavailable; bridge cannot start");
   }
+  const trustedDeviceAuthority = deps.trustedDeviceAuthority ?? (
+    config.trustedDeviceAuthEnabled
+      ? new TrustedDeviceAuthority({
+        pairingTtlMs: config.trustedDevicePairingTtlMs,
+        accessTokenTtlMs: config.trustedDeviceAccessTokenTtlMs,
+        refreshTokenTtlMs: config.trustedDeviceRefreshTokenTtlMs
+      })
+      : null
+  );
   const startupTs = Date.now();
   const audit = new AuditLogger({ path: config.auditLogPath, logger });
   const telemetry = new BridgeTelemetryCollector();
@@ -43,6 +90,27 @@ export async function startBridgeServer(deps) {
   const clients = new Map();
   const messageLimiter = new SlidingWindowRateLimiter({ maxEvents: config.maxMessagesPerMinute, windowMs: 60_000 });
   const inputLimiter = new SlidingWindowRateLimiter({ maxEvents: config.maxInputsPerMinute, windowMs: 60_000 });
+  const maxConnectedClients = normalizePositiveInt(
+    config.maxWsClients ?? process.env.COMMANDRELAY_WS_MAX_CLIENTS,
+    DEFAULT_MAX_WS_CLIENTS,
+    MIN_WS_CLIENTS,
+    MAX_WS_CLIENTS
+  );
+  const wsIdleTimeoutMs = normalizePositiveInt(
+    config.wsIdleTimeoutMs ?? process.env.COMMANDRELAY_WS_IDLE_TIMEOUT_MS,
+    DEFAULT_WS_IDLE_TIMEOUT_MS,
+    MIN_WS_IDLE_TIMEOUT_MS,
+    MAX_WS_IDLE_TIMEOUT_MS
+  );
+  const wsIdleSweepIntervalMs = Math.max(1_000, Math.min(30_000, Math.floor(wsIdleTimeoutMs / 2)));
+  const listSessionsCacheMs = 75;
+  const sessionListCache: {
+    current: CachedSessionList | null;
+    inFlight: Promise<Array<Record<string, unknown>>> | null;
+  } = {
+    current: null,
+    inFlight: null
+  };
   const engine = new BridgeEngine({
     tmux,
     replayLines: config.replayLines,
@@ -92,6 +160,9 @@ export async function startBridgeServer(deps) {
       res.end(JSON.stringify(payload));
       return;
     }
+    if (await handleTrustedDeviceHttpRequest(req, res, { config, authority: trustedDeviceAuthority })) {
+      return;
+    }
     if (appStaticEnabled && req.method === "GET" && req.url) {
       const requestPath = req.url.split("?")[0] ?? "";
       if (requestPath === "/" || requestPath === "/app") { res.writeHead(308, { location: "/app/" }); return void res.end(); }
@@ -134,8 +205,66 @@ export async function startBridgeServer(deps) {
     res.end(JSON.stringify({ error: "not_found" }));
   });
   const wsServer = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+  const idleSweepTimer = setInterval(() => {
+    const now = Date.now();
+    for (const client of clients.values()) {
+      if (client.socket.readyState !== client.socket.OPEN) {
+        continue;
+      }
+      if (now - client.lastActivityAtMs < wsIdleTimeoutMs) {
+        continue;
+      }
+      try {
+        client.socket.close(3001, "idle_timeout");
+      } catch {
+        client.socket.terminate?.();
+      }
+    }
+  }, wsIdleSweepIntervalMs);
+  idleSweepTimer.unref?.();
+
+  const listRuntimePanes = async (): Promise<Array<Record<string, unknown>>> => {
+    const nowMs = Date.now();
+    if (sessionListCache.current && nowMs - sessionListCache.current.createdAtMs <= listSessionsCacheMs) {
+      return sessionListCache.current.panes;
+    }
+
+    if (sessionListCache.inFlight) {
+      return sessionListCache.inFlight;
+    }
+
+    const flight = (async () => {
+      const panes = await tmux.listPanes();
+      sessionListCache.current = { createdAtMs: Date.now(), panes };
+      return panes;
+    })();
+
+    sessionListCache.inFlight = flight;
+    try {
+      return await flight;
+    } finally {
+      if (sessionListCache.inFlight === flight) {
+        sessionListCache.inFlight = null;
+      }
+    }
+  };
+
   httpServer.on("upgrade", (req, socket, head) => {
     if (req.url !== "/ws") {
+      socket.destroy();
+      return;
+    }
+    if (clients.size >= maxConnectedClients) {
+      const body = JSON.stringify({ error: "too_many_connections" });
+      const response = [
+        "HTTP/1.1 503 Service Unavailable",
+        "connection: close",
+        "content-type: application/json",
+        `content-length: ${Buffer.byteLength(body)}`,
+        "",
+        body
+      ].join("\r\n");
+      socket.write(response);
       socket.destroy();
       return;
     }
@@ -144,13 +273,18 @@ export async function startBridgeServer(deps) {
     });
   });
   wsServer.on("connection", (socket) => {
+    if (clients.size >= maxConnectedClients) {
+      socket.close(1013, "too many websocket connections");
+      return;
+    }
     const connectStartedAtMs = Date.now();
-    const client = {
+    const client: ClientState = {
       id: randomUUID(),
       socket,
-      authenticated: config.authToken ? false : true,
+      lastActivityAtMs: connectStartedAtMs,
       inputEnabled: false,
-      attachedPanes: new Set()
+      attachedPanes: new Set(),
+      ...createInitialBridgeAuthState(config)
     };
     clients.set(client.id, client);
     void audit.write({
@@ -159,7 +293,7 @@ export async function startBridgeServer(deps) {
       details: {
         result: "allowed",
         reason: "socket_open",
-        requiresAuth: Boolean(config.authToken),
+        requiresAuth: isBridgeAuthRequired(config),
         inputEnabled: false,
         globalInputDisabled: config.globalInputDisabled
       }
@@ -168,7 +302,9 @@ export async function startBridgeServer(deps) {
       socket,
       envelope("hello", {
         clientId: client.id,
-        requiresAuth: Boolean(config.authToken),
+        requiresAuth: isBridgeAuthRequired(config),
+        authModes: resolveBridgeAuthModes(config),
+        ...(client.authChallenge ? { authChallenge: client.authChallenge } : {}),
         ...buildInputPolicyState({
           clientInputEnabled: false,
           globalInputDisabled: config.globalInputDisabled
@@ -179,6 +315,7 @@ export async function startBridgeServer(deps) {
     );
     telemetry.recordConnectLatency(Date.now() - connectStartedAtMs);
     socket.on("message", async (raw) => {
+      client.lastActivityAtMs = Date.now();
       const requestStartedAtMs = Date.now();
       const messageRate = messageLimiter.consume(client.id); if (!messageRate.allowed) {
         send(client.socket, envelope("error", { code: "rate_limited", retryAfterMs: messageRate.retryAfterMs, limit: messageRate.limit, windowMs: messageRate.windowMs }));
@@ -204,7 +341,9 @@ export async function startBridgeServer(deps) {
           telemetry,
           requestStartedAtMs,
           inputOwnershipArbiter,
+          trustedDeviceAuthority,
           allowInputOwnershipOverride: config.allowInputOwnershipOverride ?? true,
+          listPanes: listRuntimePanes,
           trackAttachLag: (clientId, paneId, startedAtMs) => {
             const lagKey = `${clientId}:${paneId}`;
             pendingAttachLag.set(lagKey, startedAtMs);
@@ -253,6 +392,8 @@ export async function startBridgeServer(deps) {
   logger.info(`[bridge] listening on http://${config.host}:${config.port} (ws path: /ws)`);
   return {
     close: async () => {
+      engine.close();
+      clearInterval(idleSweepTimer);
       for (const client of clients.values()) {
         try {
           client.socket.close();
@@ -270,193 +411,4 @@ export async function startBridgeServer(deps) {
     }
   };
 }
-/** Parses an incoming client websocket frame using configured protocol strictness.
- * @param {string} raw UTF-8 JSON message text. @param {boolean} strictProtocolParsing Whether strict v1 validation is enabled. @returns {import("../protocol.js").ParseMessageResult} Parse result. */
-export function parseIncomingClientMessage(raw, strictProtocolParsing) {
-  return parseMessage(raw, strictProtocolParsing ? { strictV1: true } : undefined);
-}
-
-/** Handles a single parsed client message. @param {object} ctx Message context. @returns {Promise<void>} Completion signal. */
-export async function handleClientMessage(ctx) {
-  const {
-    client,
-    tmux,
-    engine,
-    config,
-    inputLimiter,
-    type,
-    payload,
-    requestId,
-    audit,
-    telemetry,
-    requestStartedAtMs,
-    inputOwnershipArbiter,
-    paneInputOwnership,
-    paneInputOwners,
-    allowInputOwnershipOverride,
-    trackAttachLag
-  } = ctx;
-  const startedAtMs = requestStartedAtMs ?? Date.now();
-  const laneOverrideAllowed = allowInputOwnershipOverride ?? config.allowInputOwnershipOverride ?? true;
-  const paneInputOwnerState = inputOwnershipArbiter ?? paneInputOwnership ?? paneInputOwners;
-  if (!client.authenticated && type !== "auth") {
-    send(client.socket, envelope("error", { code: "auth_required", recoverable: true }, requestId));
-    return;
-  }
-  switch (type) {
-    case "auth": {
-      if (!config.authToken) {
-        client.authenticated = true;
-        await audit.write({ action: "auth_ok", clientId: client.id, details: { mode: "open" } });
-        send(client.socket, envelope("auth_ok", { mode: "open" }, requestId));
-        return;
-      }
-      const token = parseNonEmptyString(payload.token) ?? "";
-      if (!tokenEquals(config.authToken, token)) {
-        await audit.write({ action: "auth_fail", clientId: client.id, details: { reason: "invalid_token" } });
-        send(client.socket, envelope("auth_error", { code: "invalid_token", recoverable: true }, requestId));
-        return;
-      }
-      client.authenticated = true;
-      await audit.write({ action: "auth_ok", clientId: client.id, details: { mode: "token" } });
-      send(client.socket, envelope("auth_ok", { mode: "token" }, requestId));
-      return;
-    }
-    case "list_sessions": {
-      const panes = await tmux.listPanes();
-      const sessions = groupSessionsByName(panes);
-      const runtime = buildSessionListRuntimeMetadata({
-        panes,
-        capabilities: {
-          laneOwnership: Boolean(paneInputOwnerState),
-          replayOffset: true,
-          inputOwnershipOverride: laneOverrideAllowed
-        },
-        laneOwnershipSnapshot: snapshotPaneInputOwnership(paneInputOwnerState),
-        replayOffsetSnapshot: engine.getReplayOffsetsSnapshot()
-      });
-      telemetry?.recordListLatency(Date.now() - startedAtMs);
-      send(client.socket, envelope("session_list", { panes, sessions, runtime }, requestId));
-      return;
-    }
-    case "attach": {
-      const paneId = parseNonEmptyString(payload.paneId);
-      if (!paneId) {
-        send(client.socket, envelope("error", { code: "invalid_pane_id" }, requestId));
-        return;
-      }
-      if (!client.attachedPanes.has(paneId) && client.attachedPanes.size >= config.maxAttachedPanes) {
-        send(client.socket, envelope("error", { code: "max_attached_panes_exceeded" }, requestId));
-        return;
-      }
-      const lastSeq = parseOptionalInt(payload.lastSeq);
-      client.attachedPanes.add(paneId);
-      trackAttachLag?.(client.id, paneId, startedAtMs);
-      const attachReplayMetadata = await engine.attach(client.id, paneId, lastSeq);
-      if (lastSeq !== null && attachReplayMetadata?.replayUsed && attachReplayMetadata.replayedCount > 0) {
-        const replayStartSeq = lastSeq + 1;
-        const replayEndSeq = lastSeq + attachReplayMetadata.replayedCount;
-        await audit.write({ action: "replay_resume", clientId: client.id, details: { paneId, lastSeq, replayedCount: attachReplayMetadata.replayedCount, replayStartSeq, replayEndSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: "resume" } });
-      } else if (lastSeq !== null && attachReplayMetadata?.fallbackToSnapshot) {
-        await audit.write({ action: "replay_gap_snapshot_fallback", clientId: client.id, details: { paneId, lastSeq, streamSeq: attachReplayMetadata.latestSeq, latestSeq: attachReplayMetadata.latestSeq, result: "allowed", reason: classifyReplaySnapshotFallbackReason(attachReplayMetadata) } });
-      }
-      await audit.write({ action: "attach", clientId: client.id, details: { paneId, lastSeq } });
-      const attachLatencyMs = Date.now() - startedAtMs;
-      telemetry?.recordAttachLatency(attachLatencyMs);
-      if (lastSeq !== null) {
-        telemetry?.recordReconnectLatency(attachLatencyMs);
-      }
-      send(client.socket, envelope("ack", { action: "attach", paneId }, requestId));
-      return;
-    }
-    case "detach": {
-      const paneId = parseNonEmptyString(payload.paneId);
-      if (!paneId) {
-        send(client.socket, envelope("error", { code: "invalid_pane_id" }, requestId));
-        return;
-      }
-      client.attachedPanes.delete(paneId);
-      const released = releasePaneInputOwnership(paneInputOwnerState, paneId, client.id);
-      engine.detach(client.id, paneId);
-      await audit.write({ action: "detach", clientId: client.id, details: { paneId } });
-      if (released) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { paneId, result: "allowed", reason: "detach" } });
-      send(client.socket, envelope("ack", { action: "detach", paneId }, requestId));
-      return;
-    }
-    case "enable_input": {
-      const nextInputEnabled = !config.globalInputDisabled;
-      client.inputEnabled = nextInputEnabled;
-      await audit.write({ action: "enable_input", clientId: client.id, details: { result: nextInputEnabled ? "allowed" : "denied", reason: nextInputEnabled ? "client_enabled" : "global_input_kill_switch" } });
-      sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
-      return;
-    }
-    case "disable_input": {
-      client.inputEnabled = false;
-      await audit.write({ action: "disable_input", clientId: client.id, details: { result: "allowed", reason: "client_disabled" } });
-      sendPolicyUpdateEnvelope(client.socket, client.inputEnabled, config.globalInputDisabled, requestId);
-      return;
-    }
-    case "input": {
-      const paneId = parseNonEmptyString(payload.paneId);
-      const data = typeof payload.data === "string" ? payload.data : "";
-      const inputBytes = Buffer.byteLength(data, "utf8");
-      const commandHash = data ? createHash("sha256").update(data, "utf8").digest("hex") : null;
-      const previewPolicy = data ? "sha256_only" : "none";
-      const inputRate = inputLimiter.consume(client.id);
-      if (!inputRate.allowed) {
-        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "rate_limited", bytes: inputBytes, commandHash, previewPolicy } });
-        send(client.socket, envelope("error", { code: "input_rate_limited", retryAfterMs: inputRate.retryAfterMs, limit: inputRate.limit, windowMs: inputRate.windowMs }, requestId));
-        return;
-      }
-      if (!isInputAllowed({ clientInputEnabled: client.inputEnabled, globalInputDisabled: config.globalInputDisabled })) {
-        await audit.write({ action: "input", clientId: client.id, details: { paneId: paneId ?? null, result: "denied", reason: "policy_blocked", bytes: inputBytes, commandHash, previewPolicy } });
-        send(client.socket, envelope("error", { code: "input_disabled" }, requestId));
-        return;
-      }
-      if (!paneId || !data) {
-        send(client.socket, envelope("error", { code: "invalid_input" }, requestId));
-        return;
-      }
-      if (!client.attachedPanes.has(paneId)) {
-        send(client.socket, envelope("error", { code: "pane_not_attached" }, requestId));
-        return;
-      }
-      if (inputBytes > config.maxInputBytes) {
-        send(client.socket, envelope("error", { code: "input_too_large", maxInputBytes: config.maxInputBytes, receivedBytes: inputBytes }, requestId));
-        return;
-      }
-      const overrideRequested = parseOptionalBoolean(payload.override) === true || parseOptionalBoolean(payload.takeOwnership) === true;
-      const claimResult = claimPaneInputOwnership(paneInputOwnerState, paneId, client.id, overrideRequested, laneOverrideAllowed);
-      if (claimResult?.ok === false) {
-        const { ownerClientId, overrideAllowed } = claimResult;
-        await audit.write({ action: "input", clientId: client.id, details: { paneId, result: "denied", reason: "ownership_conflict", bytes: inputBytes, commandHash, previewPolicy } });
-        send(client.socket, envelope("error", { code: "input_lane_conflict", paneId, ownerClientId, overrideAllowed, recoverable: true }, requestId));
-        return;
-      }
-      await tmux.sendInput(paneId, data);
-      await audit.write({ action: "input", clientId: client.id, details: { paneId, bytes: inputBytes, result: "allowed", reason: "ok", commandHash, previewPolicy } });
-      if (claimResult?.ok && claimResult.overridden) {
-        await audit.write({ action: "input_takeover", clientId: client.id, details: { paneId, result: "allowed", reason: "override", bytes: inputBytes } });
-      }
-      telemetry?.recordInputAckLatency(Date.now() - startedAtMs);
-      send(client.socket, envelope("ack", { action: "input", paneId, bytes: inputBytes }, requestId));
-      return;
-    }
-    case "heartbeat": {
-      send(client.socket, envelope("heartbeat_ack", { clientId: client.id }, requestId));
-      return;
-    }
-    case "disconnect": {
-      engine.detachAll(client.id);
-      const releasedPanes = releaseClientInputOwnership(paneInputOwnerState, client.id);
-      client.attachedPanes.clear();
-      client.inputEnabled = false;
-      if (releasedPanes > 0) await audit.write({ action: "lane_owner_released", clientId: client.id, details: { result: "allowed", reason: "disconnect", releasedPanes } });
-      await audit.write({ action: "disconnect", clientId: client.id, details: {} });
-      send(client.socket, envelope("ack", { action: "disconnect" }, requestId));
-      return;
-    }
-    default:
-      send(client.socket, envelope("error", { code: "unknown_type", type }, requestId));
-  }
-}
+export { handleClientMessage, parseIncomingClientMessage } from "./bridge-message-handler.js";
