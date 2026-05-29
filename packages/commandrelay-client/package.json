@@ -45,7 +45,7 @@
     "test": "tsx --test test/**/*.test.ts"
   },
   "dependencies": {
-    "ws": "^8.18.3",
+    "ws": "^8.20.1",
     "@commandrelay/protocol": "workspace:^"
   },
   "devDependencies": {
