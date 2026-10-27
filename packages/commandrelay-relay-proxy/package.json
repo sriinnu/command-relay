@@ -51,7 +51,7 @@
     "test": "npm exec -- node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true });\" && tsc -p tsconfig.test.json && npm exec -- node --test dist/**/*.test.js && npm exec -- node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "ws": "^8.18.3"
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/node": "^25.3.0",
