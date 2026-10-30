@@ -34,11 +34,17 @@ git rm -r --cached --ignore-unmatch \
 
 ## Required GitHub configuration
 
-1. Add repository secret `NPM_TOKEN` with publish rights for `@commandrelay`.
-2. Configure environment `npm-publish` (recommended):
+1. No npm token. Publish mode stages each package with trusted publishing
+   (OIDC); a maintainer approves each staged version with 2FA
+   (`npm stage list <pkg>`, then `npm stage approve <id>`).
+2. Staging and trust need the package to exist, so publish each package's
+   first version by hand. Then, per package:
+   `npm trust github <pkg> --repo sriinnu/command-relay --file publish-proxy-packages.yml --env npm-publish --allow-stage-publish`,
+   and on npmjs.com set "Require two-factor authentication and disallow tokens".
+3. Configure environment `npm-publish`:
    - required reviewers
    - branch restrictions to default branch
-3. Keep workflow permissions unchanged (`id-token: write` is required for provenance).
+4. Keep workflow permissions unchanged (`id-token: write` is the trusted-publishing credential and signs provenance).
 
 ## Governance Evidence Contract
 
@@ -58,7 +64,7 @@ Required governance artifacts per batch date (`<YYYY-MM-DD>`):
 
 Governance placeholders for this runbook:
 
-- `<!-- proxy-release-governance:npm-token -->` Capture evidence that `NPM_TOKEN` exists for publish automation.
+- `<!-- proxy-release-governance:npm-token -->` Capture evidence that no `NPM_TOKEN` secret exists (`contains_NPM_TOKEN=false`): publishing uses trusted publishing only.
 - `<!-- proxy-release-governance:npm-publish-environment -->` Capture `npm-publish` environment restrictions/reviewers evidence.
 - `<!-- proxy-release-governance:default-branch-protection -->` Capture default branch protection evidence.
 

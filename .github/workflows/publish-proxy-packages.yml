@@ -1,5 +1,13 @@
 name: Publish Proxy Packages
 
+# Publish mode STAGES each package with trusted publishing (OIDC) and
+# provenance; no npm token exists. A staged version goes live only after a
+# maintainer approves it with 2FA (`npm stage list <pkg>`, `npm stage approve
+# <id>`). Staging and trust need the package to exist on npm, so each
+# package's first version is published by hand; afterwards, per package:
+# `npm trust github <pkg> --repo sriinnu/command-relay
+#   --file publish-proxy-packages.yml --env npm-publish --allow-stage-publish`
+
 on:
   workflow_dispatch:
     inputs:
@@ -338,16 +346,9 @@ jobs:
           name: npm-tarball-${{ matrix.packageDir }}-${{ matrix.version }}
           path: ${{ runner.temp }}/npm-tarballs
 
-      - name: Validate npm token
-        shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
-            echo "::error::Missing repository secret NPM_TOKEN."
-            exit 1
-          fi
+      # npm stage needs npm >= 11.15; Node 22 ships npm 10.
+      - name: Install npm with stage support
+        run: npm install -g npm@11.20.0
 
       - name: Skip if already published
         id: exists
@@ -369,11 +370,10 @@ jobs:
           fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
-      - name: Publish with provenance
+      - name: Stage with provenance
         if: steps.exists.outputs.publish == 'true'
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ needs.discover.outputs.dist_tag }}
           PACKAGE_NAME: ${{ matrix.packageName }}
           PACKAGE_VERSION: ${{ matrix.version }}
@@ -385,11 +385,14 @@ jobs:
             exit 1
           fi
 
-          npm publish "$tarball" --provenance --access public --tag "$DIST_TAG"
+          mkdir -p "$RUNNER_TEMP/pkg"
+          tar -xzf "$tarball" -C "$RUNNER_TEMP/pkg"
+          cd "$RUNNER_TEMP/pkg/package"
+          npm stage publish --provenance --access public --tag "$DIST_TAG"
 
           {
             echo "### $PACKAGE_NAME"
             echo
-            echo "- Published version $PACKAGE_VERSION with dist-tag '$DIST_TAG'."
-            echo "- npm provenance enabled via OIDC."
+            echo "- Staged version $PACKAGE_VERSION with dist-tag '$DIST_TAG'; approve it with 2FA to publish."
+            echo "- Trusted publishing (OIDC) with provenance; no npm token."
           } >> "$GITHUB_STEP_SUMMARY"
